@@ -106,11 +106,17 @@
 
   // Op touch-apparaten start de preview zodra het kaartje grotendeels in beeld is.
   const previews = new WeakMap();
+  const allPreviews = [];
+  const inView = new Set();
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((e) => {
         const p = previews.get(e.target);
-        if (p) e.isIntersecting ? p.start() : p.stop();
+        if (!p) return;
+        if (e.isIntersecting) inView.add(p);
+        else inView.delete(p);
+        if (player.open) return;
+        e.isIntersecting ? p.start() : p.stop();
       });
     },
     { threshold: 0.6 }
@@ -148,6 +154,9 @@
     card.dataset.type = app.type;
 
     if (preview && !reduceMotion) {
+      allPreviews.push(preview);
+      button.addEventListener("focus", preview.start);
+      button.addEventListener("blur", preview.stop);
       if (canHover) {
         card.addEventListener("mouseenter", preview.start);
         card.addEventListener("mouseleave", preview.stop);
@@ -159,16 +168,18 @@
     return card;
   }
 
-  // Grote speler: video met geluid en/of screenshots, met vorige/volgende.
+  // Grote speler: video en/of screenshots, met vorige/volgende.
   let current = { app: null, items: [], index: 0 };
 
   function renderItem() {
     const { app, items, index } = current;
     const item = items[index];
+    if (playerMedia.contains(document.activeElement)) player.focus();
     playerMedia.replaceChildren();
     playerMedia.className = "player-media " + (item.kind === "youtube" ? "wide" : "tall");
     if (item.kind === "video") {
       const v = videoEl(item.src, { controls: true, autoplay: true, loop: true, playsInline: true });
+      v.setAttribute("aria-label", `Demo van ${app.name}`);
       if (item.poster) v.poster = item.poster;
       playerMedia.append(v);
     } else if (item.kind === "youtube") {
@@ -199,15 +210,20 @@
     current = { app, items: galleryItems(app), index: 0 };
     if (!current.items.length) return;
     player.setAttribute("aria-label", `Demo van ${app.name}`);
+    allPreviews.forEach((p) => p.stop());
     renderItem();
     player.showModal();
   }
 
-  player.addEventListener("close", () => playerMedia.replaceChildren());
+  player.addEventListener("close", () => {
+    playerMedia.replaceChildren();
+    inView.forEach((p) => p.start());
+  });
   player.addEventListener("click", (e) => {
     if (e.target === player) player.close();
   });
-  player.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", (e) => {
+    if (!player.open || e.target instanceof HTMLVideoElement) return;
     if (e.key === "ArrowLeft") step(-1);
     if (e.key === "ArrowRight") step(1);
   });

@@ -15,8 +15,8 @@ De pagina is dan te zien op `https://abons.github.io/Apps/`.
 2. Voeg in `apps.js` een item toe aan de lijst `window.APPS` (de velden staan bovenaan dat bestand uitgelegd).
    Voor een langere video kun je in plaats van `video` een YouTube-id invullen bij `youtube`.
 
-Op een computer speelt de demo (zonder geluid) zodra je over het kaartje beweegt; op een telefoon zodra het kaartje in beeld is.
-Klik op de video om hem groot en met geluid af te spelen.
+Op een computer speelt de demo zodra je over het kaartje beweegt; op een telefoon zodra het kaartje in beeld is.
+Klik of tik op de video om hem groot af te spelen, samen met de screenshots van die app.
 
 Wat er nog op je pc moet gebeuren (o.a. video's van de Android-games) staat in [TODO.md](TODO.md).
 
