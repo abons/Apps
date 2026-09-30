@@ -112,26 +112,61 @@ a {
 /* Media */
 .media {
   position: relative;
-  aspect-ratio: 16 / 9;
-  background: #000;
-  border: 0;
-  padding: 0;
+  height: 400px;
   width: 100%;
+  border: 0;
+  padding: 20px 0;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  display: block;
   overflow: hidden;
+  background: linear-gradient(160deg, var(--card-color, #555), color-mix(in srgb, var(--card-color, #555) 55%, #000));
 }
 
 .media:disabled {
   cursor: default;
 }
 
-.media video,
-.media img {
+.frame {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 9 / 19.5;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 0 5px rgb(0 0 0 / 0.85), 0 14px 30px rgb(0 0 0 / 0.35);
+  transition: transform 0.25s ease;
+}
+
+.frame.wide {
+  height: auto;
+  width: 88%;
+  aspect-ratio: 16 / 9;
+}
+
+.card:hover .frame {
+  transform: scale(1.03);
+}
+
+.frame video,
+.frame img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top;
   display: block;
+}
+
+.frame img {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.frame img.active,
+.frame.wide img {
+  opacity: 1;
 }
 
 .media .placeholder {
@@ -142,8 +177,6 @@ a {
   color: #fff;
   font-size: 3rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  background: linear-gradient(135deg, var(--card-color, #555), color-mix(in srgb, var(--card-color, #555) 45%, #000));
 }
 
 .media .placeholder small {
@@ -154,25 +187,38 @@ a {
   opacity: 0.85;
 }
 
-.play-badge {
+.badge {
   position: absolute;
   right: 12px;
   bottom: 12px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  padding: 4px 10px;
+  border-radius: 999px;
   background: rgb(0 0 0 / 0.6);
-  display: grid;
-  place-items: center;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
   pointer-events: none;
 }
 
-.play-badge::before {
-  content: "";
-  margin-left: 3px;
-  border-style: solid;
-  border-width: 8px 0 8px 13px;
-  border-color: transparent transparent transparent #fff;
+.dots {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  pointer-events: none;
+}
+
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.45);
+}
+
+.dots i.on {
+  background: #fff;
 }
 
 /* Body */
@@ -202,6 +248,13 @@ a {
   letter-spacing: 0.06em;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.status {
+  margin: -4px 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .tagline {
@@ -263,35 +316,52 @@ a {
 
 /* Player dialog */
 .player {
-  width: min(960px, calc(100vw - 32px));
   padding: 0;
   border: 0;
-  border-radius: var(--radius);
-  background: #000;
+  background: transparent;
   overflow: visible;
+  max-width: calc(100vw - 32px);
 }
 
 .player::backdrop {
-  background: rgb(0 0 0 / 0.75);
+  background: rgb(0 0 0 / 0.8);
 }
 
-.player-media {
+.player-media.tall {
+  height: min(80vh, 820px);
+  aspect-ratio: 9 / 19.5;
+  max-width: calc(100vw - 32px);
+}
+
+.player-media.wide {
+  width: min(960px, calc(100vw - 32px));
   aspect-ratio: 16 / 9;
 }
 
 .player-media video,
+.player-media img,
 .player-media iframe {
   width: 100%;
   height: 100%;
+  object-fit: contain;
   border: 0;
   display: block;
-  border-radius: var(--radius);
+  border-radius: 16px;
+  background: #000;
 }
 
+.player-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.player-nav button,
 .player-close {
-  position: absolute;
-  top: -44px;
-  right: 0;
   width: 36px;
   height: 36px;
   border: 0;
@@ -301,6 +371,23 @@ a {
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.player-nav [hidden] {
+  display: none;
+}
+
+.player-close {
+  position: absolute;
+  top: 0;
+  right: -48px;
+}
+
+@media (max-width: 600px) {
+  .player-close {
+    top: -46px;
+    right: 0;
+  }
 }
 
 /* Footer */
@@ -315,8 +402,12 @@ a {
   .card {
     transition: none;
   }
-  .card:hover {
+  .card:hover,
+  .card:hover .frame {
     transform: none;
+  }
+  .frame img {
+    transition: none;
   }
 }
 
