@@ -60,3 +60,24 @@ opgenomen in een headless browser. Ze werken, maar:
 - [ ] Het werk samenvoegen in `main`.
 - [ ] GitHub Pages aanzetten: Settings → Pages → Source "Deploy from a branch" → `main`, map `/ (root)`.
       De pagina staat dan op <https://abons.github.io/Apps/>.
+
+## 5. Ideeën voor nieuwe apps
+
+Uit een vergelijking met negen open-source Android-spellen zonder reclame (2026-09-30). Ze staan op
+volgorde van hoeveel ze hergebruiken van wat er al is. Alle vijf volgen de regels van de rest: klein,
+offline, geen reclame, geen runtime-dependencies. ⚠️ Idee overnemen mag, code niet: zeven van de negen
+vergeleken projecten zijn GPLv3.
+
+- [ ] **Woordraster**: letters in een raster van 4×4 tot 6×6, zo veel mogelijk woorden vinden binnen de
+      tijd. Draait op de 17 woordlijsten, de dagpuzzel en het scorebord van de woordspellen.
+- [ ] **Kruiswoordhulp**: bekende letters invullen en passende woorden zien, plus anagrammen, met de
+      Nederlandse definities die al offline op het toestel staan. Kan als web-app, zoals Kinderwoordjes.
+- [ ] **Stroomplanner**: wanneer draai je de was, de vaatwasser of de droger? Dezelfde kwartierprijzen
+      als e-charge, één scherm, geen login.
+- [ ] **Dagelijkse logicapuzzel**: een nonogram of ander rasterspel met een puzzel per dag. Er is geen
+      woordlijst nodig, dus hij werkt in elke taal.
+- [ ] **Kindertellen**: een tweede peuter-app naast Kinderwoordjes, met grote plaatjes om te tellen en
+      voorlezen. Dezelfde bediening, geen build-stap.
+
+De verbeterpunten voor de bestaande apps (deelknop, snelkoppeling naar de dagpuzzel, uitdaging per
+bordcode, toegankelijkheid) staan in de todo van elke app zelf.
