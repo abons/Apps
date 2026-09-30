@@ -63,7 +63,9 @@ opgenomen in een headless browser. Ze werken, maar:
 
 ## 5. Ideeën voor nieuwe apps
 
-Uit een vergelijking met negen open-source Android-spellen zonder reclame (2026-09-30). Ze staan op
+Uit een vergelijking met negen open-source Android-spellen zonder reclame (2026-09-30); het hele
+onderzoek staat in [Klein, snel, reclamevrij](https://claude.ai/artifact/RRZoGKhAdJLwQGLt44Z5yQ) (privé,
+alleen voor mij te openen). Ze staan op
 volgorde van hoeveel ze hergebruiken van wat er al is. Alle vijf volgen de regels van de rest: klein,
 offline, geen reclame, geen runtime-dependencies. ⚠️ Idee overnemen mag, code niet: zeven van de negen
 vergeleken projecten zijn GPLv3.
