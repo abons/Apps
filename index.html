@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mijn Apps</title>
+    <meta name="description" content="Overzicht van mijn apps en games, met demo's van gameplay en gebruik." />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <h1>Mijn Apps</h1>
+        <p class="lead">Games en apps die ik gemaakt heb. Beweeg over een kaartje om de demo te zien, klik om hem groot af te spelen.</p>
+        <div class="filters" role="group" aria-label="Filter op type">
+          <button type="button" class="chip" data-filter="all" aria-pressed="true">Alles</button>
+          <button type="button" class="chip" data-filter="game" aria-pressed="false">Games</button>
+          <button type="button" class="chip" data-filter="app" aria-pressed="false">Apps</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <ul class="grid" id="grid"></ul>
+      <p class="empty" id="empty" hidden>Geen apps in deze categorie.</p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <a href="https://github.com/abons/Apps">Broncode op GitHub</a>
+      </div>
+    </footer>
+
+    <dialog class="player" id="player" aria-label="Demo afspelen">
+      <button type="button" class="player-close" id="player-close" aria-label="Sluiten">×</button>
+      <div class="player-media" id="player-media"></div>
+    </dialog>
+
+    <script src="apps.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
