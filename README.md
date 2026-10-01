@@ -2,10 +2,7 @@
 
 Showcase van mijn apps en games: een pagina met kaartjes, elk met een korte demo-video van de gameplay of het gebruik.
 
-## Bekijken
-
-Open `index.html` in je browser, of zet GitHub Pages aan (Settings → Pages → branch `main`, map `/ (root)`).
-De pagina is dan te zien op `https://abons.github.io/Apps/`.
+Live: **https://abons.github.io/Apps/**
 
 ## Een app toevoegen
 
