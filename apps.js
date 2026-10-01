@@ -172,7 +172,7 @@ window.APPS = [
     description:
       "Loop door een gegenereerde stad en bouw in een beperkt aantal weken rijkdom, opleiding, geluk en carrière op. Speel tegen een AI-rivaal, samen op één telefoon of online tegen een ander.",
     tags: ["Simulatie", "Multiplayer", "Android"],
-    screenshots: ["media/fastlane/map.webp", "media/fastlane/duel.webp"],
+    screenshots: ["media/fastlane/map.webp", "media/fastlane/map-waren-klaar.webp", "media/fastlane/duel.webp"],
     color: "#c2603a",
     links: [{ label: "GitHub", url: "https://github.com/abons/fastlane" }],
   },
