@@ -50,6 +50,9 @@ opgenomen in een headless browser. Ze werken, maar:
 - [ ] **Volleybal**: het kaartje toont screenshots; een korte opname van de app op je telefoon (team kiezen,
       aanwezigheid doorgeven) maakt het levendiger.
 
+- [ ] **DnDAI**: de screenshots op het kaartje (`media/dndai/`) zijn dezelfde als in de publieke repo en
+      inmiddels verouderd. Vervang ze door nieuwe van de huidige versie van de app.
+
 ## 3. Welke apps horen erbij?
 
 - [ ] **Vocal** is een privé-repo zonder publieke pagina, daar kon ik niets over vinden. Hoort die op de
