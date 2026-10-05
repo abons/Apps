@@ -115,8 +115,8 @@ window.APPS = [
     description:
       "Zoek je team, bewaar het als favoriet en zet wedstrijden in je agenda, per wedstrijd of het hele team. Geef per wedstrijd aan of je komt en deel dat met je teamgenoten via een groep met code. Geen account, installeerbaar en werkt offline.",
     tags: ["Volleybal", "Nevobo", "PWA"],
-    screenshots: ["media/volleybal/icoon.png"],
-    color: "#e8742a",
+    screenshots: ["media/volleybal/programma.webp", "media/volleybal/uitslagen.webp", "media/volleybal/stand.webp"],
+    color: "#1a2340",
     links: [
       { label: "Open app", url: "https://abons.github.io/Volleybal/" },
       { label: "GitHub", url: "https://github.com/abons/Volleybal" },
