@@ -47,9 +47,8 @@ opgenomen in een headless browser. Ze werken, maar:
       Een opname met echte prijzen toont ook de kosten.
 - [ ] Optioneel: opnemen op je eigen telefoon (schermopname van Android/iOS) voor een scherper beeld.
 
-- [ ] **Volleybal**: het kaartje toont nu alleen het app-icoon. Een opname of screenshots van de app met een
-      echt team (programma, aanwezigheid, groep) maken het kaartje levendiger; de Nevobo-API was vanuit de
-      cloudomgeving niet bereikbaar.
+- [ ] **Volleybal**: het kaartje toont screenshots; een korte opname van de app op je telefoon (team kiezen,
+      aanwezigheid doorgeven) maakt het levendiger.
 
 ## 3. Welke apps horen erbij?
 
