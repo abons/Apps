@@ -107,6 +107,22 @@ window.APPS = [
     ],
   },
   {
+    id: "volleybal",
+    name: "Volleybal",
+    type: "app",
+    status: "Gebruik in je browser",
+    tagline: "Je Nevobo-team, programma en stand op je telefoon.",
+    description:
+      "Zoek je team, bewaar het als favoriet en zet wedstrijden in je agenda, per wedstrijd of het hele team. Geef per wedstrijd aan of je komt en deel dat met je teamgenoten via een groep met code. Geen account, installeerbaar en werkt offline.",
+    tags: ["Volleybal", "Nevobo", "PWA"],
+    screenshots: ["media/volleybal/icoon.png"],
+    color: "#e8742a",
+    links: [
+      { label: "Open app", url: "https://abons.github.io/Volleybal/" },
+      { label: "GitHub", url: "https://github.com/abons/Volleybal" },
+    ],
+  },
+  {
     id: "beasts",
     name: "Beasts",
     type: "game",
