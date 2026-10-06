@@ -43,8 +43,13 @@ opgenomen in een headless browser. Ze werken, maar:
 
 - [ ] **Kinderwoordjes**: in de opname wordt niets voorgelezen (de testbrowser heeft geen stem). Een
       opname op de telefoon, met geluid, laat beter zien hoe een peuter de app gebruikt.
-- [ ] **e-charge**: in de opname staat "geen prijzen", omdat de stroomprijs-API niet bereikbaar was.
-      Een opname met echte prijzen toont ook de kosten.
+- [ ] **e-charge**: de video (`demo.mp4`/`demo.webm`) toont nog "geen prijzen", omdat de stroomprijs-API toen
+      niet bereikbaar was. De drie screenshots (`planner`, `laden`, `uitleg`, 2026-10-06) hebben wél echte
+      prijzen; neem de video opnieuw op, dan staan de kosten er ook in.
+- [ ] **Alle andere kaartjes zijn verouderd**: de screenshots en video's van Word Guesser, Woord Swiper,
+      Woord Puzzel, Fast Lane, Kwelder, Beasts, DnDAI, Kinderwoordjes en Volleybal dateren van 2026-09-30
+      tot 2026-10-05 en komen niet meer overeen met de huidige apps. Alleen e-charge is op 2026-10-06
+      ververst. Maak ze opnieuw, per app, van de huidige versie.
 - [ ] Optioneel: opnemen op je eigen telefoon (schermopname van Android/iOS) voor een scherper beeld.
 
 - [ ] **Volleybal**: het kaartje toont screenshots; een korte opname van de app op je telefoon (team kiezen,
