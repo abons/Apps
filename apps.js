@@ -100,6 +100,7 @@ window.APPS = [
     tags: ["Elektrisch rijden", "Rekenhulp", "PWA"],
     video: ["media/e-charge/demo.mp4", "media/e-charge/demo.webm"],
     poster: "media/e-charge/poster.jpg",
+    screenshots: ["media/e-charge/planner.webp", "media/e-charge/laden.webp", "media/e-charge/uitleg.webp"],
     color: "#2f6f5e",
     links: [
       { label: "Open app", url: "https://abons.github.io/e-charge/" },
