@@ -60,8 +60,8 @@ opgenomen in een headless browser. Ze werken, maar:
 
 ## 3. Welke apps horen erbij?
 
-- [ ] **Vocal** is een privé-repo zonder publieke pagina, daar kon ik niets over vinden. Hoort die op de
-      pagina? Voeg dan een kaartje toe in `apps.js`.
+- [ ] **Vocal**: het kaartje staat er, zonder GitHub-link omdat de repo privé is. Maak de repo publiek en
+      voeg de link toe, of laat het zo.
 - [ ] Niet opgenomen: `timecalc` (werktool), `Unity_bumpkins` en `godot_bumpkins` (voorlopers van Beasts),
       en oudere repo's. Toevoegen als je dat wilt.
 - [ ] Zodra de Android-games op Google Play staan: Play-links toevoegen bij `links` en de `status` aanpassen.
