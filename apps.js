@@ -124,6 +124,19 @@ window.APPS = [
     ],
   },
   {
+    id: "vocal",
+    name: "Vocal",
+    type: "app",
+    status: "Zelf te draaien",
+    tagline: "Neem je stem op en laat AI er geluiden en liedjes van maken.",
+    description:
+      "Kloon je stem uit een korte opname, zet opnames om naar jouw stem, laat die tekst uitspreken en maak liedjes met jouw zang. Alles draait lokaal op open-source modellen: geen externe stemdienst en je opnames blijven op je eigen machine.",
+    tags: ["AI", "Stem", "Zelf-gehost"],
+    screenshots: ["media/vocal/opnemen.webp", "media/vocal/stem-veranderen.webp", "media/vocal/liedjes.webp"],
+    color: "#6d4fd6",
+    links: [],
+  },
+  {
     id: "beasts",
     name: "Beasts",
     type: "game",
