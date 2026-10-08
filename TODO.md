@@ -46,6 +46,19 @@ opgenomen in een headless browser. Ze werken, maar:
 - [ ] **e-charge**: de video (`demo.mp4`/`demo.webm`) toont nog "geen prijzen", omdat de stroomprijs-API toen
       niet bereikbaar was. De drie screenshots (`planner`, `laden`, `uitleg`, 2026-10-06) hebben wél echte
       prijzen; neem de video opnieuw op, dan staan de kosten er ook in.
+      Opnieuw proberen in de lokale sessie met emulator (2026-10-08): de cloudsessie kon dit niet, want haar
+      netwerkregels blokkeren `public.api.energyzero.nl` (403 op CONNECT). Stappen:
+      1. `git clone https://github.com/abons/e-charge`, `npm ci`, `npm run build`, serveer `build/` lokaal
+         (of `npm run serve`).
+      2. Controleer eerst dat de prijzen binnenkomen: kies een auto (de Leaf, anders geeft de app geen
+         kosten), vul huidig en doel in en kijk of de kostenregel een bedrag toont, niet "geen prijzen".
+         Lukt dat niet: stop, neem niets op.
+      3. Neem 15-20 s op op 390x844 (Playwright `recordVideo`, of de emulator): planner met prijzen, een
+         laadbeurt starten en laten lopen, kosten zichtbaar, daarna uitleg. Volg de flow van de
+         screenshots.
+      4. Maak klein met de ffmpeg-commando's uit sectie 1 (naar `media/e-charge/demo.mp4`, `demo.webm`,
+         `poster.jpg`), elk onder een paar MB. Kijk een paar frames na op bedragen.
+      5. Haal dit punt weg en pas `apps.js` alleen aan als paden of velden wijzigen.
 - [ ] **Alle andere kaartjes zijn verouderd**: de screenshots en video's van Word Guesser, Woord Swiper,
       Woord Puzzel, Fast Lane, Kwelder, Beasts, DnDAI, Kinderwoordjes en Volleybal dateren van 2026-09-30
       tot 2026-10-05 en komen niet meer overeen met de huidige apps. Alleen e-charge is op 2026-10-06
