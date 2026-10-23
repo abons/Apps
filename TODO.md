@@ -79,11 +79,15 @@ opgenomen in een headless browser. Ze werken, maar:
       en oudere repo's. Toevoegen als je dat wilt.
 - [ ] Zodra de Android-games op Google Play staan: Play-links toevoegen bij `links` en de `status` aanpassen.
 
-## 4. Online zetten
+## 4. Onderzoek afmaken (gemerged 2026-10-23, beide onvolledig)
 
-- [ ] Het werk samenvoegen in `main`.
-- [ ] GitHub Pages aanzetten: Settings → Pages → Source "Deploy from a branch" → `main`, map `/ (root)`.
-      De pagina staat dan op <https://abons.github.io/Apps/>.
+- [ ] **Monetisatie-onderzoek herstarten**: `onderzoek/2026-10-monetisatie/workflow.js` lokaal opnieuw
+      draaien (pad `R` bovenin aanpassen, Sonnet-agents, netwerk vrij zodat Play Store en App Store
+      bereikbaar zijn). De cijfers in de README daar zijn ongecontroleerd en 13 onderwerpen uit
+      "Niet gedekt" ontbreken nog.
+- [ ] **Remake-rapporten factchecken**: `docs/beasts-bumpkins-remake/onderzoek.md` nalopen op prijzen,
+      licenties en versies voordat er iets gekocht of geïnstalleerd wordt. De factcheck-agents vielen
+      uit door de sessielimiet.
 
 ## 5. Ideeën voor nieuwe apps
 
