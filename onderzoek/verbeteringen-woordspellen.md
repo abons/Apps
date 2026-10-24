@@ -15,8 +15,8 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 - WS: `main` loopt 56 commits vóór de live v1.3 (`wordfinder todo.md:9-12`, 2026-10-03).
 - WG: live is v2.6 van 2026-08-07; `main` is "far ahead" (`wordguesser docs/stand.md:13-18`). Sindsdien ≥30 commits in `app/src/main` (ondiepe clone, ondergrens).
-- WC: live is 1.6 van 2026-08-16 (`wordpuzzle todo.md:6`). Sindsdien ≥11 commits in `app/src/main` (ondergrens).
-- **Hoogste effect gedeeld door werk van dit hele rapport: een release per app** (M, toestel ja: koude eerste start verplicht, `wordfinder CLAUDE.md`).
+- WC: live is 1.6 van 2026-08-16 (`wordpuzzle todo.md:6`). Sindsdien ≥11 commits in `app/src/main` (ondergrens). ⚠️ Daar geldt "niets gaat uit tot alles Play-ready is" (gebruikersbesluit 2026-08-17), dus voor WC géén release-advies.
+- **Hoogste effect gedeeld door werk van dit hele rapport: een release voor WS en WG** (M, toestel ja: koude eerste start verplicht, `wordfinder CLAUDE.md`).
 - Snelkoppeling "Daily" voor WG (`todo.md:862`, label Engels) en WC: S, toestel ja. WS opent al de daily (`MainActivity.kt:217-218`).
 
 ## Correcties op de bekende bevindingen
@@ -115,6 +115,8 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 ## Vervolgopdrachten
 
+De punten die bleven, staan per app in `todo.md` onder *Onderzoek 2026-10-24* (bestaande punten bij hun titel, nieuwe uitgeschreven).
+
 **Word Guesser**
 1. Eind-sheet-ronde: `bump`-golf vóór de sheet, "Meaning" op de daily-sheets, aftelling naar de volgende daily. Toestelronde met een nieuwe filmstrip.
 2. Daily vindbaar maken plus snelkoppeling "Daily"; daarna release v2.7 met koude installatie.
@@ -123,7 +125,7 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 **Word Cross**
 1. Haptiek plus een pil in plaats van `Toast` (Juice-basis overnemen met `Juice.enabled`).
 2. Sprong wegnemen door het bord bovenaan uit te lijnen, met een pixelcheck op het toestel; deelknop daarna.
-3. Viering bij oplossen en dialoogfade; daarna release 1.7 met koude installatie.
+3. Viering bij oplossen en dialoogfade; landt op `main`, want er gaat niets uit vóór Play-ready.
 
 **Word Swipe**
 1. Release uitbrengen (koude installatie op de Motorola) en de shots opnieuw schieten.
