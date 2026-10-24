@@ -6,36 +6,28 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 - Apps: Word Guesser (WG, `wordguesser-src`), Word Cross / Woordpuzzel (WC, `wordpuzzle-src`), Word Swipe / Woord Swiper (WS, `wordfinder-src`).
 - `main` staat in alle drie op de opgenomen commits (98adba4, c284009, 941fc1d): beelden en code komen overeen.
-- Ronde 1: 3 Sonnet-agents, één per app, elk ≤8 zoekopdrachten en ≤5 vergelijkingsapps.
-- Ronde 2 (debunk): 3 Sonnet-agents probeerden elk punt te weerleggen tegen code, todo.md, docs/besluiten en git. Steekproeven door het hoofdmodel bevestigden hun kernclaims.
-- Uitkomst ronde 2: 6 van de 15 top-punten geschrapt of gedegradeerd, onder meer omdat ze een bestaand besluit tegenspraken. Zie "Wat de debunkronde veranderde".
+- Ronde 1: 3 Sonnet-agents, één per app (≤8 zoekopdrachten, ≤5 vergelijkingsapps). Ronde 2: 3 debunk-agents toetsten elk punt aan code, todo.md, besluiten en git; steekproeven bevestigden hun kernclaims.
 - ⚠️ Play Store, App Store, Reddit en Wikipedia waren niet bereikbaar. Alles extern komt uit zoeksamenvattingen van 2026-10-24; geen concurrent zelf gespeeld.
 - Bouwt voort op `onderzoek/2026-10-monetisatie/`: kruiswoord- en letterwielapps, daar open gelaten, zijn hier gedekt.
-- Vaste regels gerespecteerd: geen libraries, ads, tracking of cross-promotie; één vrijwillige Ko-fi-link; WG-UI blijft Engels.
-- Kolom **Toestel** = alleen op een toestel te controleren. Omvang S = uren, M = een dag, L = meerdere dagen.
+- Vaste regels gerespecteerd (geen libraries, ads, tracking, cross-promotie; WG-UI Engels). **Toestel** = alleen op toestel te controleren; S = uren, M = een dag, L = meer.
 
 ## Vooraf, voor alle drie: spelers zien het werk nog niet
 
 - WS: `main` loopt 56 commits vóór de live v1.3 (`wordfinder todo.md:9-12`, 2026-10-03).
 - WG: live is v2.6 van 2026-08-07; `main` is "far ahead" (`wordguesser docs/stand.md:13-18`). Sindsdien ≥30 commits in `app/src/main` (ondiepe clone, ondergrens).
 - WC: live is 1.6 van 2026-08-16 (`wordpuzzle todo.md:6`). Sindsdien ≥11 commits in `app/src/main` (ondergrens).
-- **Hoogste effect gedeeld door werk van dit hele rapport: een release per app.** M per app, toestel ja: een koude eerste start is verplicht volgens `wordfinder CLAUDE.md`.
-- Snelkoppeling "Daily" op het icoon voor WG (`todo.md:862`) en WC: S, toestel ja.
-- WS heeft geen snelkoppeling nodig: de app opent al de daily (`wordfinder MainActivity.kt:217-218`).
-- Randvoorwaarde voor WG: het label van de snelkoppeling is een `@string`; houd het Engels, conform het besluit "UI blijft Engels".
+- **Hoogste effect gedeeld door werk van dit hele rapport: een release per app** (M, toestel ja: koude eerste start verplicht, `wordfinder CLAUDE.md`).
+- Snelkoppeling "Daily" voor WG (`todo.md:862`, label Engels) en WC: S, toestel ja. WS opent al de daily (`MainActivity.kt:217-218`).
 
 ## Correcties op de bekende bevindingen
 
-- WC, letters weg na force-stop: een testartefact. `am start -S` slaat `onPause` over; een echte speler komt altijd door `onPause`. Alleen een crash of een OS-kill op de voorgrond verliest het bord.
-- WC, wanneer het bord bewaard wordt: bij `onPause`, en bij elke wissel die een bord achterlaat: modus, taal, thema, nieuw spel (`MainActivity.kt:284, 1062, 1074, 1417, 1450`).
-- WC, alleen-`onPause` is een besluit: `docs/besluiten/het-bord-bewaren-vier-keuzes-2026-07-29.md:26-28`, zodat typen vrij blijft van schijfwerk.
+- WC, letters weg na force-stop: testartefact. `am start -S` slaat `onPause` over; alleen een crash of voorgrond-kill verliest het bord.
+- WC bewaart bij `onPause` en bij elke wissel (modus, taal, thema, nieuw spel; `MainActivity.kt:284, 1062, 1074, 1417, 1450`), bewust: `docs/besluiten/het-bord-bewaren-vier-keuzes-2026-07-29.md:26-28`.
 - WC, de sprong van het bord is 3↔2 regels, niet 3↔1. De clue-balk heeft `minLines = 2` zonder maximum (`:534`), en het bord staat gecentreerd in een gewogen ScrollView (`:520-526`).
-- WC, Back sluit de app: niet verklaarbaar uit de code (geen Back-handler). Waarschijnlijk een emulator-artefact.
-- WC, munten 0: geen bug. Een nieuwe install krijgt 5 munten (`Economy.kt:40`).
+- WC, Back sluit de app: niet uit de code te verklaren (geen Back-handler), waarschijnlijk emulator. Munten 0: geen bug, nieuwe install krijgt 5 (`Economy.kt:40`).
 - WS, 3 letters: niet stil. De speler ziet de pil 'Minimaal 4 letters' en voelt een lichte tik (`MainActivity.kt:1331-1334`, bewust gekozen in besluitenset 4).
 - WS, waarom 4: de grens komt uit de data (`docs/besluiten/waarom-de-ondergrens-4-letters-is.md`). Een woord van 3 letters telt ook niet als bonus (`:1374`).
-- WG, schudden nooit gezien: de daily controleert nooit of een woord bestaat (`MainActivity.kt:2916`). Strict staat standaard uit (`:450`), dus ook vrij spel schudt standaard nooit.
-- WG, waarom de daily niet controleert: zo is het bord voor iedereen gelijk. Strict is een instelling per speler; zie het web-equivalent `web/src/main.ts:424-425`, commit 4dbc951.
+- WG, schudden nooit gezien: de daily controleert geen woorden (`MainActivity.kt:2916`) en strict staat standaard uit (`:450`). Bewust: gelijke daily voor iedereen (`web/src/main.ts:424-425`, 4dbc951).
 - WG, Engelse dialogen: bewust (`docs/besluiten/de-ui-blijft-engels-en-de-winkeltekst-mag-dat-zeggen.md`).
 
 ## Onderling: wie doet wat beter
@@ -62,10 +54,7 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 | 5 | Eind-sheet niet doodlopend: aftelling naar de volgende daily | `04-verloren.jpg`: alleen SHARE / CLOSE / LEADERBOARD; geen countdown in de code; zelfde todo-punt als #1 | M | ja |
 
 **Besluiten, niet bouwen:**
-- Woordcontrole in de daily: het oude advies stond op 1, maar het huidige gedrag is bewust. Gelijke regels voor elke speler (zie Correcties).
-- Een niet-woord kost bovendien een van de zes rijen, en de ranglijst sorteert op minste beurten (`Leaderboard.rank`, `:270`).
-- Afdwingen kan ook een echt woord weigeren in 17 ruwe lijsten, en moet mee naar `web/`.
-- Eerst meten hoeveel echte woorden de accept-lijst mist. Dat Wordle niet-woorden weigert, is extern **niet bevestigd**.
+- Woordcontrole in de daily (was #1): het gedrag is bewust; een niet-woord kost een rij en de ranglijst telt beurten (`Leaderboard.rank`, `:270`). Afdwingen kan echte woorden weigeren in 17 lijsten en moet mee naar `web/`. Eerst meten wat de accept-lijst mist; dat Wordle niet-woorden weigert, is **niet bevestigd**.
 - Contrast HC-palet (1,93:1 en 2,73:1, todo ~436): een toegankelijkheidsbug, maar het vraagt een besluit per palet (M, `SkinTest`).
 - Streakmijlpalen die een scène of skin ontgrendelen (todo:466): mijlpalen moeten op stats per taal en instelling, want een reeks die aan de daily hangt werkt niet.
 - Hint voor één verdiende munt: raakt het muntprijsbesluit (todo:1276).
@@ -83,18 +72,11 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 | 4 | `Toast` vervangen door een pil in de skinkleuren | Een echte `Toast` (`:2393`) valt over het toetsenbord (anim-02) en volgt `Skin.p` niet; todo ~633-635 | S-M | ja |
 | 5 | Viering bij oplossen vóór de kale beloningsdialoog, plus dialoogfade en `bump` bij invullen | Enige beloningsmoment (todo ~686-700); patroon in `wordfinder WinPanel.kt` en `Juice.kt`; met `Juice.enabled` zodat shots stil blijven (todo:626-640) | M | ja |
 
-**Verder:**
-- Eenmalige uitleg in de eerste minuut: "Controleer is gratis bij 0 munten, een hint kost 1 of 3" (S).
-- Eigen toetsenbord: in de todo "hoogste polish-rendement" (todo ~701), maar het is werk voor zes skins (L).
-- Genummerde puzzelreeksen (todo:601, L).
+**Verder:** uitleg in de eerste minuut "Controleer gratis bij 0 munten, hint kost 1/3" (S); eigen toetsenbord, "hoogste polish-rendement" (todo ~701, L, zes skins); genummerde reeksen (todo:601, L).
 
 **Besluit, niet bouwen:** een checkpoint bij een afgerond woord stond eerst op 1. Het is gedegradeerd door het bewaarbesluit, en het voordeel geldt alleen bij een crash. Doe het alleen als het besluit wordt bijgewerkt.
 
-**Genre** (zoeksamenvattingen 2026-10-24):
-- CodyCross: tokens via streak-mijlpalen (Fanatee-help); dagelijkse loginmunten zijn niet bevestigd.
-- Teazel Crossword: een loginbonus die groeit met de reeks.
-- Daily Themed Crossword: VIP met 15 munten per dag.
-- NYT Mini: sinds sept 2025 achter een abonnement, volgens Insider Gaming (geen NYT-bron).
+**Genre** (zoeksamenvattingen 2026-10-24): CodyCross geeft tokens via streak-mijlpalen (Fanatee-help; loginmunten onbevestigd); Teazel: loginbonus groeit met reeks; Daily Themed: VIP 15 munten/dag; NYT Mini sinds sept 2025 achter abonnement (Insider Gaming, geen NYT-bron).
 
 ## Word Swipe: top 5
 
@@ -106,10 +88,7 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 | 4 | Dagelijkse beloning, bv. hint-token op reeksdag 7 en 30 | De reeks kost nu alleen; tokens bestaan (`:1448-1456`); "Dagelijkse beloning … nog niet besloten" (todo.md:664) | S bouwen, besluit eerst | nee |
 | 5 | Stats-dialoog indelen met kopjes Spel / Instellingen | `04-statistieken.jpg`: tegels zijn al gebouwd, het gaat alleen om de indeling. De thema- en handrij blijven er per besluit staan (`:2426-2515`, "settings row rather than a sixth top-bar icon"); effect klein | S | ja (shot 'stats') |
 
-**Geschrapt na debunk:**
-- Snelkoppeling: de app opent al de daily.
-- Uitgebreidere melding bij een te kort woord: de melding noemt het getal al, en er is geen bewijs dat spelers 3 letters verwachten.
-- Letters los aantikken: staand besluit "het wiel is swipe-only" met een bewust geaccepteerde prijs (`docs/besluiten/staande-richtingsbesluiten.md:63-70`). Alleen te heropenen als besluit (L).
+**Geschrapt na debunk:** snelkoppeling (app opent al de daily); uitgebreidere melding bij te kort woord (noemt het getal al); letters aantikken (staand besluit "swipe-only" met geaccepteerde prijs, `docs/besluiten/staande-richtingsbesluiten.md:63-70`; alleen als besluit te heropenen, L).
 
 **Verder:**
 - Multi-hint: een nieuw idee, geen "derde muntbestemming". De stempelkaart is die bestemming al, en todo.md:651 is daarmee verouderd. Het raakt de break-even en `HINT_COST`.
@@ -118,19 +97,11 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 **Niet doen:** 3-letterwoorden (gedeelde lijst, cache-bump; L) en geluid (todo.md:813).
 
-**Genre** (zoeksamenvattingen 2026-10-24):
-- Words of Wonders (Fugo): bonuswoorden vullen een icoon; WS heeft dit al als stempelkaart (Arkadium-help).
-- Wordscapes: ~55% omzet uit reclame is een schatting van één bron (felixbraberg.substack, 2026).
-- Niet gevonden: de reeksbeloning van Wordscapes en de multi-hint van Word Connect.
+**Genre** (zoeksamenvattingen 2026-10-24): Words of Wonders vult een bonusicoon, wat WS al heeft als stempelkaart (Arkadium-help); Wordscapes ~55% omzet uit reclame is één schatting (felixbraberg.substack, 2026); reeksbeloning Wordscapes en multi-hint Word Connect niet gevonden.
 
 ## Vergelijkingsapps (zoeksamenvattingen 2026-10-24, niet zelf bekeken)
 
-- **Woord raden:**
-  - NYT Wordle: lampje-hint, stats, archief voor abonnees.
-  - Wordle! (Lion Studios): App Store 4,6★ bij ~819K beoordelingen, Remove Ads $5.99 (VS).
-  - Quordle (Merriam-Webster): oefenstand die de stats niet raakt.
-  - Woordje: 3-8 letters.
-  - Lingo-app: status onbekend.
+- **Woord raden:** NYT Wordle (lampje-hint, archief voor abonnees); Wordle! van Lion Studios (App Store 4,6★ bij ~819K, Remove Ads $5.99); Quordle (oefenstand buiten de stats); Woordje (3-8 letters); Lingo-app (status onbekend).
 - **Kruiswoord:** NYT Mini, CodyCross (Fanatee), Daily Themed Crossword (PlaySimple), Teazel Crossword. Denksport (Keesing) en Puzzelfit (DPG) zijn betaald.
 - **Letterwiel:** Wordscapes en Wordscapes Uncrossed (PeopleFun), Words of Wonders (Fugo), Word Connect. Geen NL-letterwielapp gevonden; dat kan een zoekgat zijn.
 - **Patroon bij de leiders:** hints kosten verdiende munten en reeksen worden beloond. Geld komt uit reclame + Remove Ads of een abonnement; beide vallen buiten onze regels.
@@ -138,12 +109,9 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 ## Wat de debunkronde veranderde
 
-- WG #1 "woordcontrole in de daily" werd een besluitpunt: het huidige gedrag is bewust en gelijk voor iedereen.
-- WG: "daily te verborgen" (todo ~420) en "snelkoppeling" kwamen erbij; "Meaning" geldt alleen voor de daily-sheets.
-- WC #1 "vaker bewaren" werd een besluitpunt (bestaand besluit, voordeel alleen bij crash).
-- WC: `lines = 3` + ellipsize vervangen door bord bovenaan, omdat afkappen de clue zelf beschadigt. Pil en viering kwamen erbij.
-- WS: snelkoppeling, melding bij te kort woord en tik-invoer geschrapt. Release, shots en klein scherm kwamen erbij.
-- Bronnen aangepast: de Wordle-claim over niet-woorden en de Word Connect-claim zijn onbevestigd; CodyCross geeft tokens, geen loginmunten.
+- Zes van de vijftien top-punten geschrapt of gedegradeerd. WG #1 (daily-woordcontrole) en WC #1 (vaker bewaren) bleken bestaande besluiten; WS-tikinvoer ook.
+- WC `lines = 3` + ellipsize vervangen door bord bovenaan (afkappen beschadigt de clue). WS-snelkoppeling en meldingstekst geschrapt.
+- Erbij: release-achterstand van alle drie, WG daily vindbaar, WC pil en viering, WS shots en klein scherm. Wordle- en Word Connect-claims onbevestigd.
 
 ## Vervolgopdrachten
 
@@ -166,7 +134,6 @@ Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git
 
 - Geen concurrent zelf gespeeld. Onboarding, eerste minuut, foutanimatie en meldingen van de leiders zijn niet geverifieerd.
 - Downloads, ratings en prijzen komen alleen uit zoeksamenvattingen; voor echte cijfers moet play.google.com in het netwerkbeleid open.
-- Commits sinds de release voor WG/WC zijn ondergrenzen, omdat de clones ondiep zijn.
-- Of WS-web al live staat, is tegenstrijdig: todo.md:68 tegen commit 5bcca25.
+- Commits sinds de release voor WG/WC zijn ondergrenzen (ondiepe clones). WS-web live? Tegenstrijdig (todo.md:68 tegen 5bcca25).
 - Niet bekeken: filmstrips van WG en WS, beelden van WC, `gameplay.mp4`.
 - Alles met "Toestel: ja" moet op de Motorola of een AVD bevestigd worden, inclusief clue-breedte en pixelsprong.
