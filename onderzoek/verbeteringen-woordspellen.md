@@ -1,116 +1,172 @@
-# Verbeteringen voor de drie woordspellen (2026-10-24)
+# Verbeteringen voor de drie woordspellen (2026-10-24, na debunkronde)
 
-Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs en opnames gelezen.
+Onderzoek, geen implementatie. Niets gebouwd of gedraaid; alleen code, docs, git en opnames gelezen.
 
 ## Opzet en grenzen
 
-- Apps: Word Guesser (`wordguesser-src`), Word Cross / Woordpuzzel (`wordpuzzle-src`), Word Swipe / Woord Swiper (`wordfinder-src`).
-- `main` staat in alle drie nog op de opgenomen commits: 98adba4, c284009, 941fc1d. Beelden en code komen dus overeen.
-- Bronnen intern: `Apps/media/ai-sessie/*/NOTES.md`, sleutelbeelden, CLAUDE.md, todo.md, docs/besluiten, gerichte stukken code.
-- Er is geen `.claude-index` in deze checkouts (gitignored), dus gezocht via `docs/map.md` en grep.
-- Bronnen extern: 3 Sonnet-agents, elk ≤8 zoekopdrachten en ≤5 vergelijkingsapps.
-- ⚠️ Play Store, App Store, Reddit en Wikipedia waren niet bereikbaar. Alles extern komt uit zoeksamenvattingen van 2026-10-24.
-- ⚠️ Geen enkele concurrent is zelf gespeeld: onboarding en foutfeedback van de leiders zijn **niet geverifieerd**.
-- Bouwt voort op `onderzoek/2026-10-monetisatie/`: dat liet kruiswoord- en Wordscapes-achtigen open; die zijn hier gedekt.
-- Vaste regels gerespecteerd: geen libraries, ads, tracking of cross-promotie; één vrijwillige Ko-fi-link; Word Guesser-UI blijft Engels.
-- Kolom **Toestel** = alleen op een toestel te controleren (ja/nee). Omvang S = uren, M = een dag, L = meerdere dagen.
+- Apps: Word Guesser (WG, `wordguesser-src`), Word Cross / Woordpuzzel (WC, `wordpuzzle-src`), Word Swipe / Woord Swiper (WS, `wordfinder-src`).
+- `main` staat in alle drie op de opgenomen commits (98adba4, c284009, 941fc1d): beelden en code komen overeen.
+- Ronde 1: 3 Sonnet-agents, één per app, elk ≤8 zoekopdrachten en ≤5 vergelijkingsapps.
+- Ronde 2 (debunk): 3 Sonnet-agents probeerden elk punt te weerleggen tegen code, todo.md, docs/besluiten en git. Steekproeven door het hoofdmodel bevestigden hun kernclaims.
+- Uitkomst ronde 2: 6 van de 15 top-punten geschrapt of gedegradeerd, onder meer omdat ze een bestaand besluit tegenspraken. Zie "Wat de debunkronde veranderde".
+- ⚠️ Play Store, App Store, Reddit en Wikipedia waren niet bereikbaar. Alles extern komt uit zoeksamenvattingen van 2026-10-24; geen concurrent zelf gespeeld.
+- Bouwt voort op `onderzoek/2026-10-monetisatie/`: kruiswoord- en letterwielapps, daar open gelaten, zijn hier gedekt.
+- Vaste regels gerespecteerd: geen libraries, ads, tracking of cross-promotie; één vrijwillige Ko-fi-link; WG-UI blijft Engels.
+- Kolom **Toestel** = alleen op een toestel te controleren. Omvang S = uren, M = een dag, L = meerdere dagen.
+
+## Vooraf, voor alle drie: spelers zien het werk nog niet
+
+- WS: `main` loopt 56 commits vóór de live v1.3 (`wordfinder todo.md:9-12`, 2026-10-03).
+- WG: live is v2.6 van 2026-08-07; `main` is "far ahead" (`wordguesser docs/stand.md:13-18`). Sindsdien ≥30 commits in `app/src/main` (ondiepe clone, ondergrens).
+- WC: live is 1.6 van 2026-08-16 (`wordpuzzle todo.md:6`). Sindsdien ≥11 commits in `app/src/main` (ondergrens).
+- **Hoogste effect gedeeld door werk van dit hele rapport: een release per app.** M per app, toestel ja: een koude eerste start is verplicht volgens `wordfinder CLAUDE.md`.
+- Snelkoppeling "Daily" op het icoon voor WG (`todo.md:862`) en WC: S, toestel ja.
+- WS heeft geen snelkoppeling nodig: de app opent al de daily (`wordfinder MainActivity.kt:217-218`).
+- Randvoorwaarde voor WG: het label van de snelkoppeling is een `@string`; houd het Engels, conform het besluit "UI blijft Engels".
 
 ## Correcties op de bekende bevindingen
 
-- Word Cross, sprong van het bord: clue-balk heeft `minLines = 2` en geen maximum (`wordpuzzle MainActivity.kt:534`). De sprong is dus 3↔2 regels, niet 3↔1.
-- Word Cross, letters weg na force-stop: verklaard. `saveSnapshot()` loopt alleen in `onPause` en bij moduswissel (`MainActivity.kt:296-300`); `am start -S` slaat `onPause` over. Normaal sluiten bewaart wel (volgens code, niet op toestel herhaald).
-- Word Cross, Back sluit app: in code niet te verklaren. Er is geen Back-handler, dialogen zijn standaard annuleerbaar. Waarschijnlijk een emulator-artefact.
-- Word Cross, munten 0: geen bug. Nieuwe install krijgt 5 (`Economy.kt:40`); 0 is eerder uitgegeven saldo.
-- Word Swipe, 3 letters: **niet stil**. Pil 'Minimaal 4 letters' + haptische tik (`wordfinder MainActivity.kt:1331-1334`).
-- Word Swipe, waarom 4: de grens is van de data, niet van het ontwerp. `nl.txt` en `nl-accept.txt` bevatten niets onder 4 (`docs/besluiten/waarom-de-ondergrens-4-letters-is.md`). Een 3-letterwoord telt ook niet als bonus (`:1372`).
-- Word Guesser, schudden nooit gezien: verklaard. In de daily wordt **geen woordcontrole** gedaan (`wordguesser MainActivity.kt:2916`: `!dailyMode && strictMode && …`) en strict staat standaard uit (`:450`).
-- Word Guesser, Engelse dialogen: bewust (`docs/besluiten/de-ui-blijft-engels-en-de-winkeltekst-mag-dat-zeggen.md`). Geen verbeterpunt binnen de regels.
+- WC, letters weg na force-stop: een testartefact. `am start -S` slaat `onPause` over; een echte speler komt altijd door `onPause`. Alleen een crash of een OS-kill op de voorgrond verliest het bord.
+- WC, wanneer het bord bewaard wordt: bij `onPause`, en bij elke wissel die een bord achterlaat: modus, taal, thema, nieuw spel (`MainActivity.kt:284, 1062, 1074, 1417, 1450`).
+- WC, alleen-`onPause` is een besluit: `docs/besluiten/het-bord-bewaren-vier-keuzes-2026-07-29.md:26-28`, zodat typen vrij blijft van schijfwerk.
+- WC, de sprong van het bord is 3↔2 regels, niet 3↔1. De clue-balk heeft `minLines = 2` zonder maximum (`:534`), en het bord staat gecentreerd in een gewogen ScrollView (`:520-526`).
+- WC, Back sluit de app: niet verklaarbaar uit de code (geen Back-handler). Waarschijnlijk een emulator-artefact.
+- WC, munten 0: geen bug. Een nieuwe install krijgt 5 munten (`Economy.kt:40`).
+- WS, 3 letters: niet stil. De speler ziet de pil 'Minimaal 4 letters' en voelt een lichte tik (`MainActivity.kt:1331-1334`, bewust gekozen in besluitenset 4).
+- WS, waarom 4: de grens komt uit de data (`docs/besluiten/waarom-de-ondergrens-4-letters-is.md`). Een woord van 3 letters telt ook niet als bonus (`:1374`).
+- WG, schudden nooit gezien: de daily controleert nooit of een woord bestaat (`MainActivity.kt:2916`). Strict staat standaard uit (`:450`), dus ook vrij spel schudt standaard nooit.
+- WG, waarom de daily niet controleert: zo is het bord voor iedereen gelijk. Strict is een instelling per speler; zie het web-equivalent `web/src/main.ts:424-425`, commit 4dbc951.
+- WG, Engelse dialogen: bewust (`docs/besluiten/de-ui-blijft-engels-en-de-winkeltekst-mag-dat-zeggen.md`).
 
 ## Onderling: wie doet wat beter
 
 | Onderwerp | Beste | Achterblijver | Overnemen |
 |---|---|---|---|
-| Animatie | WS: `Juice.kt` 462 r. (flyLetters, flyCoins, confetti) | WC: 0 animator-aanroepen | WC port Juice + `Juice.enabled`-schakelaar voor shots |
-| Haptiek | WG/WS: tick/success/reject zonder VIBRATE-recht | WC: geen | WC (S) |
+| Animatie | WS: `Juice.kt` 462 r. (flyLetters, flyCoins, confetti), `WinPanel.kt` | WC: nul animator-aanroepen | WC, gepland in todo.md:626-640 |
+| Haptiek | WG/WS: tick/success/reject zonder VIBRATE-recht (WG `Juice.kt:35-55`) | WC: nul | WC (S) |
 | Delen | WG: spoilervrije, geteste `Share.kt`; WS: silhouet + `?s=`-link | WC: geen ACTION_SEND | WC (todo.md:513) |
-| Foutmelding | WS: pil in plaats van Toast, reden in tekst | WG: pil ver van de rij; WC: toast over toetsenbord (anim-02) | WG reden bij de rij |
-| Dialogen/thema | WC: alles via `SkinDialog.kt`, CONTRAST-skin met kleurenblind-simulatie (`ThemeTest`) | WS: overvolle stats-dialoog (beeld 04) | WS/WG: één dialoogbouwer, contrasttoets |
-| Munten | WC: nooit vast (Controleer gratis op 0); WS: stempelkaart, 25 bonuswoorden = hint | WG: munt alleen voor streakredding | WG: kleine verdiende hint |
-| Eerste minuut | WS: geleide eerste veeg (todo.md:14-72); WG adopteert toesteltaal | WC: geen uitleg van munten/Controleer | WC tooltip |
-| Dagelijkse terugkeer | WG/WC: daily + ranglijst + reeks | alle drie: geen icoon-snelkoppeling (todo.md wf:512) | `shortcuts.xml` in alle drie (S) |
-| Bewaren | WC: snapshot per modus met fingerprint (`SavedGame.kt`) | WC zelf: alleen op `onPause` | zie WC #1 |
-
-WG = Word Guesser, WC = Word Cross, WS = Word Swipe.
+| Foutmelding | WS: eigen pil met reden in tekst | WC: echte `Toast` over het toetsenbord (`:2393`, anim-02); WG: pil ver van de rij | WC pil (todo ~633); WG pil bij de rij (todo:449) |
+| Dialogen/thema | WC: alles via `SkinDialog.kt`, CONTRAST-skin met kleurenblind-simulatie | WG: HC-palet haalt 1,93:1 (todo ~436) | WG contrast per palet |
+| Munten | WS: stempelkaart (25 bonuswoorden = hint, `Economy.kt:25-29`); WC: nooit vast (Controleer gratis op 0) | WG: munt koopt alleen streakredding | WG pas na muntprijsbesluit |
+| Eerste minuut | WS: campagne-level 1 met getekende eerste veeg (`:213-217`); WG adopteert toesteltaal | WG: daily verstopt achter getaltegel; WC: geen uitleg | zie top 5 |
+| Stats | WS: tegels (besluitenset 3) | WS: instellingen tussen cijfers | WS-indeling |
 
 ## Word Guesser: top 5 (effect gedeeld door werk)
 
 | # | Wat | Waarom (bewijs) | Omvang | Toestel |
 |---|---|---|---|---|
-| 1 | Woordcontrole ook in de daily (en strict standaard aan, of alleen voor de daily) | `MainActivity.kt:2916` slaat de controle over in de daily; "ZZZZZ" kost een beurt en geeft gratis letterinfo, wat de ranglijst oneerlijk maakt. De reden staat nergens in docs; eerst `git log -S'!dailyMode && strictMode'` lezen. Wordle weigert niet-woorden zonder beurt (TechRadar/Tom's Guide via zoeksamenvatting, 2026-10-24, indirect) | S + besluit | nee (JVM-test) |
-| 2 | Knop "Meaning" op de eind-sheet | `04-verloren.jpg`: "the word was FALIE" zonder uitleg; de definitie-opzoeking (`?` per rij) bestaat al. Dat onderscheidt hem van elke kloon | S | ja (layout) |
-| 3 | Winst krijgt beweging: `bump`-golf over de winnende rij, sheet pas daarna | Na winst nu alleen `hapticSuccess` en direct de sheet (`MainActivity.kt` ~2971); `Juice.bump` bestaat (`Juice.kt:55`) | S | ja |
-| 4 | Eind-sheet niet doodlopend: aftelling naar volgende daily + "Next word" | `04-verloren.jpg`: alleen SHARE / CLOSE / LEADERBOARD. NYT-app toont reeks en statistieken na afloop (Play-listing via zoeksamenvatting, 2026-10-24) | M | nee |
-| 5 | Afwijzing bij de rij tonen en `?`-knop naar 48 dp raakvlak | Pil "Not in word list" staat boven het toetsenbord, het schudden ver erboven (`:2910/2917`, `Juice.kt:70`); `?` is klein en grijs (`02-midgame.jpg`, todo.md ~450) | S | ja |
+| 1 | Golf (`bump`) over de winnende rij, sheet pas daarna | Na winst nu alleen `hapticSuccess` (`:2971`) en direct de sheet; `Juice.bump` bestaat (`Juice.kt:60`); al gepland in todo.md:417-421 | S | ja |
+| 2 | Daily vindbaar maken: label of chevron op het getaltegeltje, Daily op de New-sheet | De daily zit achter tegel "5" die niet als knop leest, en *New* kent geen Daily (todo.md ~420) | S-M | ja |
+| 3 | Knop "Meaning" op de daily-eindsheets | `04-verloren.jpg`: "the word was FALIE" zonder uitleg (`:4033-4040`, `promptSubmit` ~`:4063`). In vrij spel staat al een `?` naast het woord (`:1115-1133`) | S | ja |
+| 4 | Afwijzingspil bij de actieve rij; `?`-knop een groter raakvlak via `TouchDelegate` | Pil boven het toetsenbord (todo.md:449); `?` is 20 dp (`:1778/1807`). Echt 48 dp breed raakt de rijbreedte en is dan M | S | ja |
+| 5 | Eind-sheet niet doodlopend: aftelling naar de volgende daily | `04-verloren.jpg`: alleen SHARE / CLOSE / LEADERBOARD; geen countdown in de code; zelfde todo-punt als #1 | M | ja |
 
-Verder: streakmijlpalen 7/30/100 ontgrendelen een scène of skin (M); één hint voor één verdiende munt, niet te koop (M); één icoonstijl in de kop (S, todo.md ~423).
-Nakijken: todo zegt dat toetsen tijdens de flip kleuren, NOTES ziet ze pas ná de flip (`anim-01`) — alleen op toestel te beslechten.
-Niet doen zonder besluit: lokale herinnering (vraagt POST_NOTIFICATIONS, raakt de "twee permissies"-lijn in `docs/security.md`).
+**Besluiten, niet bouwen:**
+- Woordcontrole in de daily: het oude advies stond op 1, maar het huidige gedrag is bewust. Gelijke regels voor elke speler (zie Correcties).
+- Een niet-woord kost bovendien een van de zes rijen, en de ranglijst sorteert op minste beurten (`Leaderboard.rank`, `:270`).
+- Afdwingen kan ook een echt woord weigeren in 17 ruwe lijsten, en moet mee naar `web/`.
+- Eerst meten hoeveel echte woorden de accept-lijst mist. Dat Wordle niet-woorden weigert, is extern **niet bevestigd**.
+- Contrast HC-palet (1,93:1 en 2,73:1, todo ~436): een toegankelijkheidsbug, maar het vraagt een besluit per palet (M, `SkinTest`).
+- Streakmijlpalen die een scène of skin ontgrendelen (todo:466): mijlpalen moeten op stats per taal en instelling, want een reeks die aan de daily hangt werkt niet.
+- Hint voor één verdiende munt: raakt het muntprijsbesluit (todo:1276).
+- Herinnering (POST_NOTIFICATIONS): raakt de "twee permissies"-lijn (`docs/security.md:170`).
+
+**Nakijken op toestel:** toetsen kleuren tijdens of ná de flip (todo ~447 tegen `anim-01`), en één icoonstijl in de kop (todo ~423).
 
 ## Word Cross: top 5
 
 | # | Wat | Waarom (bewijs) | Omvang | Toestel |
 |---|---|---|---|---|
-| 1 | Snapshot ook bij woord af, hint en Controleer (eventueel gedebounced na typen) | Nu alleen `onPause` + moduswissel (`MainActivity.kt:284-300`); het commentaar daar erkent "a crash still loses the board"; NOTES: MINIBAR weg na kill | S | nee (JVM-test op SavedGame) |
-| 2 | Clue-balk vaste hoogte: `lines = 3` + ellipsize; tikken opent al de volledige lijst | `minLines = 2` zonder max (`MainActivity.kt:530-536`); bord verspringt ~20 px (NOTES) | S | ja (pixelcheck) |
-| 3 | Haptiek: tik per letter, reject bij fout, success bij woord/oplossen | Nul `performHapticFeedback` in de app; kan zonder VIBRATE-recht, zoals in WG `Juice.kt:35-55` | S | ja |
-| 4 | Deelknop na de dagpuzzel (tijd, reeks, spoilervrij) | Geen ACTION_SEND; staat open op todo.md:513; `DailyScore.kt`/`Stats.kt` hebben de gegevens; vorm van WG `Share.kt` | S-M | nee |
-| 5 | Juice-port: fade/scale op `skinDialog`, bump bij invullen, golf bij goed woord, confetti bij oplossen | 0 animator-aanroepen (grep); `anim-01/02/03` tonen dialogen en toast die direct verschijnen; todo.md:626-634 stelt de port zelf voor. Kleuren via `Skin.p` | M | ja |
+| 1 | Haptiek: tik per letter, reject bij fout, success bij woord en oplossen | Nul haptiek in `app/src` (grep); gepland in todo.md:626-631; kan zonder VIBRATE-recht | S | ja |
+| 2 | Deelknop na de dagpuzzel (tijd, reeks, spoilervrij, geen andere game noemen) | Geen ACTION_SEND; todo.md:513-517; de vorm moet nog bedacht worden. Of `DailyScore`/`Stats` genoeg leveren, is niet nagelopen | S-M | nee |
+| 3 | Sprong weg: bord bovenaan uitlijnen (`gravity` TOP, `:522-524`) of `minLines = 3` | **Niet** `lines = 3` + ellipsize: clues zijn tot 110 tekens plus prefix (`WordData.cleanClue`). In `contracts/puzzle-vectors-v1.json` is 10-20% langer dan drie regels | S | ja |
+| 4 | `Toast` vervangen door een pil in de skinkleuren | Een echte `Toast` (`:2393`) valt over het toetsenbord (anim-02) en volgt `Skin.p` niet; todo ~633-635 | S-M | ja |
+| 5 | Viering bij oplossen vóór de kale beloningsdialoog, plus dialoogfade en `bump` bij invullen | Enige beloningsmoment (todo ~686-700); patroon in `wordfinder WinPanel.kt` en `Juice.kt`; met `Juice.enabled` zodat shots stil blijven (todo:626-640) | M | ja |
 
-Verder: eenmalige uitleg "Controleer is gratis bij 0 munten, hint kost 1/3" (S; geen onboarding in code); kleine muntbonus bij reeks 3/7 naast herstel voor 10 munten (`Economy.kt:54/70`, S); genummerde puzzelreeksen voor voortgang buiten de daily (todo.md:601, L).
-Genre: hints met verdiende munten zijn standaard. CodyCross: munten via mijlpalen en dagelijkse login, plus reclame en abonnement (Common Sense Media + Fanatee-helpcentrum). Teazel Crossword: loginbonus die groeit met de reeks. Daily Themed: VIP met 15 munten per dag. Bronnen: zoeksamenvattingen, 2026-10-24.
+**Verder:**
+- Eenmalige uitleg in de eerste minuut: "Controleer is gratis bij 0 munten, een hint kost 1 of 3" (S).
+- Eigen toetsenbord: in de todo "hoogste polish-rendement" (todo ~701), maar het is werk voor zes skins (L).
+- Genummerde puzzelreeksen (todo:601, L).
+
+**Besluit, niet bouwen:** een checkpoint bij een afgerond woord stond eerst op 1. Het is gedegradeerd door het bewaarbesluit, en het voordeel geldt alleen bij een crash. Doe het alleen als het besluit wordt bijgewerkt.
+
+**Genre** (zoeksamenvattingen 2026-10-24):
+- CodyCross: tokens via streak-mijlpalen (Fanatee-help); dagelijkse loginmunten zijn niet bevestigd.
+- Teazel Crossword: een loginbonus die groeit met de reeks.
+- Daily Themed Crossword: VIP met 15 munten per dag.
+- NYT Mini: sinds sept 2025 achter een abonnement, volgens Insider Gaming (geen NYT-bron).
 
 ## Word Swipe: top 5
 
 | # | Wat | Waarom (bewijs) | Omvang | Toestel |
 |---|---|---|---|---|
-| 1 | Instellingen uit 'Statistieken': twee kopjes (Spel / Instellingen) of één rij naar een eigen blad, geen zesde icoon | `04-statistieken.jpg`: vijf instellingenrijen onder de cijfers; `showStats` `MainActivity.kt:2426-2515`; het besluit over vaste chroom blijft heel | S | ja (shot 'stats') |
-| 2 | Reeksmijlpaal (dag 7, 30) betaalt een gratis hint-token | Reeks kost nu alleen (redden, `Economy.kt` STREAK_SAVE_*); tokens bestaan (`MainActivity.kt:1451`). Wordscapes geeft extra beloning bij aaneengesloten dagpuzzels (theriagames.com, mrt-apr 2025, derde partij) | S | nee |
-| 3 | Snelkoppeling 'Dagpuzzel' op het icoon (`res/xml/shortcuts.xml`, nl + en) | Dagelijkse terugkeer met één tik; todo.md:512 zegt "geen van de drie woordspellen heeft er een" — daarna kopiëren naar WG en WC | S | ja |
-| 4 | Melding bij te kort woord noemt woord en reden: "WAD — woorden hier hebben 4+ letters" | Pil 'Minimaal 4 letters' (`03-waag.jpg`, values-nl strings:53) leest als afwijzing van een goed woord; Wordscapes speelt 3-7 letters (zoeksamenvatting, 2026), spelers verwachten 3 | S | nee |
-| 5 | Letters los aantikken als tweede invoer naast vegen | `WheelView` is alleen met een veeg te bedienen en dus niet speelbaar met TalkBack (CLAUDE.md, todo.md:419-428) | M | ja |
+| 1 | Release uitbrengen (zie "Vooraf") | 56 commits vóór live v1.3: gerichte hint, geleide veeg en stempelkaart heeft nog geen speler gezien | M | ja (koude installatie) |
+| 2 | Shots opnieuw schieten | De winkelbeelden tonen nog de oude pil en deelknop (todo.md:19, 66) | S | ja |
+| 3 | Wiel op een klein scherm (360x640 dp) bekijken | `FitTest` rekent het alleen door (todo.md:30) | S | ja |
+| 4 | Dagelijkse beloning, bv. hint-token op reeksdag 7 en 30 | De reeks kost nu alleen; tokens bestaan (`:1448-1456`); "Dagelijkse beloning … nog niet besloten" (todo.md:664) | S bouwen, besluit eerst | nee |
+| 5 | Stats-dialoog indelen met kopjes Spel / Instellingen | `04-statistieken.jpg`: tegels zijn al gebouwd, het gaat alleen om de indeling. De thema- en handrij blijven er per besluit staan (`:2426-2515`, "settings row rather than a sixth top-bar icon"); effect klein | S | ja (shot 'stats') |
 
-Verder: multi-hint als derde muntbestemming (eerste letter van elk open woord), want de muntlus dooft rond level 13-23 uit (todo.md:651; Word Connect noemt hint/target/multi-hint, App Store via zoeksamenvatting, 2026-10-24) (M); `assetlinks.json` zodat de `?s=`-link in de app opent (S, andere repo, todo.md:26); teller 'Woorden 2/9' laten ogen als knop (S, todo.md:497).
-Niet doen zonder besluit: 3-letterwoorden (raakt de gedeelde lijst in wordguesser, cache-bump en drempels; L); geluid (raakt het besluit 'geen geluid', todo.md:813).
-Genre: Wordscapes (PeopleFun/AppLovin) dagpuzzel met reeks en bonuswoorden voor munten, ~55% omzet uit reclame (schatting, felixbraberg.substack, 2026). Words of Wonders (Fugo): bonuswoorden vullen een icoon dat edelstenen uitkeert (Arkadium-help, ongedateerd). Geen NL-letterwielapp gevonden: mogelijk een zoekgat, geen bewijs van een lege niche.
+**Geschrapt na debunk:**
+- Snelkoppeling: de app opent al de daily.
+- Uitgebreidere melding bij een te kort woord: de melding noemt het getal al, en er is geen bewijs dat spelers 3 letters verwachten.
+- Letters los aantikken: staand besluit "het wiel is swipe-only" met een bewust geaccepteerde prijs (`docs/besluiten/staande-richtingsbesluiten.md:63-70`). Alleen te heropenen als besluit (L).
+
+**Verder:**
+- Multi-hint: een nieuw idee, geen "derde muntbestemming". De stempelkaart is die bestemming al, en todo.md:651 is daarmee verouderd. Het raakt de break-even en `HINT_COST`.
+- `assetlinks.json` zodat de `?s=`-link in de app opent (todo.md:26; S, andere repo).
+- De teller aantikbaar laten ogen (todo.md:497): S, maar eerst een besluit.
+
+**Niet doen:** 3-letterwoorden (gedeelde lijst, cache-bump; L) en geluid (todo.md:813).
+
+**Genre** (zoeksamenvattingen 2026-10-24):
+- Words of Wonders (Fugo): bonuswoorden vullen een icoon; WS heeft dit al als stempelkaart (Arkadium-help).
+- Wordscapes: ~55% omzet uit reclame is een schatting van één bron (felixbraberg.substack, 2026).
+- Niet gevonden: de reeksbeloning van Wordscapes en de multi-hint van Word Connect.
 
 ## Vergelijkingsapps (zoeksamenvattingen 2026-10-24, niet zelf bekeken)
 
-- **Woord raden:** NYT Wordle (lampje-hint, stats, archief voor abonnees). Wordle! van Lion Studios (boosters, Remove Ads $5.99, 4,6★ bij 819K iOS volgens appfollow 2026). Quordle van Merriam-Webster (oefenstand die stats niet raakt). Lingo-app (status onbekend). Woordje (3-8 letters).
-- **Kruiswoord:** NYT Mini (sinds sept 2025 achter abonnement, Insider Gaming), CodyCross (Fanatee), Daily Themed Crossword (PlaySimple), Teazel Crossword. Denksport (Keesing) en Puzzelfit (DPG) zijn betaald.
-- **Letterwiel:** Wordscapes, Wordscapes Uncrossed (Piggy Bank, Crate of Hints), Words of Wonders (Fugo), Word Connect.
-- **Patroon bij de leiders:** hints kosten verdiende munten, reeksen worden beloond, verlies kost weinig. Geld komt uit reclame + Remove Ads of een abonnement; beide vallen buiten onze regels.
-- **Wat binnen onze regels past:** verdiende beloningen (reeks → hint), betere winmomenten en delen. Sluit aan op de conclusie in `2026-10-monetisatie/README.md` (eenmalige aankopen of supporterpakket in plaats van reclame).
+- **Woord raden:**
+  - NYT Wordle: lampje-hint, stats, archief voor abonnees.
+  - Wordle! (Lion Studios): App Store 4,6★ bij ~819K beoordelingen, Remove Ads $5.99 (VS).
+  - Quordle (Merriam-Webster): oefenstand die de stats niet raakt.
+  - Woordje: 3-8 letters.
+  - Lingo-app: status onbekend.
+- **Kruiswoord:** NYT Mini, CodyCross (Fanatee), Daily Themed Crossword (PlaySimple), Teazel Crossword. Denksport (Keesing) en Puzzelfit (DPG) zijn betaald.
+- **Letterwiel:** Wordscapes en Wordscapes Uncrossed (PeopleFun), Words of Wonders (Fugo), Word Connect. Geen NL-letterwielapp gevonden; dat kan een zoekgat zijn.
+- **Patroon bij de leiders:** hints kosten verdiende munten en reeksen worden beloond. Geld komt uit reclame + Remove Ads of een abonnement; beide vallen buiten onze regels.
+- **Wat binnen onze regels past:** verdiende reeksbeloningen, betere winmomenten, delen. Zie ook `2026-10-monetisatie/README.md` (eenmalige aankopen of supporterpakket in plaats van reclame).
+
+## Wat de debunkronde veranderde
+
+- WG #1 "woordcontrole in de daily" werd een besluitpunt: het huidige gedrag is bewust en gelijk voor iedereen.
+- WG: "daily te verborgen" (todo ~420) en "snelkoppeling" kwamen erbij; "Meaning" geldt alleen voor de daily-sheets.
+- WC #1 "vaker bewaren" werd een besluitpunt (bestaand besluit, voordeel alleen bij crash).
+- WC: `lines = 3` + ellipsize vervangen door bord bovenaan, omdat afkappen de clue zelf beschadigt. Pil en viering kwamen erbij.
+- WS: snelkoppeling, melding bij te kort woord en tik-invoer geschrapt. Release, shots en klein scherm kwamen erbij.
+- Bronnen aangepast: de Wordle-claim over niet-woorden en de Word Connect-claim zijn onbevestigd; CodyCross geeft tokens, geen loginmunten.
 
 ## Vervolgopdrachten
 
 **Word Guesser**
-1. Besluit en bouw "woordcontrole in de daily": git-historie van `:2916` lezen, besluit vastleggen, JVM-test op onEnter-pad, ranglijst-eerlijkheid meewegen.
-2. Eind-sheet: knop "Meaning", `bump`-golf vóór de sheet, aftelling naar volgende daily. Toestelronde met nieuwe filmstrip.
-3. Toestelronde zonder code: afgekeurd woord (schudden + pil) opnemen, toetskleur tijdens flip bepalen, `?`-raakvlak meten (`uiautomator dump`).
+1. Eind-sheet-ronde: `bump`-golf vóór de sheet, "Meaning" op de daily-sheets, aftelling naar de volgende daily. Toestelronde met een nieuwe filmstrip.
+2. Daily vindbaar maken plus snelkoppeling "Daily"; daarna release v2.7 met koude installatie.
+3. Besluitnotitie "regels in de daily": meten hoeveel echte woorden de accept-lijst mist, en het HC-contrast per palet laten kiezen.
 
 **Word Cross**
-1. Bewaren bij woord af/hint/Controleer + clue-balk vaste hoogte, met JVM-test op `SavedGame` en pixelcheck van het bord op het toestel.
-2. Juice-port in stappen: eerst haptiek, dan dialoogfade en bump, dan confetti; `Juice.enabled` meenemen zodat shots stil blijven.
-3. Deelknop (vorm van WG `Share.kt`) plus eenmalige uitleg van munten en Controleer in de eerste minuut.
+1. Haptiek plus een pil in plaats van `Toast` (Juice-basis overnemen met `Juice.enabled`).
+2. Sprong wegnemen door het bord bovenaan uit te lijnen, met een pixelcheck op het toestel; deelknop daarna.
+3. Viering bij oplossen en dialoogfade; daarna release 1.7 met koude installatie.
 
 **Word Swipe**
-1. Statistieken en instellingen splitsen; shot 'stats' en `docs/screenshots.md` bijwerken.
-2. Economie-besluit: hint-token bij reeks 7/30 en multi-hint als derde muntbestemming; doorrekenen tegen todo.md:651.
-3. Tik-invoer naast vegen in `WheelView`, daarna een TalkBack-ronde op het toestel; snelkoppeling 'Dagpuzzel' meenemen en naar WG/WC kopiëren.
+1. Release uitbrengen (koude installatie op de Motorola) en de shots opnieuw schieten.
+2. Wiel op 360x640 dp bekijken en de stats-dialoog indelen; shot 'stats' bijwerken.
+3. Besluit "dagelijkse beloning" (todo.md:664) voorleggen en todo.md:651 bijwerken nu de stempelkaart bestaat.
 
 ## Wat ontbreekt
 
-- Geen concurrent zelf gespeeld; onboarding, eerste minuut, foutanimatie en meldingen van de leiders zijn niet geverifieerd.
-- Downloads, ratings en prijzen alleen uit zoeksamenvattingen; voor echte cijfers moet play.google.com in het netwerkbeleid open.
-- Niet bekeken: filmstrips van WG en WS, beelden van WC (code was beslissend); `gameplay.mp4` bewust niet.
-- Alles met "Toestel: ja" is alleen uit code en notities beoordeeld en moet op de Motorola of een AVD worden bevestigd.
+- Geen concurrent zelf gespeeld. Onboarding, eerste minuut, foutanimatie en meldingen van de leiders zijn niet geverifieerd.
+- Downloads, ratings en prijzen komen alleen uit zoeksamenvattingen; voor echte cijfers moet play.google.com in het netwerkbeleid open.
+- Commits sinds de release voor WG/WC zijn ondergrenzen, omdat de clones ondiep zijn.
+- Of WS-web al live staat, is tegenstrijdig: todo.md:68 tegen commit 5bcca25.
+- Niet bekeken: filmstrips van WG en WS, beelden van WC, `gameplay.mp4`.
+- Alles met "Toestel: ja" moet op de Motorola of een AVD bevestigd worden, inclusief clue-breedte en pixelsprong.
