@@ -88,6 +88,13 @@ opgenomen in een headless browser. Ze werken, maar:
 - [ ] **Remake-rapporten factchecken**: `docs/beasts-bumpkins-remake/onderzoek.md` nalopen op prijzen,
       licenties en versies voordat er iets gekocht of geïnstalleerd wordt. De factcheck-agents vielen
       uit door de sessielimiet.
+- [ ] **Woordspellen-vergelijking (cloudsessie, alleen onderzoek)**: materiaal staat in
+      `media/ai-sessie/` (README, per app `NOTES.md` + screenshots + filmstrips; lees nooit de mp4).
+      Rapport hoort in `onderzoek/verbeteringen-woordspellen.md`; bestaat het niet, dan is de sessie
+      niet gedraaid of niet gepusht. Open waarnemingen: wordpuzzle-bord verschuift ~20 px bij wisselende
+      aanwijsbalk; wordpuzzle-invoer weg na force-stop (normaal sluiten niet getest); wordguesser
+      toont Engelse dialoogtekst in NL; shake-animatie bij afgewezen woord nooit gefilmd; dialoog-,
+      swipe- en shuffle-filmstrips zijn op timing benoemd, niet visueel gecontroleerd.
 
 ## 5. Ideeën voor nieuwe apps
 
