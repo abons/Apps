@@ -43,3 +43,8 @@ Grotendeels wel, maar niet volledig.
 2. Bouw een vertical slice in Godot: 1 missie, 3 gebouwen en 2 soorten dorpelingen, met tijdelijke art.
 3. Leg de stijl vast: werk 1 figuur en 1 gebouw helemaal uit.
 4. Maak daarna de assets in bulk, eventueel met ultracode.
+
+### Eerste gebouw: de peasant hut (2026-10-28)
+`modellen/peasant_hut.py` bouwt de hut in Blender 5.2 na naar `House.png` (217×147, uit `abons/Unity_bumpkins`), zelfde camera (iso 2:1), render op 4×. 12 Opus-rondes van meten tegen de sprite; Sonnet stopte twee keer na 2–3 rondes. Draaien: `blender -b -P peasant_hut.py -- 4`.
+- ⚠️ De vergelijkingsplaat bevat de originele sprite en blijft daarom uit deze publieke repo.
+- Les: een Gemini-plaat van de sprite als detailreferentie scheelt rondes raden; volgende gebouw eerst plaat, dan eventueel Tripo, dan Blender.
