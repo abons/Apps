@@ -15,26 +15,34 @@ Uitvoer koe.glb: armatuur `koe_rig` (koe_rig.py) met alle acties, losse delen op
 een gedeelde atlas in textures_koe/ (koe_kleur.jpg, koe_normaal.png, koe_orm.png; R=AO G=ruw B=metaal).
 
 DELEN (mesh-object = glTF-node, stabiele namen):
-| deel     | inhoud                                          | materiaal        | tint (baseColorFactor)  |
+| deel     | inhoud                                          | materiaal        | tint                    |
 | -------- | ----------------------------------------------- | ---------------- | ----------------------- |
-| lijf     | romp, hals, kop, benen, hoeven, staart, oren    | mat_lijf         | #ffffff vacht (wit)     |
-|          | de vlekken (eigen vlakken, langs de rand gesneden) | mat_vlek      | #262422 vlekken (zwart) |
+| lijf     | romp, hals, kop, benen, hoeven, staart, oren,   | mat_lijf         | factor #ffffff; vlekken |
+|          | vlekken (in de textuur, masker apart)           |                  | zie HERTINTEN           |
 |          | ogen (eigen vlakken: ook leesbaar in een zwarte kop) | mat_vast    | wit (echte kleur)       |
 | uier     | uier met vier spenen                            | mat_uier         | #f0b9ae roze            |
 | halsband | leren halsband, VERBORGEN (extras.verborgen)     | mat_halsband     | #6e4226 leer            |
 | bel      | koperen bel + lus + klepel, kind van prop_bel, VERBORGEN | mat_vast | wit (echte kleur)    |
-Tintbaar: de kleurtextuur is lichtgrijs (gemiddeld ~0,86) met het detail als luminantie (snuit roze,
-hoeven en ogen donker, kwast crème, vuile onderbenen als relatieve tint); kleur = factor x textuur.
-mat_lijf en mat_vlek delen dezelfde textuur: vachtvariant = twee factoren, bv. roodbont = vlek
-#7a3b22, blaarkop = vlek zwart of rood met een witte kop (vereist een andere vlekkenkaart, niet nu).
+HERTINTEN (r7, vervangt mat_vlek met gesneden vlakken): de vlekken zitten op textuurresolutie in
+koe_kleur.jpg, dus de glb toont zonder meer een zwartbonte koe (factor wit). Het masker staat los in
+textures_koe/koe_vlek.png (R = 1 in de vlek, zachte haarrand). mat_lijf draagt glTF-extras (in Godot
+meta op het materiaal): tint_vacht "#ffffff", tint_vlek "#262422", vlek_standaard "#262422",
+vlek_masker "textures_koe/koe_vlek.png". Hertinten = één parameter per deel, in een shader:
+  albedo = tex.rgb * mix(tint_vacht, tint_vlek / vlek_standaard, masker)      (lineaire kleuren)
+koe_vacht.gdshader doet precies dat (uniforms tint_vacht, tint_vlek; standaard = geen verschil).
+Voorbeeld roodbont: tint_vlek #7a3b22. De textuur is in het wit lichtgrijs (~0,86) met crème en vuil
+als relatieve tint, in de vlek vlek_standaard x detail (bruinzwarte glans, haarplukken).
 halsband en bel staan in de glb maar met extras {"verborgen": true}: het spel zet ze bij het spawnen
 onzichtbaar en toont ze als de koe van het dorp is.
 
 Bouw: een signed distance field (numpy; afgeronde kegels en ellipsoïden langs de gewrichten van het
 skelet, glad samengevoegd) -> surface nets (7 mm) = hoog-poly; gedecimeerd (symmetrisch) = laag-poly.
-De vlekgrens is een 3D-veld; de laag-poly wordt langs de nullijn doorgesneden zodat elk vlak óf vacht
-óf vlek is. Gewichten: bone heat (ARMATURE_AUTO), daarna oren/hoeven/kaak rechtgezet. Cycles bakt
-normaal en AO van hoog naar laag; kleur en ruwheid komen er per texel bij uit een gebakken positiekaart.
+De vlekgrens is een 3D-veld, per texel geëvalueerd (positie- en normaalkaart gebakken); vacht = haar-
+strengen en plukken als hoogte langs een vaste 3D-richting per streek (romp, buik, been, kop, staart),
+krullen op de kuif, lange haren in kwast en oor. Gewichten: bone heat (ARMATURE_AUTO), gladgestreken,
+romp los van de bovenbenen (romp_los), onderbenen star (onderbenen), oren/hoeven/kwast vast. Romp korter
+via koe_rig.ROMP; bas() rekent de velden terug naar de basismaat. Cycles bakt normaal en AO van hoog naar
+laag; kleur, ruwheid en het vlekkenmasker komen er per texel bij.
 """
 import math
 import os
@@ -66,7 +74,7 @@ SCRATCH = os.path.join(os.environ.get("TEMP", ""), "claude", "E--werk-androidApp
 REF = OPTS.get("ref", SCRATCH)
 T0 = time.time()
 H_GRID = 0.007 if not SNEL else 0.010
-DOEL_LIJF = 5300                    # driehoeken na decimeren (de vlekgrens snijdt er nog ~400 bij)
+DOEL_LIJF = 5500                    # driehoeken na decimeren (de oogranden snijden er nog ~40 bij)
 DELEN = ["lijf", "uier", "halsband", "bel"]
 GRIJS = 0.86
 TINT = {"lijf": "#ffffff", "vlek": "#262422", "uier": "#f0b9ae", "halsband": "#6e4226"}
@@ -75,6 +83,14 @@ srgb, naar_srgb, ruis, gladstap = BM.srgb, BM.naar_srgb, BM.ruis, BM.gladstap
 
 def log(*a):
     print(f"[koe {time.time() - T0:6.1f}s]", *a, flush=True)
+
+
+def bas(A):
+    """Wereld/schaal -> basismaat: maakt de romp-inkorting (koe_rig.ROMP) ongedaan, zodat de vlakken- en
+    kleurvelden in de oude basismaat blijven rekenen."""
+    A = np.array(A, float)
+    A[..., 1] = R.romp_y_inv(A[..., 1])
+    return A
 
 
 def nrm(v):
@@ -270,18 +286,18 @@ def kop_assen(sk):
 
 def vorm_lijf(sk):
     s, J, T = sk.s, sk.J, sk.T
-    V = lambda x, y, z: np.array((x, y, z)) * s
+    V = lambda x, y, z: np.array((x, float(R.romp_y(y)), z)) * s
     S = SDF()
     # romp
-    S.el(V(0, -0.36, 0.82), np.array((0.24, 0.22, 0.31)) * s, k=0.10 * s)
-    S.el(V(0, -0.02, 0.81), np.array((0.29, 0.38, 0.31)) * s, k=0.12 * s)
+    S.el(V(0, -0.36, 0.83), np.array((0.25, 0.22, 0.31)) * s, k=0.10 * s)
+    S.el(V(0, -0.02, 0.80), np.array((0.30, 0.38, 0.33)) * s, k=0.12 * s)
     S.el(V(0, 0.30, 0.84), np.array((0.28, 0.26, 0.25)) * s, k=0.10 * s)
-    S.el(V(0, 0.47, 0.91), np.array((0.22, 0.14, 0.17)) * s, k=0.08 * s)
+    S.el(V(0, 0.48, 0.94), np.array((0.23, 0.15, 0.19)) * s, k=0.08 * s)                 # kruis (vlakke ruglijn)
     S.rc(V(0, -0.48, 1.03), V(0, 0.52, 1.02), 0.10 * s, 0.10 * s, k=0.12 * s)          # rugbalk (vlakke rug)
     S.el(V(0, -0.44, 1.04), np.array((0.10, 0.15, 0.06)) * s, k=0.08 * s)             # schoft
     for sg in (1, -1):
         S.el(V(sg * 0.18, 0.34, 1.02), np.array((0.065, 0.07, 0.055)) * s, k=0.07 * s)  # heupknobbel
-        S.el(V(sg * 0.085, 0.585, 0.98), np.array((0.05, 0.05, 0.05)) * s, k=0.05 * s)  # zitbeenknobbel
+        S.el(V(sg * 0.085, 0.59, 1.00), np.array((0.05, 0.05, 0.05)) * s, k=0.05 * s)  # zitbeenknobbel
     # staart (wortel glad aan de romp, de rest los)
     S.rc(V(0, 0.52, 1.03), J["Tail"], 0.07 * s, 0.05 * s, k=0.05 * s)
     S.rc(J["Tail"], J["Tail1"], 0.05 * s, 0.034 * s, k=0.03 * s)
@@ -289,27 +305,43 @@ def vorm_lijf(sk):
     S.rc(J["Tail2"], J["Tail3"], 0.026 * s, 0.022 * s, k=0.008 * s)
     td = nrm(T["Tail3"] - J["Tail3"])
     ax = np.array([[1, 0, 0], nrm(np.cross(td, [1, 0, 0])), td])
-    S.el(J["Tail3"] + td * 0.13 * s, np.array((0.05, 0.042, 0.15)) * s, k=0.02 * s, assen=ax)   # kwast
+    S.el(J["Tail3"] + td * 0.07 * s, np.array((0.055, 0.046, 0.10)) * s, k=0.025 * s, assen=ax)  # kwast
+    S.rc(J["Tail3"] + td * 0.08 * s, J["Tail3"] + td * 0.30 * s, 0.045 * s, 0.012 * s, k=0.03 * s)        # punt
     # hals + kwab
-    S.rc(V(0, -0.40, 0.88), V(0, -0.91, 1.12), 0.23 * s, 0.13 * s, k=0.10 * s)
-    S.rc(V(0, -0.45, 1.04), V(0, -0.91, 1.19), 0.08 * s, 0.075 * s, k=0.08 * s)
-    S.el(V(0, -0.63, 0.74), np.array((0.045, 0.15, 0.10)) * s, k=0.06 * s)
+    S.rc(V(0, -0.36, 0.90), V(0, -0.80, 1.09), 0.26 * s, 0.16 * s, k=0.10 * s)
+    S.rc(V(0, -0.45, 1.06), V(0, -0.80, 1.15), 0.10 * s, 0.09 * s, k=0.08 * s)             # halskam
+    S.rc(V(0, -0.50, 0.73), V(0, -0.72, 0.86), 0.05 * s, 0.03 * s, k=0.05 * s)         # kwab langs de keel
     # kop
     d, u = kop_assen(sk)
     H0, H1 = J["Head"], T["Head"]
     KA = np.array([[1, 0, 0], d, u])
-    S.el(H0 + d * 0.07 * s, np.array((0.135, 0.115, 0.125)) * s, k=0.05 * s, assen=KA)     # schedel
-    S.rc(H0 + d * 0.06 * s, H1 - d * 0.06 * s, 0.115 * s, 0.088 * s, k=0.04 * s)          # gezicht
-    S.el(H1 - d * 0.035 * s + u * 0.005 * s, np.array((0.107, 0.072, 0.082)) * s, k=0.03 * s, assen=KA)  # snuit
+    S.el(H0 + d * 0.07 * s, np.array((0.143, 0.12, 0.13)) * s, k=0.05 * s, assen=KA)       # schedel
+    S.rc(H0 + d * 0.06 * s, H1 - d * 0.06 * s, 0.12 * s, 0.094 * s, k=0.04 * s)           # gezicht
+    S.el(H1 - d * 0.035 * s + u * 0.008 * s, np.array((0.126, 0.06, 0.09)) * s, k=0.03 * s, assen=KA)   # snuit: breed, plat
+    S.el(H0 - u * 0.09 * s + d * 0.03 * s, np.array((0.07, 0.06, 0.035)) * s, k=0.04 * s, assen=KA)      # kuif (krullenkam)
     S.rc(J["Jaw"], T["Jaw"], 0.07 * s, 0.045 * s, k=0.04 * s)                              # onderkaak
     for sg in (1, -1):
         S.el(J["Jaw"] + V(sg * 0.055, 0.0, 0.01), np.array((0.05, 0.08, 0.08)) * s, k=0.04 * s)   # wang
-        S.el(H0 + d * 0.13 * s + np.array((sg * 0.093 * s, 0, 0)) - u * 0.025 * s, np.array((0.026,) * 3) * s,
-             k=0.010 * s)                                                                    # oog
-        S.el(H0 + d * 0.118 * s + np.array((sg * 0.098 * s, 0, 0)) - u * 0.05 * s,
-             np.array((0.026, 0.02, 0.012)) * s, k=0.012 * s, assen=KA)                     # wenkbrauwboog
-        S.el(H1 + d * 0.025 * s - u * 0.03 * s + np.array((sg * 0.034 * s, 0, 0)),
-             np.array((0.016,) * 3) * s, k=0.008 * s, m="-")                                # neusgat
+        # oog: ondiepe kas, oogbol, boven- en onderlid, wenkbrauwboog erboven
+        oc = oog_c(sk, sg)
+        X = np.array((sg * 1.0, 0, 0))
+        uit = nrm(X + 0.2 * d - 0.15 * u)
+        S.el(oc + uit * 0.022 * s - u * 0.004 * s, np.array((0.034, 0.045, 0.038)) * s, k=0.014 * s, m="-",
+             assen=KA)                                                                       # oogkas
+        S.el(oc, np.array((OOG[3],) * 3) * s, k=0.004 * s)                                  # oogbol
+        S.el(oc - u * 0.017 * s + X * 0.001 * s, np.array((0.0275, 0.0325, 0.0105)) * s, k=0.004 * s,
+             assen=KA)                                                                       # bovenlid
+        S.el(oc + u * 0.019 * s - X * 0.001 * s, np.array((0.025, 0.029, 0.0085)) * s, k=0.004 * s,
+             assen=KA)                                                                       # onderlid
+        S.el(H0 + d * 0.118 * s + np.array((sg * 0.100 * s, 0, 0)) - u * 0.056 * s,
+             np.array((0.026, 0.024, 0.012)) * s, k=0.012 * s, assen=KA)                    # wenkbrauwboog
+        # neusgat: komma (diep ovaal + kleine staart naar binnen-onder), met een opstaande vleugel
+        nc = H1 + d * 0.028 * s - u * 0.024 * s + X * 0.034 * s
+        S.el(nc + X * 0.012 * s - d * 0.006 * s, np.array((0.009, 0.012, 0.022)) * s, k=0.006 * s,
+             assen=KA)                                                                       # neusvleugel
+        S.el(nc, np.array((0.010, 0.020, 0.017)) * s, k=0.006 * s, m="-", assen=KA)
+        S.el(nc + u * 0.014 * s - X * 0.009 * s, np.array((0.007, 0.014, 0.008)) * s, k=0.005 * s, m="-",
+             assen=KA)
         # oor: plat blad met een kom aan de voorkant, steel in de kop
         eb = ("Left" if sg > 0 else "Right") + "Ear"
         ea, ee = J[eb], T[eb]
@@ -320,17 +352,17 @@ def vorm_lijf(sk):
         OA = np.array([e, w, t])
         mid = ea + (ee - ea) * 0.55
         S.rc(ea - e * 0.02 * s, mid, 0.035 * s, 0.028 * s, k=0.02 * s)
-        S.el(mid, np.array((0.105, 0.068, 0.022)) * s, k=0.012 * s, assen=OA)
-        S.el(mid + t * 0.016 * s + e * 0.01 * s, np.array((0.085, 0.05, 0.013)) * s, k=0.006 * s, m="-", assen=OA)
+        S.el(mid, np.array((0.10, 0.054, 0.025)) * s, k=0.012 * s, assen=OA)
+        S.el(mid + t * 0.019 * s + e * 0.012 * s, np.array((0.084, 0.040, 0.016)) * s, k=0.006 * s, m="-", assen=OA)
     S.el(H0 + np.array((0, 0, 0.10 * s)) + d * 0.02 * s, np.array((0.075, 0.05, 0.04)) * s, k=0.03 * s)  # kuif
     # voorbenen
     for z, sg in (("Left", 1), ("Right", -1)):
         b = lambda n: z + n
         sh, el_, kn, ko, te = J[b("UpperArm")], J[b("ForeArm")], J[b("FrontCannon")], J[b("FrontHoof")], T[b("FrontHoof")]
-        S.el(sh + V(-sg * 0.02, 0.03, 0.06), np.array((0.10, 0.15, 0.19)) * s, k=0.08 * s)   # schouder
-        S.rc(sh, el_, 0.12 * s, 0.09 * s, k=0.06 * s)
-        S.el(el_ + V(0, 0.02, 0.0), np.array((0.055,) * 3) * s, k=0.04 * s)                  # elleboog
-        S.rc(el_, kn, 0.09 * s, 0.056 * s, k=0.04 * s)
+        S.el(sh + V(-sg * 0.03, 0.10, 0.08), np.array((0.08, 0.12, 0.17)) * s, k=0.08 * s)   # schouder
+        S.rc(sh + V(-sg * 0.01, 0.04, 0.0), el_, 0.075 * s, 0.068 * s, k=0.06 * s)
+        S.el(el_ + V(0, 0.02, 0.01), np.array((0.045,) * 3) * s, k=0.04 * s)                 # elleboog
+        S.rc(el_, kn, 0.08 * s, 0.05 * s, k=0.04 * s)
         S.el(kn, np.array((0.055, 0.052, 0.06)) * s, k=0.025 * s)                            # voorknie
         poot(S, kn, ko, te, s, V)
     # achterbenen
@@ -339,7 +371,7 @@ def vorm_lijf(sk):
         hp, kn, hak, ko, te = J[b("Thigh")], J[b("Shin")], J[b("HindCannon")], J[b("HindHoof")], T[b("HindHoof")]
         S.rc(hp + V(0, 0, 0.03), kn, 0.17 * s, 0.10 * s, k=0.08 * s)                         # dij
         S.el((hp + kn) / 2 + V(sg * 0.02, 0.03, 0), np.array((0.12, 0.17, 0.20)) * s, k=0.08 * s)
-        S.rc(kn, hak, 0.11 * s, 0.056 * s, k=0.05 * s)                                       # scheen
+        S.rc(kn, hak, 0.10 * s, 0.05 * s, k=0.05 * s)                                       # scheen
         S.el(kn + (hak - kn) * 0.3 + V(0, 0.025, 0), np.array((0.075, 0.07, 0.10)) * s, k=0.06 * s)
         S.rc(hak, hak + V(0, 0.04, 0.03), 0.036 * s, 0.028 * s, k=0.02 * s)                   # hakknobbel
         S.el(hak, np.array((0.047, 0.05, 0.05)) * s, k=0.025 * s)
@@ -349,7 +381,7 @@ def vorm_lijf(sk):
 
 def poot(S, boven, ko, te, s, V):
     """Pijp, kogel, koot en klauw (afgekapt op de grond)."""
-    S.rc(boven, ko, 0.05 * s, 0.046 * s, k=0.018 * s)
+    S.rc(boven, ko, 0.045 * s, 0.042 * s, k=0.018 * s)
     S.el(ko + V(0, 0.008, 0), np.array((0.05, 0.053, 0.05)) * s, k=0.018 * s)
     hm = ko + (te - ko) * 0.5
     g0 = np.array((te[0], te[1] + 0.05 * s, -0.01 * s))
@@ -359,65 +391,98 @@ def poot(S, boven, ko, te, s, V):
 
 def vorm_uier(sk):
     s = sk.s
-    V = lambda x, y, z: np.array((x, y, z)) * s
+    V = lambda x, y, z: np.array((x, float(R.romp_y(y)), z)) * s
     S = SDF()
-    S.el(V(0, 0.29, 0.52), np.array((0.12, 0.15, 0.10)) * s, k=0.04 * s)
-    S.el(V(0, 0.29, 0.60), np.array((0.10, 0.14, 0.07)) * s, k=0.05 * s)
+    S.el(V(0, 0.30, 0.53), np.array((0.10, 0.145, 0.095)) * s, k=0.04 * s)
+    S.el(V(0, 0.30, 0.61), np.array((0.09, 0.14, 0.07)) * s, k=0.05 * s)
     for x in (0.055, -0.055):
         for y in (0.22, 0.36):
-            S.rc(V(x, y, 0.45), V(x * 1.1, y, 0.375), 0.017 * s, 0.013 * s, k=0.015 * s)
+            S.rc(V(x, y, 0.45), V(x * 1.1, y, 0.38), 0.017 * s, 0.013 * s, k=0.015 * s)
     return S
 
 
 # --- Vlekken --------------------------------------------------------------------------------------
-VLEKKEN = [  # (midden, stralen) in basismaat; vrij naar het concept (links en rechts verschillen)
-    ((0.0, -0.60, 1.00), (0.42, 0.30, 0.28)),     # hals en schouders
-    ((0.20, -0.44, 0.74), (0.13, 0.15, 0.22)),    # linkerschouder tot de elleboog
-    ((-0.19, -0.46, 0.76), (0.12, 0.14, 0.20)),   # rechterschouder tot de elleboog
-    ((0.22, 0.30, 0.93), (0.10, 0.11, 0.10)),     # heup/flank links, klein
-    ((0.0, 0.53, 1.02), (0.14, 0.08, 0.06)),      # bovenop het kruis
-    ((0.30, -0.02, 0.93), (0.22, 0.24, 0.20)),    # flank links
-    ((-0.30, 0.10, 0.90), (0.22, 0.28, 0.21)),    # flank rechts
-    ((0.08, 0.02, 1.09), (0.26, 0.19, 0.13)),     # zadel over de rug (loopt over de ruglijn)
-    ((0.0, 0.40, 1.05), (0.28, 0.11, 0.10)),      # heup
-    ((0.20, 0.52, 0.86), (0.10, 0.12, 0.17)),     # dij links achter
-    ((-0.20, 0.50, 0.83), (0.11, 0.13, 0.19)),    # dij rechts achter
+VLEKKEN = [  # (midden, stralen) in basismaat; naar het concept: weinig grote, rafelige vlekken (links != rechts)
+    ((0.0, -0.62, 0.98), (0.40, 0.30, 0.30)),     # hals, borst en schouders (rondom)
+    ((0.0, -0.80, 1.10), (0.32, 0.24, 0.27)),     # bovenhals tot achter de kop
+    ((0.20, -0.46, 0.72), (0.12, 0.13, 0.21)),    # linkerschouder tot de elleboog
+    ((-0.20, -0.44, 0.75), (0.12, 0.15, 0.22)),   # rechterschouder tot de elleboog
+    ((0.25, -0.03, 0.94), (0.21, 0.26, 0.21)),    # grote middenvlek links (raakt de ruglijn)
+    ((0.10, 0.06, 1.08), (0.19, 0.17, 0.09)),     # ... en zijn lob over de rug
+    ((0.21, 0.34, 1.01), (0.08, 0.07, 0.07)),     # klein, links bij de heup
+    ((0.15, 0.60, 0.82), (0.11, 0.10, 0.25)),     # links achter op de dij (ook van achteren)
+    ((-0.27, 0.07, 0.92), (0.21, 0.30, 0.22)),    # grote flankvlek rechts
+    ((-0.16, 0.56, 0.86), (0.13, 0.13, 0.24)),    # dij en kruis rechts (ook van achteren)
+    ((0.0, 0.56, 1.02), (0.11, 0.06, 0.05)),      # band over de zitbeenderen
 ]
 
 
-def vlekveld(P, sk):
-    """> 0 = zwart. Ellipsoïdes + ruis; kop zwart met witte bles en witte snuit; benen, buik, staart wit."""
+WIT_IN = [  # witte inhammen (r9) gaven ronde gaten; alleen een baai onder in de grote linkervlek
+    ((0.31, 0.07, 0.76), (0.09, 0.12, 0.10)),
+]
+
+
+def vlekveld(P, sk, fijn=True):
+    """> 0 = zwart (basismaat-eenheden: ~5 per meter rond een vlekrand). Ellipsoïdes met domeinvervorming
+    op drie schalen (rafelige, gekartelde randen), losse eilandjes langs de randen; kop zwart met witte
+    bles, snuit en kuif; benen, buik en staart wit. Wordt per texel geëvalueerd (masker), niet gesneden."""
     s = sk.s
-    Q = np.asarray(P, float) / s
-    # domein-vervorming: rafelige randen zoals het concept (geen ronde vlekken)
-    W = np.column_stack([ruis(Q, 2.5, 21 + i, 2) for i in range(3)]) * 0.10 +         np.column_stack([ruis(Q, 7.0, 31 + i) for i in range(3)]) * 0.035
+    Q = bas(np.asarray(P, float) / s)
+    W = np.column_stack([ruis(Q, 2.0, 21 + i, 2) for i in range(3)]) * 0.16 + \
+        np.column_stack([ruis(Q, 4.5, 26 + i) for i in range(3)]) * 0.07 + \
+        np.column_stack([ruis(Q, 9.0, 31 + i) for i in range(3)]) * 0.03
+    if fijn:
+        W += np.column_stack([ruis(Q, 15.0, 41 + i) for i in range(3)]) * 0.018
     Qw = Q + W
     f = np.full(len(Q), -1.0)
     for c, r in VLEKKEN:
         f = np.maximum(f, 1 - np.linalg.norm((Qw - np.array(c)) / np.array(r), axis=1))
+    for c, r in WIT_IN:
+        f = np.minimum(f, -0.7 * (1 - np.linalg.norm((Qw - np.array(c)) / np.array(r), axis=1)))
+    f = f + 0.16 * ruis(Q, 3.0, 11) + 0.09 * ruis(Q, 8, 12) + 0.20 * ruis(Q, 5.5, 18, 2)
+    if fijn:
+        f += 0.15 * ruis(Q, 11, 17) + 0.07 * ruis(Q, 24, 13) + 0.01 * ruis(Q, 50, 14)   # gekartelde rand
+        # eilandjes: kleine zwarte spikkels in het wit vlak bij een vlek (en witte in het zwart)
+        sp = ruis(Q, 9.0, 15)
+        dicht = gladstap(-0.22, -0.04, f) * gladstap(0.05, -0.02, f)
+        f = np.maximum(f, (sp - 0.86) * 1.5 * dicht - 0.02 * (1 - dicht))
+        gat = ruis(Q, 11.0, 16)
+        f = np.where((f > 0) & (f < 0.12) & (gat > 0.97), f - (gat - 0.80) * 1.2, f)
     # kop
     d, u = kop_assen(sk)
-    H0, H1 = sk.J["Head"] / s, sk.T["Head"] / s
+    H0, H1 = bas(sk.J["Head"] / s), bas(sk.T["Head"] / s)
     t = np.clip((Q - H0) @ (H1 - H0) / np.sum((H1 - H0) ** 2), 0, 1)
     afst = np.linalg.norm(Q - (H0 + t[:, None] * (H1 - H0)), axis=1)
     kop = 1 - afst / 0.19
     for z in ("Left", "Right"):                         # oren zwart
-        ea, ee = sk.J[z + "Ear"] / s, sk.T[z + "Ear"] / s
+        ea, ee = bas(sk.J[z + "Ear"] / s), bas(sk.T[z + "Ear"] / s)
         te = np.clip((Q - ea) @ (ee - ea) / np.sum((ee - ea) ** 2), 0, 1)
         kop = np.maximum(kop, 1 - np.linalg.norm(Q - (ea + te[:, None] * (ee - ea)), axis=1) / 0.09)
     voorkant = -(Q - H0) @ u                            # > 0 aan de bles-kant
-    bles = (np.abs(Q[:, 0]) < 0.034 + 0.022 * t + 0.006 * ruis(Q, 6, 5)) & (voorkant > 0.0)
-    kop = np.where(bles, -1.0, kop)
-    snuit = np.linalg.norm(Q - (H1 - d * 0.04 + u * 0.02), axis=1) < 0.11
-    kop = np.where(snuit, -1.0, kop)
+    rb = 0.006 * ruis(Q, 6, 5) + (0.004 * ruis(Q, 30, 6) if fijn else 0)
+    bles = (np.abs(Q[:, 0]) < 0.026 + 0.010 * t + 0.032 * gladstap(0.40, 0.05, t) + 2.5 * rb) & (voorkant > -0.02)
+    snuit = np.linalg.norm(Q - (H1 - d * 0.04 + u * 0.02), axis=1) < 0.11 + 0.006 * ruis(Q, 6, 5)
+    kuif = kuifveld(Q, sk) + 3 * rb > 0.5
     f = np.maximum(f, kop * 2)
-    f = f + 0.18 * ruis(Q, 3.0, 11) + 0.08 * ruis(Q, 7, 12) + 0.04 * ruis(Q, 16, 13)
+    # witte aftekening van de kop wint van alles (geen rompvlekken of eilandjes in bles, snuit, kuif)
+    inkop = (afst < 0.26) & (Q[:, 1] < H0[1] + 0.10)
+    f = np.where(inkop & (bles | snuit | kuif), np.minimum(f, -0.5), f)
     # wit: onderbenen, buik, staart, kwast
     romp = (Q[:, 1] > -0.75) & (Q[:, 1] < 0.66)
     f -= 3 * gladstap(0.60, 0.50, Q[:, 2]) * romp
-    f -= 3 * (Q[:, 1] > 0.64) * (Q[:, 2] < 1.0)
+    f -= 3 * (Q[:, 1] > 0.64) * gladstap(1.0, 0.93, Q[:, 2]) * gladstap(0.10, 0.06, np.abs(Q[:, 0]))   # staart wit
     f -= 3 * gladstap(0.62, 0.52, Q[:, 2]) * (np.abs(Q[:, 0]) < 0.2)
     return f
+
+
+def kuifveld(Q, sk):
+    """0..1: de lichte krullenkuif boven op de kop tussen de oren (Q in basismaat)."""
+    s = sk.s
+    d, u = kop_assen(sk)
+    H0, H1 = bas(sk.J["Head"] / s), bas(sk.T["Head"] / s)
+    t = (Q - H0) @ (H1 - H0) / np.sum((H1 - H0) ** 2)
+    hoog = -(Q - H0) @ u
+    return gladstap(-0.12, 0.0, t) * gladstap(0.32, 0.18, t) * gladstap(0.05, 0.085, hoog) *         gladstap(0.075, 0.045, np.abs(Q[:, 0]))
 
 
 def snij_langs(bm, P_fn, naam):
@@ -454,48 +519,36 @@ def snij_langs(bm, P_fn, naam):
     return lay
 
 
+def oog_c(sk, sg):
+    d, u = kop_assen(sk)
+    return sk.J["Head"] + (d * OOG[0] + np.array((sg * OOG[1], 0, 0)) - u * OOG[2]) * sk.s
+
+
+OOG = (0.13, 0.096, 0.030, 0.027)       # langs de kop, opzij, omhoog (-u), straal: basismaat
+
+
+def oog_uit(sk, sg):
+    """Kijkrichting van het oog: opzij, iets naar voren en omhoog."""
+    d, u = kop_assen(sk)
+    return nrm(np.array((sg * 1.0, 0, 0)) + 0.2 * d - 0.15 * u)
+
+
 def oogveld(P, sk):
     """> 0 binnen de ogen (eigen vlakken, mat_vast: echte oogkleur ook in een zwarte kop)."""
-    s = sk.s
-    d, u = kop_assen(sk)
-    H0 = sk.J["Head"]
     f = np.full(len(P), -1.0)
     for sg in (1, -1):
-        c = H0 + (d * 0.13 + np.array((sg * 0.093, 0, 0)) - u * 0.025) * s
-        f = np.maximum(f, 0.024 * s - np.linalg.norm(P - c, axis=1))
+        kap = oog_c(sk, sg) + oog_uit(sk, sg) * OOG[3] * 0.6 * sk.s
+        f = np.maximum(f, OOG[3] * 0.76 * sk.s - np.linalg.norm(P - kap, axis=1))
     return f
 
 
-def snij_vlekken(o, sk):
-    """Snijdt de mesh langs vlekveld = 0 en de oogranden; material_index 0 vacht, 1 vlek, 2 oog (vast)."""
+def snij_ogen(o, sk):
+    """Snijdt de mesh langs de oogranden: material_index 0 vacht (vlekken zitten in het masker), 1 oog (vast)."""
     bm = bmesh.new()
     bm.from_mesh(o.data)
-    lay = snij_langs(bm, lambda P: vlekveld(P, sk), "vlek")
-    for fc in bm.faces:
-        m = np.mean([v[lay] for v in fc.verts])
-        fc.material_index = 1 if m > 0 else 0
-    # losse spikkels (eilanden van < 8 vlakken) omzetten: die flikkeren op afstand
-    gezien = set()
-    for fc in bm.faces:
-        if fc.index in gezien:
-            continue
-        eiland, rand = [fc], [fc]
-        gezien.add(fc.index)
-        while rand:
-            f_ = rand.pop()
-            for e in f_.edges:
-                for g in e.link_faces:
-                    if g.index not in gezien and g.material_index == fc.material_index:
-                        gezien.add(g.index)
-                        eiland.append(g)
-                        rand.append(g)
-        if len(eiland) < 20:
-            for f_ in eiland:
-                f_.material_index = 1 - f_.material_index
     lay2 = snij_langs(bm, lambda P: oogveld(P, sk), "oog")
     for fc in bm.faces:
-        if np.mean([v[lay2] for v in fc.verts]) > 0:
-            fc.material_index = 2
+        fc.material_index = 1 if np.mean([v[lay2] for v in fc.verts]) > 0 else 0
     bm.to_mesh(o.data)
     bm.free()
     o.data.validate(verbose=False)
@@ -610,8 +663,21 @@ def decimeer(hoog, naam, doel, coll):
     bpy.ops.object.modifier_apply(modifier="dec")
     bm = bmesh.new()
     bm.from_mesh(o.data)
+    for v in bm.verts:                            # decimeren mag niet onder de grond prikken (klauwpunten)
+        if v.co.z < 0:
+            v.co.z = 0.0
     bmesh.ops.triangulate(bm, faces=bm.faces)
     bmesh.ops.dissolve_degenerate(bm, dist=1e-5, edges=bm.edges)
+    # lange splinters (decimeren verbindt soms de zool met de knie): opdelen, zodat elk stuk zijn eigen
+    # gewicht krijgt en niet als naald meedraait met de klauw
+    def splinter(e):
+        L_ = e.calc_length()
+        return L_ > 0.08 and any(2 * f.calc_area() / L_ < 0.12 * L_ for f in e.link_faces)
+    lang = [e for e in bm.edges if splinter(e)]
+    if lang:
+        bmesh.ops.subdivide_edges(bm, edges=lang, cuts=2, use_grid_fill=False)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+        log(naam, len(lang), "lange randen opgedeeld")
     bm.to_mesh(o.data)
     bm.free()
     o.data.validate(verbose=False)
@@ -667,11 +733,19 @@ def bak_mat(naam, soort, deel_id=0):
     m.use_nodes = True
     nt = m.node_tree
     out = nt.nodes["Material Output"]
-    if soort in ("pos", "id"):
+    if soort in ("pos", "id", "nrm"):
         em = nt.nodes.new("ShaderNodeEmission")
         if soort == "pos":
             g = nt.nodes.new("ShaderNodeNewGeometry")
             nt.links.new(g.outputs["Position"], em.inputs["Color"])
+        elif soort == "nrm":                      # wereldnormaal (glad), als n*0,5+0,5
+            g = nt.nodes.new("ShaderNodeNewGeometry")
+            vm = nt.nodes.new("ShaderNodeVectorMath")
+            vm.operation = "MULTIPLY_ADD"
+            vm.inputs[1].default_value = (0.5, 0.5, 0.5)
+            vm.inputs[2].default_value = (0.5, 0.5, 0.5)
+            nt.links.new(g.outputs["Normal"], vm.inputs[0])
+            nt.links.new(vm.outputs[0], em.inputs["Color"])
         else:
             em.inputs["Color"].default_value = ((deel_id + 1) / 8.0, 1.0, 0.0, 1.0)
         nt.links.new(em.outputs[0], out.inputs["Surface"])
@@ -690,7 +764,7 @@ def bak(doel, highs, soort, img, ext=0.01, ray=0.03, margin=4, clear=False):
     doel.select_set(True)
     bpy.context.view_layer.objects.active = doel
     kw = dict(use_clear=clear, margin=margin, margin_type="EXTEND", target="IMAGE_TEXTURES")
-    if soort in ("pos", "id"):
+    if soort in ("pos", "id", "nrm"):
         sc.cycles.samples = 1
         kw.update(type="EMIT", use_selected_to_active=False)
     else:
@@ -710,7 +784,7 @@ def bak_alles(delen, highs, sk):
     log("cycles op", BM.gpu(sc))
     sc.world = sc.world or bpy.data.worlds.new("w")
     sc.world.light_settings.distance = 0.15 * sk.s
-    beelden = {k: BM.beeld("_" + k, RES) for k in ("pos", "id", "normaal", "ao")}
+    beelden = {k: BM.beeld("_" + k, RES) for k in ("pos", "id", "nrm", "normaal", "ao")}
     eerst = True
     for i, (naam, o) in enumerate(delen.items()):
         t1 = time.time()
@@ -720,7 +794,7 @@ def bak_alles(delen, highs, sk):
         me.polygons.foreach_get("material_index", oud_idx)
         for o2 in delen.values():
             o2.hide_render = o2 is not o
-        for soort in ("pos", "id"):
+        for soort in ("pos", "id", "nrm"):
             me.materials.clear()
             me.materials.append(bak_mat("_" + soort, soort, i))
             me.polygons.foreach_set("material_index", np.zeros(len(me.polygons), np.int32))
@@ -757,76 +831,194 @@ def componeer(B, mpp, sk):
     ys, xs = np.nonzero(idm[..., 1] > 0.5)
     deel = np.clip(np.round(idm[ys, xs, 0] * 8).astype(int) - 1, 0, len(DELEN) - 1)
     P = B["pos"][ys, xs, :3].astype(np.float64)
-    Q = P / s
+    Q = bas(P / s)
     n = len(P)
     kl = np.ones((n, 3)) * GRIJS
     H = np.zeros(n)
     ruw = np.full(n, 0.72)
     met = np.zeros(n)
     L = deel == 0
-    # vacht: lage variatie + korte haren (gestrekt langs de romp, langs de benen omlaag)
-    var = 1 + 0.05 * ruis(Q, 4, 1, 2) + 0.03 * ruis(Q, 25, 2)
-    kl *= var[:, None]
-    been = gladstap(0.55, 0.45, Q[:, 2])
-    fh = np.where(been[:, None] > 0.5, np.array([90.0, 90.0, 18.0]), np.array([90.0, 18.0, 70.0]))
-    H += 0.00035 * ruis(Q * fh / 40.0, 40.0, 3) * L
-    # vuile onderbenen, iets bruin
-    vuil = gladstap(0.30, 0.06, Q[:, 2]) * L
-    kl *= (1 - vuil[:, None] * np.array([0.25, 0.32, 0.42]) * (0.7 + 0.3 * ruis(Q, 14, 4))[:, None])
+    N = B["nrm"][ys, xs, :3].astype(np.float64) * 2 - 1
+    N /= np.linalg.norm(N, axis=1, keepdims=True) + 1e-9
+    d, u = kop_assen(sk)
+    H0, H1 = bas(sk.J["Head"] / s), bas(sk.T["Head"] / s)
+    tk = np.clip((Q - H0) @ (H1 - H0) / np.sum((H1 - H0) ** 2), -0.5, 1.5)
+    kopafst = np.linalg.norm(Q - (H0 + np.clip(tk, 0, 1)[:, None] * (H1 - H0)), axis=1)
+    # --- haarrichting: gewichten per streek (romp, buik, been, kop, staart), elk een vaste 3D-richting
+    w_kop = gladstap(0.24, 0.17, kopafst) * (tk > -0.3)
+    w_staart = ((Q[:, 1] > 0.62) & (Q[:, 2] < 1.0)).astype(float)
+    w_been = gladstap(0.50, 0.40, Q[:, 2]) * (1 - w_staart)
+    w_buik = gladstap(-0.35, -0.70, N[:, 2]) * (1 - w_been) * (1 - w_kop) * (1 - w_staart)
+    w_romp = np.clip(1 - w_kop - w_been - w_buik - w_staart, 0, 1)
+    streken = [  # (gewicht, richting, fijn dwars/langs, pluk dwars/langs, hoogte fijn/pluk m)
+        (w_romp, (0, 0.55, -1.0), (190, 16), (45, 4), (0.00075, 0.00160)),
+        (w_buik, (0, 1.0, -0.15), (170, 9), (60, 4), (0.00090, 0.00160)),     # buiklijn: langer haar
+        (w_been, (0, 0.12, -1.0), (230, 22), (80, 9), (0.00050, 0.00070)),
+        (w_kop, tuple(d), (230, 22), (90, 9), (0.00050, 0.00070)),
+        (w_staart, (0, 0.05, -1.0), (200, 4), (70, 2), (0.00090, 0.00200)),
+    ]
+
+    def streng(t, fd, fl, seed, octv=2, Qp=None):
+        Qp = Q if Qp is None else Qp
+        t = nrm(t)
+        Qa = Qp * fd + np.outer(Qp @ t, t) * (fl - fd)
+        return ruis(Qa, 1.0, seed, octv)
+
+    haar = np.zeros(n)          # -1..1, fijne strengen + plukken (voor kleur, ruwheid, randen)
+    H_haar = np.zeros(n)
+    rand_streep = np.zeros(n)
+    for i, (w, t, fijn, pluk, amp) in enumerate(streken):
+        sel = w > 1e-3
+        if not sel.any():
+            continue
+        Qs = Q[sel]
+        hf = streng(t, *fijn, 50 + i, Qp=Qs)
+        hp = streng(t, *pluk, 60 + i, Qp=Qs)
+        rs = streng(t, 55, 5, 70 + i, 1, Qp=Qs)
+        haar[sel] += w[sel] * (0.55 * hf + 0.45 * hp)
+        H_haar[sel] += w[sel] * (amp[0] * hf + amp[1] * hp)
+        rand_streep[sel] += w[sel] * rs
+    # kuif: krullen, langer haar; kwast: lange strengen (zit al in w_staart, extra hoogte)
+    kuif = kuifveld(Q, sk) * L
+    krul = ruis(Q, 120, 80, 2)
+    haar = haar * (1 - kuif) + kuif * krul
+    H_haar = H_haar * (1 - kuif) + kuif * 0.0026 * krul
+    kw = gladstap(0.52, 0.40, Q[:, 2]) * (Q[:, 1] > 0.62) * L
+    H_haar += kw * 0.0008 * streng((0, 0.05, -1), 260, 3, 81)
+    H += H_haar * L
+    # --- vlekkenmasker (per texel): rand breekt langs de haarrichting
+    fv = vlekveld(P, sk) + 0.01 * rand_streep + 0.035 * haar
+    M = gladstap(-0.016, 0.016, fv) * L
+    bruinrand = gladstap(0.0, 0.03, fv) * gladstap(0.09, 0.03, fv)      # bruine waas net binnen de rand
+    # --- kleur wit: crème-zweem, vuil aan buik en benen, haarlicht
+    lage = ruis(Q, 3.0, 1, 2)
+    wit = np.ones((n, 3)) * GRIJS * np.array([1.0, 0.975, 0.935])
+    creme = np.clip(0.5 + 0.8 * lage, 0, 1)
+    wit *= (1 - 0.14 * creme[:, None] * np.array([0.0, 0.25, 0.75]))
+    warm = gladstap(0.75, 0.35, Q[:, 2])                      # buik en benen warm gebroken wit
+    wit *= (1 - 0.10 * warm[:, None] * np.array([0.1, 0.4, 0.9]))
+    wit *= (1 + 0.035 * ruis(Q, 9, 2))[:, None]
+    buikvuil = gladstap(0.70, 0.52, Q[:, 2]) * gladstap(-0.2, -0.6, N[:, 2]) * (1 - w_been)
+    wit *= (1 - ((0.10 + 0.08 * ruis(Q, 7, 3)) * buikvuil)[:, None] * np.array([0.6, 0.85, 1.2]))
+    vuil = gladstap(0.42, 0.05, Q[:, 2]) * (0.7 + 0.3 * ruis(Q * np.array([1, 1, 0.3]), 18, 4)) + \
+        0.25 * gladstap(0.55, 0.40, Q[:, 2]) * (1 - w_staart)
+    knie = np.zeros(n)
+    for z in ("Left", "Right"):
+        for b in ("FrontCannon", "HindCannon"):
+            knie = np.maximum(knie, gladstap(0.07, 0.02, np.linalg.norm(Q - bas(sk.J[z + b] / s), axis=1)))
+    vuil = np.clip(vuil + 0.5 * knie, 0, 1)
+    wit *= (1 - vuil[:, None] * np.array([0.30, 0.38, 0.50]))
+    wit *= (1 + 0.16 * haar)[:, None]                   # haarpunten licht, wortels in de schaduw
+    # --- kleur zwart: bruinzwarte glans, verbleekt op rug en lichtzijde, haarstructuur sterker
+    v0 = srgb(TINT["vlek"])
+    bleek = np.clip(ruis(Q, 2.4, 7, 2) * 1.8 - 0.1, 0, 1) * (0.5 + 0.5 * gladstap(0.75, 1.05, Q[:, 2]))
+    zwart = np.ones((n, 3)) * (1 + 0.18 * ruis(Q, 5, 8))[:, None]
+    zwart *= 1 + bleek[:, None] * np.array([1.4, 0.95, 0.55])
+    zwart *= 1 + (bruinrand * (0.6 + 0.4 * haar))[:, None] * np.array([1.6, 1.0, 0.5])
+    zwart *= (1 + 0.45 * haar + 0.15 * rand_streep)[:, None]
+    zwart *= 1 + (0.45 * np.clip(ruis(Q, 6.5, 24, 2) * 1.6 - 0.3, 0, 1))[:, None] * np.array([0.95, 0.95, 1.0])
+    kam = np.clip(haar * 1.8 - 0.35, 0, 1)
+    zwart *= 1 + kam[:, None] * np.array([1.1, 0.85, 0.6])                    # bruingrijze glans op de plukken
+    zwart *= (1 + 0.25 * ruis(Q * np.array([1, 1, 0.5]), 18, 9))[:, None]    # lokken: tweede toon
+    zwart *= v0                                          # textuur = vlek-standaard x detail (zie DELEN)
+    kl = wit * (1 - M[:, None]) + zwart * M[:, None]
+    ruw = 0.80 - 0.06 * haar - M * (0.16 + 0.05 * haar)
     # hoeven: alles onder de kroonrand donker en glad
     kroon = 0.075 + 0.006 * ruis(Q, 30, 5)
     hoef = gladstap(kroon + 0.006, kroon - 0.006, Q[:, 2]) * L
     kl = kl * (1 - hoef[:, None]) + hoef[:, None] * np.array([0.050, 0.045, 0.042]) * (1 + 0.3 * ruis(Q, 60, 6))[:, None]
     ruw = ruw * (1 - hoef) + 0.45 * hoef
-    H += hoef * 0.0003 * np.sin(Q[:, 2] * 900)          # groeiringen
-    # klauwspleet: smalle donkere groef vooraan in de hoef
+    H = H * (1 - hoef) + hoef * 0.00012 * np.sin(Q[:, 2] * 700 + 3 * ruis(Q, 40, 23))   # groeiringen (geen haar)
+    M = M * (1 - hoef)
     for zijde in ("Left", "Right"):
         for b in ("FrontHoof", "HindHoof"):
+            ko = bas(sk.J[zijde + b] / s)
             x0 = sk.T[zijde + b][0] / s
             gl = np.exp(-((Q[:, 0] - x0) / 0.004) ** 2) * hoef * (Q[:, 2] < 0.07)
             kl *= (1 - 0.8 * gl[:, None])
             H -= 0.002 * gl
-    # kop: snuit roze en vochtig, neusgaten donker, ogen
-    d, u = kop_assen(sk)
-    H0, H1 = sk.J["Head"] / s, sk.T["Head"] / s
+    # --- snuit: roze, vochtig, grijze spikkels, filtrum, neusgaten diep donker, mondlijn
     sn = np.linalg.norm(Q - (H1 - d * 0.005), axis=1)
-    snuit = gladstap(0.085, 0.065, sn) * L
-    roze = np.array([1.0, 0.70, 0.66]) * (0.9 + 0.1 * ruis(Q, 50, 7))[:, None]
-    kl = kl * (1 - snuit[:, None]) + snuit[:, None] * kl * roze
-    ruw = ruw * (1 - snuit) + 0.38 * snuit
-    H += snuit * 0.0005 * ruis(Q, 160, 8)
+    snuit = gladstap(0.088, 0.066, sn + 0.004 * ruis(Q, 40, 7)) * L
+    roze = np.array([1.0, 0.66, 0.62]) * (0.9 + 0.1 * ruis(Q, 50, 7))[:, None]
+    spik = gladstap(0.45, 0.75, ruis(Q, 45, 17, 2))
+    roze = roze * (1 - 0.45 * spik[:, None] * np.array([0.7, 0.85, 0.8]))
+    kl = kl * (1 - snuit[:, None]) + snuit[:, None] * GRIJS * roze
+    M = M * (1 - snuit)
+    ruw = ruw * (1 - snuit) + (0.30 + 0.1 * spik) * snuit
+    H = H * (1 - snuit) + snuit * 0.0006 * np.abs(ruis(Q, 140, 8))       # poriën
+    fil = np.exp(-(Q[:, 0] / 0.0035) ** 2) * gladstap(0.0, 0.04, (Q - H1) @ u + 0.03) * snuit
+    kl *= (1 - 0.35 * fil[:, None])
+    H -= 0.0012 * fil
     for sg in (1, -1):
-        ng = np.linalg.norm(Q - (H1 + d * 0.025 - u * 0.03 + np.array((sg * 0.034, 0, 0))), axis=1)
-        gat = gladstap(0.024, 0.014, ng) * L
-        kl *= (1 - 0.75 * gat[:, None])
-        oog_c = H0 + d * 0.13 + np.array((sg * 0.093, 0, 0)) - u * 0.025
-        og = np.linalg.norm(Q - oog_c, axis=1)
-        oog = gladstap(0.032, 0.024, og) * L
-        kl = kl * (1 - oog[:, None]) + oog[:, None] * np.array([0.03, 0.02, 0.014])
-        lid = gladstap(0.036, 0.030, og) * (1 - oog) * L
-        kl *= (1 - 0.6 * lid[:, None])
-        ruw = ruw * (1 - oog) + 0.10 * oog
-        # iris (bruin), pupil (liggend ovaal), oogwit in de voorste hoek, glanspuntje: op het oppervlak
-        uit = nrm(np.array((sg * 1.0, -0.25, 0.1)))
-        ic = oog_c + uit * 0.026
+        nc = H1 + d * 0.028 - u * 0.024 + np.array((sg * 0.034, 0, 0))
+        ng = np.linalg.norm((Q - nc) / np.array((1.2, 1.0, 0.8)), axis=1)
+        gat = gladstap(0.026, 0.012, ng) * L
+        kl *= (1 - 0.85 * gat[:, None])
+        ruw = ruw * (1 - gat) + 0.25 * gat
+    # mondlijn: donkere naad tussen boven- en onderkaak
+    kin = bas(sk.T["Jaw"] / s)
+    mond = np.exp(-(((Q - kin) @ u + 0.035) / 0.006) ** 2) * gladstap(0.10, 0.06, np.linalg.norm(Q - kin, axis=1)) * L
+    kl *= (1 - 0.7 * mond[:, None])
+    # --- ogen: donkerbruine bol met iris, pupil, glans; leden met donkere rand en wimpers
+    for sg in (1, -1):
+        oc = bas(oog_c(sk, sg) / s)
+        uit = oog_uit(sk, sg)
+        kap = oc + uit * OOG[3] * 0.6                # bol gezien door de oogspleet: kap rond de as
+        og = np.linalg.norm(Q - kap, axis=1)
+        oog = gladstap(OOG[3] * 0.80, OOG[3] * 0.72, og) * (deel == 0)
+        ic = oc + uit * OOG[3]
         di = np.linalg.norm(Q - ic, axis=1)
-        iris = gladstap(0.0135, 0.0105, di) * oog
-        kl = kl * (1 - iris[:, None]) + iris[:, None] * np.array([0.11, 0.055, 0.025])
-        dp = np.sqrt(((Q - ic)[:, 1] / 1.6) ** 2 + ((Q - ic)[:, 2]) ** 2 + ((Q - ic)[:, 0] * 0.3) ** 2)
-        pup = gladstap(0.0055, 0.004, dp) * oog
-        kl = kl * (1 - pup[:, None]) + pup[:, None] * 0.008
-        wit = gladstap(0.006, 0.003, np.linalg.norm(Q - (oog_c + nrm(np.array((sg * 0.75, -0.62, 0.0))) * 0.026), axis=1)) * oog
-        kl = kl * (1 - wit[:, None]) + wit[:, None] * np.array([0.55, 0.5, 0.45])
-        gl = np.linalg.norm(Q - (ic + np.array((0, -0.004, 0.005))), axis=1)
-        kl += (gladstap(0.0035, 0.0018, gl) * oog * 0.9)[:, None]
-    # binnenkant oren iets roze (zichtbaar bij witte oren)
-    # kwast crème met haarlijnen
-    kw = gladstap(0.50, 0.42, Q[:, 2]) * (Q[:, 1] > 0.62) * L
-    kl = kl * (1 - kw[:, None]) + kw[:, None] * kl * np.array([1.0, 0.92, 0.78])
-    H += kw * 0.0012 * ruis(Q * np.array([1, 1, 0.15]), 120, 9)
+        bol = np.array([0.020, 0.011, 0.007]) * (1 + 0.15 * ruis(Q, 300, 19))[:, None]
+        iris = gladstap(0.016, 0.012, di)
+        bol = bol * (1 - iris[:, None]) + iris[:, None] * np.array([0.075, 0.035, 0.014]) * (0.8 + 0.4 * ruis(Q, 500, 20))[:, None]
+        dp = np.sqrt(((Q - ic) @ d / 1.7) ** 2 + ((Q - ic) @ u) ** 2 + ((Q - ic)[:, 0] * 0.2) ** 2)
+        pup = gladstap(0.0065, 0.005, dp)
+        bol = bol * (1 - pup[:, None]) + pup[:, None] * 0.006
+        glans = gladstap(0.0042, 0.0022, np.linalg.norm(Q - (ic - u * 0.007 + d * 0.004), axis=1))
+        bol = bol + glans[:, None] * 0.55                                   # natte glans (vangt licht)
+        hoek = gladstap(0.007, 0.003, np.linalg.norm(Q - (oc + nrm(uit + 0.9 * d) * OOG[3]), axis=1))
+        bol = bol * (1 - hoek[:, None]) + hoek[:, None] * np.array([0.35, 0.22, 0.18])   # roze ooghoek
+        kl = kl * (1 - oog[:, None]) + oog[:, None] * bol
+        M = M * (1 - oog)
+        ruw = ruw * (1 - oog) + 0.06 * oog
+        H = H * (1 - oog)
+        # lidrand: smalle kale rand rond het oog, wimpers aan het bovenlid (strepen naar buiten-boven)
+        rand = gladstap(OOG[3] * 0.98, OOG[3] * 0.78, og) * (1 - oog) * L
+        kl = kl * (1 - 0.7 * rand[:, None]) + 0.7 * rand[:, None] * np.array([0.028, 0.020, 0.018])
+        M = M * (1 - rand)
+        ruw = ruw * (1 - rand) + 0.35 * rand
+        boven = np.clip(-((Q - oc) @ u) / OOG[3], 0, 1)
+        ang = np.arctan2((Q - oc) @ d, -((Q - oc) @ u))
+        wimp = gladstap(OOG[3] * 1.35, OOG[3] * 0.85, og) * gladstap(0.3, 0.7, boven) * L * (1 - oog)
+        lijn = np.clip(np.sin(ang * 60 + 3 * ruis(Q, 60, 21)) * 2 - 0.6, 0, 1)
+        kl *= (1 - 0.8 * (wimp * lijn)[:, None])
+        H += wimp * lijn * 0.0006
+    # --- oren: binnenkant licht grijsroze met lange witte haren langs de rand
+    for z in ("Left", "Right"):
+        ea, ee = bas(sk.J[z + "Ear"] / s), bas(sk.T[z + "Ear"] / s)
+        e = nrm(ee - ea)
+        te = np.clip((Q - ea) @ e / np.linalg.norm(ee - ea), -1, 2)
+        dist = np.linalg.norm(Q - (ea + np.clip(te, 0, 1)[:, None] * (ee - ea)), axis=1)
+        tt = nrm(np.array([0, -1.0, 0]) - e * e[1] * -1)
+        w_ = nrm(np.cross(e, tt))
+        tt = np.cross(w_, e)
+        binnen = (te > 0.2) * gladstap(0.075, 0.045, dist) * gladstap(0.2, 0.6, N @ tt) * L
+        hr = streng(e, 160, 8, 90)
+        haren = np.clip(hr * 1.5 - 0.3, 0, 1) * gladstap(0.03, 0.065, dist)        # lange haren aan de binnenrand
+        bk = np.array([0.085, 0.058, 0.052]) * (1 - haren[:, None]) + haren[:, None] * np.array([0.42, 0.38, 0.34])
+        kl = kl * (1 - binnen[:, None]) + binnen[:, None] * bk
+        M = M * (1 - binnen)
+        H += binnen * 0.0010 * hr
+    # kuif en kwast: crème
+    km = (kuif * (1 - M) * 0.85)[:, None]
+    kl = kl * (1 - km) + km * GRIJS * np.array([0.86, 0.79, 0.68]) * (0.62 + 0.5 * np.clip(krul + 0.3, 0, 1.2))[:, None]
+    kws = streng((0, 0.05, -1), 220, 3, 82)
+    kl = kl * (1 - kw[:, None]) + kw[:, None] * kl * np.array([0.98, 0.86, 0.64]) * (1 + 0.25 * kws)[:, None]
     # nekplooien (onder de hals)
-    hals = gladstap(-0.56, -0.64, Q[:, 1]) * gladstap(-0.86, -0.78, Q[:, 1]) * gladstap(0.88, 0.76, Q[:, 2]) *         (np.abs(Q[:, 0]) < 0.06) * L
-    H += hals * 0.0002 * np.sin(Q[:, 1] * 2 * np.pi / 0.03 + 2 * ruis(Q, 8, 10))
+    hals = gladstap(-0.56, -0.64, Q[:, 1]) * gladstap(-0.86, -0.78, Q[:, 1]) * gladstap(0.88, 0.76, Q[:, 2]) * \
+        (np.abs(Q[:, 0]) < 0.06) * L
+    H += hals * 0.0003 * np.sin(Q[:, 1] * 2 * np.pi / 0.03 + 2 * ruis(Q, 8, 10))
     # uier: roze huid, spenen iets donkerder, fijne aders
     U = deel == 1
     kl[U] = GRIJS * np.array([1.0, 0.96, 0.95])
@@ -846,7 +1038,7 @@ def componeer(B, mpp, sk):
     kl[BE] = srgb("#b08a3a") * (0.9 + 0.15 * ruis(Q[BE], 60, 17))[:, None]
     ruw[BE] = 0.33 + 0.15 * np.abs(ruis(Q[BE], 40, 18))
     met[BE] = 1.0
-    return ys, xs, kl, H, ruw, met, deel
+    return ys, xs, kl, H, ruw, met, deel, M
 
 
 def bewaar(arr, naam, data, jpg=False):
@@ -872,7 +1064,7 @@ def bewaar(arr, naam, data, jpg=False):
 
 def texturen(B, mpp, sk):
     t1 = time.time()
-    ys, xs, kl, H, ruw, met, deel = componeer(B, mpp, sk)
+    ys, xs, kl, H, ruw, met, deel, M = componeer(B, mpp, sk)
     h, w = B["pos"].shape[:2]
     mask = np.zeros((h, w), bool)
     mask[ys, xs] = True
@@ -901,6 +1093,10 @@ def texturen(B, mpp, sk):
     K = BM.dilateer(K, mask, 10)
     Nimg = BM.dilateer(Nimg.astype(np.float32), mask, 10)
     ORM = BM.dilateer(ORM, mask, 10)
+    VM = np.zeros((h, w, 3), np.float32)
+    VM[ys, xs] = M[:, None]
+    VM = BM.dilateer(VM, mask, 10)
+    bewaar(VM, "koe_vlek", True)                     # vlekkenmasker (los bestand, voor de hertint-shader)
     kleur = bewaar(K, "koe_kleur", False, jpg=True)
     normaal = bewaar(Nimg, "koe_normaal", True)
     orm = bewaar(ORM[::2, ::2] if RES >= 2048 else ORM, "koe_orm", True)
@@ -909,7 +1105,13 @@ def texturen(B, mpp, sk):
 
 
 def materialen(delen, kleur, normaal, orm):
-    mats = {k: BM.pbr("mat_" + k, kleur, normaal, orm, tuple(srgb(v))) for k, v in TINT.items()}
+    mats = {k: BM.pbr("mat_" + k, kleur, normaal, orm) if k == "lijf" else
+            BM.pbr("mat_" + k, kleur, normaal, orm, tuple(srgb(v))) for k, v in TINT.items() if k != "vlek"}
+    # hertint-schema (glTF extras -> Godot meta): zie DELEN in de docstring en koe_vacht.gdshader
+    mats["lijf"]["tint_vacht"] = TINT["lijf"]
+    mats["lijf"]["tint_vlek"] = TINT["vlek"]
+    mats["lijf"]["vlek_standaard"] = TINT["vlek"]
+    mats["lijf"]["vlek_masker"] = "textures_koe/koe_vlek.png"
     vast = BM.pbr("mat_vast", kleur, normaal, orm)
     for naam, o in delen.items():
         me = o.data
@@ -918,7 +1120,6 @@ def materialen(delen, kleur, normaal, orm):
         me.materials.clear()
         if naam == "lijf":
             me.materials.append(mats["lijf"])
-            me.materials.append(mats["vlek"])
             me.materials.append(vast)
         elif naam == "bel":
             me.materials.append(vast)
@@ -931,13 +1132,13 @@ def materialen(delen, kleur, normaal, orm):
 
 def vlak_materialen(delen):
     """Zonder bake (silhouetrondes): platte kleuren."""
-    kl = {"oog": "#140c08", "lijf": "#ece9e2", "vlek": "#1d1b1b", "uier": "#e7b3a8", "halsband": "#6e4226", "bel": "#b08a3a"}
+    kl = {"oog": "#140c08", "lijf": "#ece9e2", "uier": "#e7b3a8", "halsband": "#6e4226", "bel": "#b08a3a"}
     for naam, o in delen.items():
         me = o.data
         idx = np.zeros(len(me.polygons), np.int32)
         me.polygons.foreach_get("material_index", idx)
         me.materials.clear()
-        for k in (["lijf", "vlek", "oog"] if naam == "lijf" else [naam]):
+        for k in (["lijf", "oog"] if naam == "lijf" else [naam]):
             me.materials.append(BM.vlak_mat("v_" + k, srgb(kl[k]), 0.35 if k == "bel" else 0.75))
         me.polygons.foreach_set("material_index", idx if naam == "lijf" else idx * 0)
 
@@ -969,6 +1170,8 @@ def skin(o, rig, sk, naam):
 
     s = sk.s
     if naam == "lijf":
+        # eerst gladstrijken (bone heat geeft harde naden), daarna de vaste toewijzingen
+        glad_gewichten(o, 0.5, 3)
         for z in ("Left", "Right"):
             ea, ee = sk.J[z + "Ear"], sk.T[z + "Ear"]
             e = ee - ea
@@ -979,7 +1182,10 @@ def skin(o, rig, sk, naam):
                 ko = sk.J[z + b]
                 zet((P[:, 2] < ko[2] - 0.035 * s) & (np.linalg.norm(P[:, :2] - ko[:2], axis=1) < 0.12 * s), z + b)
         # kwast hangt aan Tail3
-        zet((P[:, 2] < sk.J["Tail3"][2]) & (P[:, 1] > 0.62 * s), "Tail3")
+        zet((P[:, 2] < sk.J["Tail3"][2]) & (P[:, 1] > float(R.romp_y(0.62)) * s), "Tail3")
+        # tegen het knijpen in de flank en achter de elleboog: de romp laat de bovenbenen los
+        romp_los(o, sk)
+        onderbenen(o, sk)
     elif naam == "halsband":
         zet(np.ones(len(P), bool), "Neck1")
     elif naam == "uier":
@@ -994,6 +1200,119 @@ def skin(o, rig, sk, naam):
     leeg = sum(1 for v in me.vertices if not v.groups)
     if leeg:
         log("  let op:", naam, leeg, "vertices zonder gewicht")
+
+
+def glad_gewichten(o, a=0.5, n=3):
+    """Laplace-gladstrijken van alle vertexgroepen (numpy, buren via de randen)."""
+    me = o.data
+    nv, ng = len(me.vertices), len(o.vertex_groups)
+    W = np.zeros((nv, ng))
+    for v in me.vertices:
+        for ge in v.groups:
+            W[v.index, ge.group] = ge.weight
+    E = np.zeros(len(me.edges) * 2, np.int64)
+    me.edges.foreach_get("vertices", E)
+    E = E.reshape(-1, 2)
+    P = np.array([v.co for v in me.vertices])
+    E = E[np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1) < 0.05]       # niet langs splinters smeren
+    deg = np.bincount(E.ravel(), minlength=nv).astype(float)[:, None]
+    for _ in range(n):
+        S = np.zeros_like(W)
+        np.add.at(S, E[:, 0], W[E[:, 1]])
+        np.add.at(S, E[:, 1], W[E[:, 0]])
+        W = (1 - a) * W + a * S / np.maximum(deg, 1)
+    for gi, g in enumerate(o.vertex_groups):
+        nz = np.nonzero(W[:, gi] > 1e-4)[0]
+        g.remove(list(range(nv)))
+        for vi in nz:
+            g.add([int(vi)], float(W[vi, gi]), "REPLACE")
+
+
+def onderbenen(o, sk):
+    """Onderbeen (onder voorknie/hak) star per bot: pijp en klauw, met korte overgangen bij het gewricht.
+    Bone heat + gladstrijken laten daar anders losse vertices aan verre botten hangen (naalden)."""
+    s = sk.s
+    me = o.data
+    P = np.array([v.co for v in me.vertices])
+    gi = {g.name: g for g in o.vertex_groups}
+    for z in ("Left", "Right"):
+        for boven, pijp, klauw in (("ForeArm", "FrontCannon", "FrontHoof"), ("Shin", "HindCannon", "HindHoof")):
+            kn, ko = sk.J[z + pijp], sk.J[z + klauw]
+            zijde = np.sign(kn[0])
+            sel = (P[:, 2] < kn[2] + 0.03 * s) & (np.sign(P[:, 0]) == zijde) &                 (seg_afst(P, kn, sk.T[z + klauw]) < 0.10 * s)
+            ids = np.nonzero(sel)[0]
+            if not len(ids):
+                continue
+            zp = P[ids, 2]
+            w_k = gladstap(ko[2] + 0.015 * s, ko[2] - 0.025 * s, zp)          # klauw
+            w_b = gladstap(kn[2] - 0.03 * s, kn[2] + 0.03 * s, zp) * (1 - w_k)  # boven het gewricht
+            w_p = 1 - w_k - w_b
+            for g in o.vertex_groups:
+                g.remove(ids.tolist())
+            for nm, w in ((z + klauw, w_k), (z + pijp, w_p), (z + boven, w_b)):
+                g = gi.get(nm) or o.vertex_groups.new(name=nm)
+                gi[nm] = g
+                for vi, wv in zip(ids, w):
+                    if wv > 1e-3:
+                        g.add([int(vi)], float(wv), "REPLACE")
+
+
+def seg_afst(P, a, b):
+    ab = b - a
+    t = np.clip((P - a) @ ab / (ab @ ab), 0, 1)
+    return np.linalg.norm(P - (a + t[:, None] * ab), axis=1)
+
+
+def romp_los(o, sk):
+    """Haalt gewicht van Thigh/UpperArm/ForeArm weg op de romp (voor de dij, achter de elleboog, boven
+    de elleboog aan de binnenkant) en geeft het aan Hips resp. Spine2. Zachte overgang over ~10 cm."""
+    s = sk.s
+    me = o.data
+    P = np.array([v.co for v in me.vertices])
+    naam = {g.index: g.name for g in o.vertex_groups}
+    gi = {g.name: g for g in o.vertex_groups}
+    regels = []
+    for z in ("Left", "Right"):
+        hp, kn = sk.J[z + "Thigh"], sk.J[z + "Shin"]
+        # voor de dij (flank, buik): y kleiner dan de heupkop - 0,08, boven de knie
+        f = gladstap(0.0, 0.12 * s, (hp[1] - 0.06 * s) - P[:, 1]) * gladstap(kn[2] - 0.06 * s, kn[2] + 0.04 * s, P[:, 2])
+        # binnenkant (buik/uier-zijde)
+        f = np.maximum(f, gladstap(0.0, 0.08 * s, (np.abs(hp[0]) - 0.07 * s) - np.abs(P[:, 0])) *
+                       gladstap(kn[2] - 0.04 * s, kn[2] + 0.06 * s, P[:, 2]))
+        f = f * gladstap(0.10 * s, 0.17 * s, seg_afst(P, hp, kn))          # het been zelf blijft
+        regels.append((z + "Thigh", "Hips", f))
+        regels.append((z + "Shin", "Hips", f * gladstap(kn[2], kn[2] + 0.06 * s, P[:, 2])))
+        el = sk.J[z + "ForeArm"]
+        sh = sk.J[z + "UpperArm"]
+        # achter de elleboog (singel) en eronder naar de borst
+        f = gladstap(0.0, 0.10 * s, P[:, 1] - (el[1] + 0.04 * s)) * gladstap(el[2] - 0.08 * s, el[2] + 0.02 * s, P[:, 2])
+        f = np.maximum(f, gladstap(0.0, 0.07 * s, (np.abs(sh[0]) - 0.06 * s) - np.abs(P[:, 0])) *
+                       gladstap(el[2] - 0.06 * s, el[2] + 0.04 * s, P[:, 2]))
+        f = f * gladstap(0.08 * s, 0.14 * s, seg_afst(P, sh, el))
+        regels.append((z + "UpperArm", "Spine2", f))
+        regels.append((z + "ForeArm", "Spine2", f))
+    # algemeen: wat ver van de eigen beenketen ligt (buik, flank, borst) hoort niet bij dat been
+    for z in ("Left", "Right"):
+        for keten, doel in ((["UpperArm", "ForeArm", "FrontCannon"], "Spine2"), (["Thigh", "Shin", "HindCannon"], "Hips")):
+            a = [sk.J[z + k] for k in keten] + [sk.T[z + keten[-1]]]
+            dist = np.min([seg_afst(P, a[i], a[i + 1]) for i in range(len(a) - 1)], axis=0)
+            f = gladstap(0.11 * s, 0.17 * s, dist)
+            for k in keten[:2]:
+                regels.append((z + k, doel, f))
+    for bot, doel, f in regels:
+        if bot not in gi:
+            continue
+        g = gi[bot]
+        dg = gi.get(doel) or o.vertex_groups.new(name=doel)
+        gi[doel] = dg
+        for vi in np.nonzero(f > 1e-3)[0]:
+            v = me.vertices[int(vi)]
+            for ge in v.groups:
+                if ge.group == g.index:
+                    weg = ge.weight * float(f[vi])
+                    ge.weight -= weg
+                    dg.add([int(vi)], weg, "ADD")
+                    break
 
 
 # --- Previews -------------------------------------------------------------------------------------------
@@ -1057,7 +1376,7 @@ def vergelijk(sc, rig, tag=""):
     toon_bel(sc, True)
     pan = []
     for yw, pt in ((250, 10), (200, 20), (270, 0)):
-        BM.studio(sc, 900, 0.7, 0.7, doel=(0, -1.0 * rig["schaal"], 0.95 * rig["schaal"]), yaw=yw, pitch=pt)
+        BM.studio(sc, 900, 0.7, 0.7, doel=(0, -0.97 * rig["schaal"], 0.90 * rig["schaal"]), yaw=yw, pitch=pt)
         pan.append(BM.render_np(sc, os.path.join(tmp, f"k_{yw}.png")))
     BM.schrijf(BM.plak(pan), os.path.join(PREV, f"koe_kop{tag}.png"))
 
@@ -1090,6 +1409,21 @@ def poses(sc, rig, tag=""):
         BM.studio(sc, 330 * 1.3 / br, br, 1.1 * br / 1.3, doel=doel, yaw=yw, pitch=pt)
         pan.append(BM.render_np(sc, os.path.join(tmp, f"v_{act}_{f}.png")))
     BM.schrijf(BM.plak(pan), os.path.join(PREV, f"koe_vervorming{tag}.png"))
+    rig.animation_data.action = None
+
+
+def lig_blad(sc, rig, tag=""):
+    """Ligpose (sterven eind, geboorte begin, knielen) van opzij, voor, schuin en van boven."""
+    tmp = bpy.app.tempdir
+    toon_bel(sc, False)
+    pan = []
+    for act, f in (("sterven", 60), ("geboorte", 0), ("sterven", 26)):
+        R.zet_actie(rig, act)
+        sc.frame_set(f)
+        for yw, pt in ((180, 4), (0, 4), (225, 30), (270, 10)):
+            BM.studio(sc, 180, 2.4, 1.2, doel=(0, -0.2, 0.40), yaw=yw, pitch=pt)
+            pan.append(BM.bijsnijden(BM.render_np(sc, os.path.join(tmp, f"g_{act}_{f}_{yw}.png"))))
+    BM.schrijf(BM.onder(BM.plak(pan[:4]), BM.plak(pan[4:8]), BM.plak(pan[8:])), os.path.join(PREV, f"koe_lig{tag}.png"))
     rig.animation_data.action = None
 
 
@@ -1140,7 +1474,7 @@ def main():
     vorm = vorm_lijf(sk)
     hoog_lijf = oppervlak(vorm, H_GRID, "lijf_hoog", coll)
     lijf = decimeer(hoog_lijf, "lijf", DOEL_LIJF, coll)
-    snij_vlekken(lijf, sk)
+    snij_ogen(lijf, sk)
     uier = decimeer(hoog_uier, "uier", 480, coll)
     halsband = maak_halsband(sk, vorm, rig)
     bel = maak_bel(sk, rig)
@@ -1194,6 +1528,8 @@ def main():
         poses(sc, rig, tag)
     if "lopen" in OPTS:
         lopen_blad(sc, rig, tag)
+    if "lig" in OPTS:
+        lig_blad(sc, rig, tag)
     os.makedirs(PREV, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(PREV, "koe.blend"))
     log("KLAAR")

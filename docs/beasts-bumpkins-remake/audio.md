@@ -271,3 +271,12 @@ Eenmalige klanken (uil, vogelroep, donder) via een **scheduler** (random interva
 | 6 | **Bibliotheek**: mag ik CC0 downloaden (Freesound-inlog nodig) of lever jij een map? Sonniss GDC-bundels zijn groot (meer dan 30 GB) | sectie 3 |
 | 7 | De 9 ontbrekende `BBRBANK`-entries: opnieuw laten extraheren (alleen nodig als origineel een bron blijft) | 1a |
 | 8 | **Taal**: lijnen zijn nu taalneutraal (geen woorden). Houden we dat, of echte Nederlandse/Engelse zinnen (bijv. "Yes?", "Ja baas?")? Dat kost per taal een set | stemmenset |
+
+## Besluiten van de gebruiker (2026-10-29)
+
+| Vraag | Besluit |
+| --- | --- |
+| Originele stemmen lokaal | **Ja**, voor eigen gebruik (nooit in git) |
+| Muziek | Origineel had muziek, vooral in het menu; **volgende fase** |
+| Woorden | Originele stemmen hebben herkenbare Engelse woorden; beasts-src heeft woordloze gegenereerde klanken |
+| Bron per geluid | **Schakelbaar tussen origineel en gegenereerd** (instelling), zodat het origineel later volledig uit te sluiten is. AudioManager kiest per geluids-id uit `origineel/` of `eigen/`; ontbreekt een eigen variant, dan valt hij terug op het origineel (alleen in de lokale build) |

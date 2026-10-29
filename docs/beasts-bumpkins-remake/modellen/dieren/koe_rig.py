@@ -58,25 +58,26 @@ VOOR, ACHTER = Vector((0, -1, 0)), Vector((0, 1, 0))
 BOVEN, ONDER = Vector((0, 0, 1)), Vector((0, 0, -1))
 
 # --- Maten (meters, basis; alles x `schaal`) -----------------------------------------------------
-# Koe: schoft 1,15 x 1,05 = 1,21 m, snuit-zitbeen 1,83 m. Uit de sprites (cowwalk zijaanzicht: 45 px
+# Koe (r7: schaal 0,92 en romp x0,88 zodat ze op de sprite-hoogte en de concept-verhouding zit):
+# eerder schoft 1,15 x 1,05 = 1,21 m, snuit-zitbeen 1,83 m. Uit de sprites (cowwalk zijaanzicht: 45 px
 # snuit-staart, kop 1,38 m bij 21,9 px/m en cos 30) en de man van 1,37 m: een kleine, stevige koe.
 # (y, z)-paren in het zijvlak, x apart per been. De wolf geeft hier zijn eigen tabel.
 MAAT = {
-    "schaal": 1.05,
+    "schaal": 0.92,
     "heup": (0.45, 1.06),                                   # Hips-kop (bekken)
     "rug": [(0.20, 1.08), (-0.05, 1.09), (-0.30, 1.10), (-0.50, 1.12)],   # staarten Hips, Spine, Spine1, Spine2
-    "nek": [(-0.46, 0.92), (-0.71, 1.04), (-0.92, 1.18)],  # Neck-kop, Neck1-kop, Neck1-staart
-    "kop": [(-0.95, 1.23), (-1.17, 0.95)],                  # Head: nek (achter de oren) -> snuit
-    "kaak": [(-1.01, 1.06), (-1.14, 0.91)],                 # Jaw: kaakgewricht -> kin
-    "oor": (0.075, -0.98, 1.22), "oor_richting": (1.0, 0.2, -0.15), "oor_lengte": 0.19,
+    "nek": [(-0.46, 0.95), (-0.65, 1.05), (-0.83, 1.13)],  # Neck-kop, Neck1-kop, Neck1-staart
+    "kop": [(-0.86, 1.20), (-1.09, 0.94)],                  # Head: nek (achter de oren) -> snuit
+    "kaak": [(-0.92, 1.04), (-1.06, 0.89)],                 # Jaw: kaakgewricht -> kin
+    "oor": (0.072, -0.89, 1.19), "oor_richting": (1.0, 0.25, -0.30), "oor_lengte": 0.19,
     "staart": [(0.58, 1.06), (0.68, 0.88), (0.70, 0.68), (0.70, 0.48), (0.69, 0.32)],
     "voor_x": 0.165,
     # schoftblad-top, schoudergewricht, elleboog, voorknie, kogel, teen
     "voorbeen": [(-0.36, 1.06), (-0.52, 0.80), (-0.38, 0.57), (-0.45, 0.31), (-0.46, 0.12), (-0.53, 0.0)],
     "achter_x": 0.155,
     # heupgewricht, knie (stifle), hak, kogel, teen
-    "achterbeen": [(0.38, 0.93), (0.27, 0.60), (0.46, 0.38), (0.43, 0.12), (0.36, 0.0)],
-    "bel": (-0.70, 0.82),                                   # onderkant keel, waar de halsband de bel draagt
+    "achterbeen": [(0.38, 0.93), (0.27, 0.60), (0.48, 0.39), (0.43, 0.12), (0.36, 0.0)],
+    "bel": (-0.64, 0.84),                                   # onderkant keel, waar de halsband de bel draagt
 }
 
 VOORBEEN = ["Scapula", "UpperArm", "ForeArm", "FrontCannon", "FrontHoof"]
@@ -84,9 +85,28 @@ ACHTERBEEN = ["Thigh", "Shin", "HindCannon", "HindHoof"]
 POTEN = {"LF": (LINKS, True), "RF": (RECHTS, True), "LH": (LINKS, False), "RH": (RECHTS, False)}
 
 
+# Romp korter dan de basismaat: y tussen ROMP[0] en ROMP[1] (schoft tot heup) x ROMP[2], daarbuiten
+# alleen verschoven. De maten hieronder blijven in de basismaat; koe.py rekent er ook mee (romp_y / inv).
+ROMP = (-0.45, 0.40, 0.88)
+
+
+def romp_y(y):
+    a, b, k = ROMP
+    import numpy as _np
+    y = _np.asarray(y, float)
+    return _np.where(y < a, a * k + (y - a), _np.where(y > b, b * k + (y - b), y * k))
+
+
+def romp_y_inv(y):
+    a, b, k = ROMP
+    import numpy as _np
+    y = _np.asarray(y, float)
+    return _np.where(y < a * k, a + (y - a * k), _np.where(y > b * k, b + (y - b * k), y / k))
+
+
 def _p(m, yz, x=0.0):
     s = m["schaal"]
-    return Vector((x * s, yz[0] * s, yz[1] * s))
+    return Vector((x * s, float(romp_y(yz[0])) * s, yz[1] * s))
 
 
 # --- Skelet -------------------------------------------------------------------------------------
@@ -463,16 +483,16 @@ def clip_lopen(M):
     lagen = dict(benen)
     lagen.update({
         "T": lambda f: (0.006 * s * golf(f, N, 1, 0.6), 0.0, -0.012 * s + 0.007 * s * golf(f, N, 2, 0.4)),
-        "Hips": lambda f: (0.8 * golf(f, N, 2, 1.2), 1.6 * golf(f, N, 1, 0.3), 1.5 * golf(f, N, 1)),
+        "Hips": lambda f: (0.8 * golf(f, N, 2, 1.2), 2.4 * golf(f, N, 1, 0.3), 2.4 * golf(f, N, 1)),
         "Spine": lambda f: (0.0, -0.5 * golf(f, N, 1, 0.3), -0.8 * golf(f, N, 1)),
         "Spine1": lambda f: (0.0, -0.5 * golf(f, N, 1, 0.3), -0.8 * golf(f, N, 1)),
         "Spine2": lambda f: (-0.5 * golf(f, N, 2, 1.2), -0.6 * golf(f, N, 1, 0.3 + math.pi), 0.6 * golf(f, N, 1)),
-        "Neck": lambda f: (3 + 2.5 * golf(f, N, 2, 2.2), 0.0, 1.5 * golf(f, N, 1, 0.8)),
+        "Neck": lambda f: (3 + 4.0 * golf(f, N, 2, 2.2), 0.0, 1.5 * golf(f, N, 1, 0.8)),
         "Neck1": lambda f: (1.5 * golf(f, N, 2, 2.6), 0.0, 1.0 * golf(f, N, 1, 1.0)),
         "Head": lambda f: (-1.5 * golf(f, N, 2, 2.6), 0.0, 0.0),
         "LeftScapula": scap("LF"), "RightScapula": scap("RF"),
     })
-    lagen.update(staart_zwiep(N, 1, amp=(4, 6, 9, 12), achter=(2, 2, 1, 0)))
+    lagen.update(staart_zwiep(N, 1, amp=(6, 10, 15, 20), achter=(4, 3, 2, 1)))
     lagen.update(oorflap(N, [], [], amp=0.0))
     optellen(poses, lagen)
     return N, True, poses, {"snelheid_mps": v}, None
@@ -527,9 +547,14 @@ def clip_gemolken(M):
 
 def _lig(s):
     """Ligpose (borst/buik op de grond, benen gevouwen), gedeeld door sterven en geboorte."""
-    return {"T": (0.0, 0.0, -0.36 * s), "Hips": (1.0, 0.0, 0.0), "Spine2": (-2.0, 0, 0),
-            "LF": (0.06 * s, 0.22 * s, -0.075 * s, 115.0, 92.0), "RF": (0.06 * s, 0.22 * s, -0.075 * s, 115.0, 92.0),
-            "LH": (0.20 * s, -0.22 * s, -0.075 * s, -40.0, -88.0), "RH": (0.20 * s, -0.22 * s, -0.075 * s, -40.0, -88.0)}
+    # voorbenen: onderarm plat naar voren, voorknie vooraan, pijp en klauw terug onder de borst gevouwen;
+    # achterbenen: hak achter op de grond, pijp en klauw naar voren langs de buik (links verder uit)
+    # (rx van ca/hp in wereldruimte: + draait omlaag naar achteren.) Romp laag op de grond, iets op de
+    # linkerflank gerold; voorbenen: voorknie vooraan onder de borst, pijp en klauw terug eronder;
+    # achterbenen: hak achter, pijp en klauw naar voren; links ver uit langs de buik, rechts eronder.
+    return {"T": (0.0, 0.0, -0.44 * s), "Hips": (1.0, 7.0, 0.0), "Spine2": (-2.0, -4.0, 0),
+            "LF": (0.04 * s, 0.0, -0.07 * s, 105.0, 92.0), "RF": (0.02 * s, 0.04 * s, -0.07 * s, 108.0, 92.0),
+            "LH": (0.20 * s, -0.24 * s, -0.07 * s, -40.0, -88.0), "RH": (0.05 * s, -0.12 * s, -0.07 * s, -30.0, -80.0)}
 
 
 def _knielen(s):
@@ -552,11 +577,11 @@ def clip_sterven(M):
              "LF": (0.01 * s, 0.10 * s, 0.03 * s, 50, 45), "RF": (0.0, 0.05 * s, 0.0, 0, 12)}
     kn = _knielen(s)
     K[22] = {**kn, "Neck": (-8, 0, 3), "LH": (0, 0.02 * s, 0, 0, 3), "RH": (0, -0.01 * s, 0, 0, 0)}
-    K[30] = {**kn, "T": (0.01 * s, 0.03 * s, -0.16 * s), "Hips": (12, 3, 0),
+    K[30] = {**kn, "T": (0.01 * s, 0.03 * s, -0.17 * s), "Hips": (12, 3, 0),
              "LH": (0.04 * s, -0.08 * s, 0.0, 0, 30), "RH": (0.04 * s, -0.06 * s, 0.0, 0, 26), "Neck": (-4, 0, 0)}
     lg = _lig(s)
-    K[38] = {**lg, "T": (0.02 * s, 0, -0.37 * s), "Neck": (5, 0, 0), "Head": (-4, 0, 0)}
-    K[48] = {**lg, "T": (0.03 * s, 0, -0.36 * s), "Hips": (2, 10, 0), "Spine": (0, 2, 0), "Spine2": (0, 2, 0),
+    K[38] = {**lg, "T": (0.02 * s, 0, -0.45 * s), "Neck": (5, 0, 0), "Head": (-4, 0, 0)}
+    K[48] = {**lg, "T": (0.03 * s, 0, -0.44 * s), "Hips": (2, 10, 0), "Spine": (0, 2, 0), "Spine2": (0, 2, 0),
              "Neck": (30, 0, 6), "Neck1": (14, 0, 4), "Head": (-36, 0, 0), "Jaw": (6, 0, 0),
              "LeftEar": (-25, 0, 10), "RightEar": (-25, 0, -10),
              "Tail": (-5, 0, 6), "Tail1": (-4, 0, 8)}
@@ -574,7 +599,7 @@ def clip_geboorte(M):
     kn = _knielen(s)
     K = {0: {**lg, "Neck": (-6, 0, 0), "Head": (6, 0, 0)},
          10: {**lg, "Neck": (-10, 0, 3), "Head": (8, 0, 0), "LeftEar": (10, 0, 0), "RightEar": (10, 0, 0)},
-         20: {**lg, "T": (0, 0.01 * s, -0.32 * s), "Hips": (6, 0, 0), "Neck": (-14, 0, 0)},
+         20: {**lg, "T": (0, 0.01 * s, -0.40 * s), "Hips": (6, 0, 0), "Neck": (-14, 0, 0)},
          32: {**kn, "T": (0, 0.03 * s, -0.12 * s), "Hips": (18, 0, 0)},
          42: {**kn},
          52: {**kn, "T": (0, 0.0, -0.05 * s), "Hips": (8, 0, 0), "Neck": (-6, 0, 0),
