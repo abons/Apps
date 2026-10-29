@@ -39,7 +39,7 @@ func herbouw() -> void:
 	var half := BREED * 0.5
 	for y in w.raster.rijen:
 		for x in w.raster.kolommen:
-			if w.raster.soort[w.raster.idx(x, y)] != pad:
+			if not _weg(x, y, pad):
 				continue
 			var c := Vector2((x + 0.5) * tm, (y + 0.5) * tm)
 			# achthoek op het midden
@@ -51,11 +51,11 @@ func herbouw() -> void:
 			# stroken naar de buren met een grotere index (elke verbinding een keer)
 			for d in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 1)]:
 				var n: Vector2i = Vector2i(x, y) + d
-				if not w.raster.in_kaart(n.x, n.y) or w.raster.soort[w.raster.idx(n.x, n.y)] != pad:
+				if not _weg(n.x, n.y, pad):
 					continue
 				if d.x != 0 and d.y != 0:
-					var a := w.raster.soort[w.raster.idx(x + d.x, y)] == pad
-					var b := w.raster.soort[w.raster.idx(x, y + d.y)] == pad
+					var a := _weg(x + d.x, y, pad)
+					var b := _weg(x, y + d.y, pad)
 					if a or b:
 						continue
 				var e := Vector2((n.x + 0.5) * tm, (n.y + 0.5) * tm)
@@ -69,6 +69,11 @@ func herbouw() -> void:
 	st.generate_normals()
 	_mi.mesh = st.commit()
 	_mi.material_override = mat
+
+
+## Pad waar een weg te zien is: niet onder een blokkerend object (de vlag staat op het kaartpad; de weg gaat eromheen).
+func _weg(x: int, y: int, pad: int) -> bool:
+	return w.raster.in_kaart(x, y) and w.raster.soort[w.raster.idx(x, y)] == pad and w.raster.blok[w.raster.idx(x, y)] == 0
 
 
 func _strook(st: SurfaceTool, a: Vector2, b: Vector2, half: float) -> void:

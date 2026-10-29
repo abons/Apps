@@ -5,7 +5,7 @@
     "5":   {"naam": "boom_rond",    "origineel": "tree",        "model": "natuur:loofboom",  "varianten": [["loofboom", 0.65], ["loofboom_jong", 0.35]], "voetafdruk": [1, 1], "blokkeert": true},
     "6":   {"naam": "boom_spar",    "origineel": "tree",        "model": "natuur:spar",      "varianten": [["spar", 0.8], ["jonge_den", 0.2]], "voetafdruk": [1, 1], "blokkeert": true},
     "83":  {"naam": "paddenstoel",  "origineel": "_mushroom",   "model": "natuur:paddenstoel", "schaal": 1.0, "voetafdruk": [1, 1], "blokkeert": false},
-    "98":  {"naam": "vlag",         "origineel": "flagpost",    "model": "natuur:vlag",      "schaal": 1.5, "voetafdruk": [1, 1], "blokkeert": false},
+    "98":  {"naam": "vlag",         "origineel": "flagpost",    "model": "natuur:vlag",      "schaal": 1.5, "voetafdruk": [1, 1], "blokkeert": true},
     "103": {"naam": "dorpeling",    "origineel": "villager",    "model": "bumpkin_man",      "voetafdruk": [1, 1], "blokkeert": false, "spawn": true},
     "143": {"naam": "kampvuur",     "origineel": "campfire",    "model": "natuur:kampvuur",  "schaal": 1.3, "voetafdruk": [1, 1], "blokkeert": true},
     "144": {"naam": "bron",         "origineel": "spring",      "model": "natuur:bronplas",  "schaal": 1.0, "voetafdruk": [1, 1], "blokkeert": true},

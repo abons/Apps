@@ -30,7 +30,8 @@ Opties na `--`: `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, 
 
 Padtegels (uit de kaart: `road` 1/2/6, plus wat er later bijkomt) worden een keienstrook van 1,3 m (`view/wegen.gd`,
 `shaders/weg.gdshader`: procedurele kinderkopjes, rafelrand, sneeuw en nat), van tegelmidden naar tegelmidden; het terrein
-eronder is alleen wat vertrapte grond. Elk afgebouwd gebouw met een deur (`Plan.DEUREN`: hut, molen, melkerij, kippenhok,
+eronder is alleen wat vertrapte grond. Onder een blokkerend object (de vlag staat op het kaartpad en blokkeert nu)
+komt geen weg; de stroken lopen eromheen, en nieuwe wegen zoeken er een omweg langs. Elk afgebouwd gebouw met een deur (`Plan.DEUREN`: hut, molen, melkerij, kippenhok,
 loods) krijgt meteen een weg van zijn deur naar het dichtste pad of het kampvuur (`Wereld.leg_weg`, BFS; beasts-src
 `World.aim` bestelt die weg mee), `weg_per_tegel` (2) kas per nieuwe tegel, zonder bouwtijd. De laatste meters, van de
 deurtegel tot de echte deur binnen de voetafdruk, tekent `Wegen` als stoep naar `Plan.deur_punt`.
