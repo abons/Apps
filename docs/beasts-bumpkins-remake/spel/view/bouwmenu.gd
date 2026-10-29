@@ -20,7 +20,7 @@ const GEBOUWEN := {
 	&"melkerij": {"tekst": "Melkerij", "toets": KEY_J, "glb": "res://assets/melkerij_boerderij_rt.glb", "hoogte": 2.6},
 	&"akker": {"tekst": "Akker", "toets": KEY_G, "glb": "", "hoogte": 0.3},   # geen glb: per tegel akker_kaal + akker_rijp
 	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
-	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 2.0},   # poort.glb, deur draait open (klik)
+	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 1.3},   # hek_poort.glb, vleugel draait open (klik)
 }
 const POORT_OPEN_RAD := deg_to_rad(100.0)
 const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
@@ -314,15 +314,15 @@ func _bouw_hekken() -> void:
 				continue
 			var a := _grond(t)
 			var b := _grond(n)
-			if poort.has(n):    # tot aan de pijler, niet erdoor
-				b = a.lerp(b, 0.45)
+			if poort.has(n):    # tot aan de poortpaal op de tegelrand
+				b = a.lerp(b, 0.5)
 			seg.position = (a + b) * 0.5
 			seg.rotation.y = atan2(-(b.z - a.z), b.x - a.x)
 			seg.scale.x = Vector2(b.x - a.x, b.z - a.z).length() / tm
 			_hekken.add_child(seg)
 	for t: Vector2i in poort:
 		var p: Plan = poort[t]
-		var n := Natuur.instantie("poort")
+		var n := Natuur.instantie("hek_poort")       # houten hekpoort (origineel `gate`); `poort` is de stenen sleutelpoort
 		if n == null:
 			continue
 		n.position = _grond(t)
@@ -335,7 +335,6 @@ func _bouw_hekken() -> void:
 		elif langs_x:
 			rot = 0.0
 		n.rotation.y = rot
-		n.scale = Vector3.ONE * (tm / 2.5)      # pijlers op +-1,25: de poort past op een tegel
 		_hekken.add_child(n)
 		var deur := n.find_child("poort_deur", true, false) as Node3D
 		if deur:

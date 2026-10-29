@@ -1,4 +1,4 @@
-"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, bron (put, latere
+"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, hek_poort, bron (put, latere
 missies), bronplas (de spring van missie 1: kring keien om een plasje),
 hek_segment, hek_paal, poort, akker_kaal, akker_rijp.
 
@@ -22,7 +22,7 @@ from mathutils import Matrix, Vector, noise
 import natuur_lib as L
 from atlas import CEL
 
-ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "bron", "bronplas", "hek_segment",
+ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "bron", "bronplas", "hek_segment", "hek_poort",
         "hek_paal", "poort", "akker_kaal", "akker_rijp"]
 ALLEEN = [n for n in L.OPTS.get("alleen", ",".join(ALLE)).split(",") if n]
 
@@ -928,6 +928,37 @@ def hek_segment():
             touwrol(b, Vector((x, 0.05, z)), Vector((0, 0, 1)), 0.15, 0.2, winden=4)
     o = L.obj("hek_segment", b.mesh("hek_segment", [m("hout"), m("kopshout"), m("touw")]))
     o.data.set_sharp_from_angle(angle=math.radians(50))
+    return [o]
+
+
+def hek_poort():
+    """Houten hekpoort (origineel `gate`, het hek van missie 1; `poort` is de stenen sleutelpoort van later): twee
+    zware palen op x = -1 en +1 met touw, ertussen een draaiende vleugel `poort_deur` (twee regels, een schoor en een
+    slotpaaltje) met het scharnier op x = -1 als lokale oorsprong (om lokaal Z in Blender = lokaal Y in Godot)."""
+    rnd = random.Random(12)
+    b = L.Bouwer()
+    for x in (-1.0, 1.0):
+        paal(b, rnd, Vector((x, 0, -0.05)), 1.25, r=0.14)
+        for z in (0.45, 0.85):
+            touwrol(b, Vector((x, 0.05, z)), Vector((0, 0, 1)), 0.16, 0.2, winden=4)
+    o = L.obj("hek_poort", b.mesh("hek_poort", [m("hout"), m("kopshout"), m("touw")]))
+    o.data.set_sharp_from_angle(angle=math.radians(50))
+    d = L.Bouwer()
+    paal(d, rnd, Vector((1.78, 0.0, 0.08)), 0.95, r=0.07)     # slotpaaltje aan de vrije kant
+    for z in (0.45, 0.85):
+        p0, p1 = Vector((0.12, 0.0, z)), Vector((1.82, 0.0, z + rnd.uniform(-0.02, 0.02)))
+        rr = L.buis(d, [p0, p0.lerp(p1, 0.5) + Vector((0, 0, -0.012)), p1], [0.07, 0.068, 0.07], zijden=8,
+                    uvschaal=1 / 0.8, mat=0, u_rep=0.45)
+        schijf_uv(d, rr[0], p0, 1, omgekeerd=True)
+        schijf_uv(d, rr[-1], p1, 1)
+    q0, q1 = Vector((0.18, 0.0, 0.47)), Vector((1.72, 0.0, 0.83))      # schoor tegen het doorzakken
+    rr = L.buis(d, [q0, q1], [0.055, 0.055], zijden=8, uvschaal=1 / 0.8, mat=0, u_rep=0.4)
+    for z in (0.45, 0.85):                                             # scharnieren: touw om de grote paal
+        touwrol(d, Vector((0.02, 0.0, z)), Vector((1, 0, 0)), 0.09, 0.14, winden=3)
+    do = L.obj("poort_deur", d.mesh("poort_deur", [m("hout"), m("kopshout"), m("touw")]))
+    do.data.set_sharp_from_angle(angle=math.radians(50))
+    do.parent = o
+    do.location = (-1.0, 0, 0)
     return [o]
 
 

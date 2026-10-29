@@ -31,7 +31,8 @@ Driehoeken: LOD0 / LOD1 (+ sneeuwlaag).
 | bronplas (spring 144, missie 1), 2 m | `bronplas.glb` | 1464 | kring keien (gebakken, steen-shader) + `bronplas_water` (BLEND) |
 | hekpaal | `hek_paal.glb` | 50 | |
 | heksegment, 2 m (palen op x = +-1) | `hek_segment.glb` | 2676 | oranje touw om de kruisingen |
-| poort, doorgang 2 m | `poort.glb` | 2224 | blauwe steen emissief, keien met mos |
+| poort (stenen sleutelpoort, `mgate`, latere missies), doorgang 2 m | `poort.glb` | 2224 | blauwe steen emissief, keien met mos; deur los als `poort_deur` |
+| hekpoort (houten, `gate`, missie 1), 2 m | `hek_poort.glb` | 3782 | twee palen met touw, vleugel `poort_deur` (scharnier op x = -1) |
 | akker kaal, 2 x 2 m | `akker_kaal.glb` | 2822 | vier ruggen langs x |
 | akker rijp, 2 x 2 m | `akker_rijp.glb` | 3830 | tarwe als gekruiste kaarten (`akker_rijp_gewas`, wind) |
 
