@@ -407,6 +407,7 @@ func _rond_af(p: Plan) -> void:
 		if d.werk_plan == p:
 			d.werk_plan = null
 			d.bouwt = false
+		if r.has_point(d.tegel()):    # ook zwervers die op de voetafdruk staan
 			var t := dichtstbij_loopbaar(d.tegel())
 			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
 				d.zet_tegel(t)

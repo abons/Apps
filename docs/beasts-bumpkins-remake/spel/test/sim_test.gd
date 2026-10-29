@@ -171,6 +171,11 @@ func _initialize() -> void:
 	_check(bp.klaar, "hut klaar na %d bouwtikken (%.0f s)" % [bouwtikken, bouwtikken * w.tik_dt])
 	_check(not w.raster.loopbaar(100, 64), "afgebouwde hut blokkeert zijn tegels")
 	_check(bouwer.werk_plan == null and not bouwer.bouwt, "bouwer is vrij na afloop")
+	var in_hut := 0
+	for dl in w.dorpelingen:
+		if bp.afdruk().has_point(dl.tegel()):
+			in_hut += 1
+	_check(in_hut == 0, "niemand staat in de afgebouwde hut (%d)" % in_hut)
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
