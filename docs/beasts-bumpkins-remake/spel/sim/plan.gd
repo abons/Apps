@@ -8,6 +8,9 @@ var tegel: Vector2i         ## linksboven van de voetafdruk
 var draai: int              ## kwartslagen, 0..3
 var breed: int
 var diep: int
+var bouwtijd_s := 30.0     ## werker-seconden tot klaar (een werker: 30 s, twee: 15 s)
+var voortgang := 0.0       ## 0..1
+var klaar := false
 
 
 func _init(s: StringName, t: Vector2i, d: int, b: int, di: int) -> void:

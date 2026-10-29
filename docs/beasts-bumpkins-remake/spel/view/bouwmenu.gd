@@ -18,6 +18,7 @@ var knop: Button
 var ghost: MeshInstance3D
 var _rechts_start := Vector2.ZERO
 var _rechts := false
+var _kisten := {}          ## Plan -> kist
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -79,6 +80,12 @@ func _plan_onder(pos: Vector2) -> Plan:
 
 
 func _process(_dt: float) -> void:
+	for p in _kisten:
+		var k: MeshInstance3D = _kisten[p]
+		var f: float = p.voortgang
+		k.scale.y = maxf(0.05, f)
+		k.position.y = GROND_Y + HOOGTE * 0.5 * k.scale.y
+		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
 	if not actief:
 		return
 	var p := _plan_onder(get_viewport().get_mouse_position())
@@ -95,6 +102,7 @@ func _toon_plan(p: Plan) -> void:
 	var mi := _kist(Color(0.9, 0.8, 0.4, 0.5))
 	mi.position = _midden(p)
 	mi.rotation.y = p.draai * PI * 0.5
+	_kisten[p] = mi
 	ghost.get_parent().add_child(mi)
 
 

@@ -12,6 +12,7 @@ const REGENKANS := [0.35, 0.10, 0.40, 0.0]
 
 signal bevel_gegeven(ids: Array, soort: String, doel: Vector2i)
 signal plan_gezet(plan: Plan)
+signal plan_klaar(plan: Plan)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 const BOUWSOORTEN := {&"hut": Vector2i(2, 2)}
@@ -193,6 +194,9 @@ func tik(dt: float) -> void:
 	tik_nr += 1
 	for d in dorpelingen:
 		d.tick(self, dt)
+	for p in plannen:
+		if not p.klaar and p.voortgang >= 1.0:
+			_rond_af(p)
 
 
 ## 0..1 tussen de vorige en de volgende tik, voor interpolatie in de view.
@@ -367,3 +371,43 @@ func plan_zet(p: Plan) -> bool:
 	plannen.append(p)
 	plan_gezet.emit(p)
 	return true
+
+
+func plan_op(t: Vector2i) -> Plan:
+	for p in plannen:
+		if not p.klaar and p.afdruk().has_point(t):
+			return p
+	return null
+
+
+## Stuur volwassenen in `ids` naar het plan om te bouwen (elk naar een eigen tegel van de voetafdruk). Geeft het aantal.
+func geef_bouwbevel(ids: Array, p: Plan) -> int:
+	var r := p.afdruk()
+	var tegels: Array[Vector2i] = []
+	for c in range(r.position.x, r.end.x):
+		for rij in range(r.position.y, r.end.y):
+			tegels.append(Vector2i(c, rij))
+	var n := 0
+	for id in ids:
+		var d := dorpeling(id)
+		if d != null and d.geef_bevel(self, "werk", tegels[n % tegels.size()]):
+			d.werk_plan = p
+			n += 1
+	return n
+
+
+## Plan af: de voetafdruk wordt blokkerend en de werkers lopen weg van de nieuwe muren.
+func _rond_af(p: Plan) -> void:
+	p.klaar = true
+	var r := p.afdruk()
+	for c in range(r.position.x, r.end.x):
+		for rij in range(r.position.y, r.end.y):
+			raster.blok[raster.idx(c, rij)] = 1
+	for d in dorpelingen:
+		if d.werk_plan == p:
+			d.werk_plan = null
+			d.bouwt = false
+			var t := dichtstbij_loopbaar(d.tegel())
+			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
+				d.zet_tegel(t)
+	plan_klaar.emit(p)

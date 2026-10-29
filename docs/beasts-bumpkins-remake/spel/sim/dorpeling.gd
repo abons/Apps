@@ -14,6 +14,8 @@ var route: Array[Vector2] = []   ## te volgen punten (tegelmiddens, in tegelcoö
 var bevel := {}               ## {} (geen) of {"soort": "loop"|"vecht"|"werk", "doel": Vector2i}
 var anker := Vector2i.ZERO    ## zwerfmiddelpunt: het kampvuur, na een bevel de plek waar hij bleef staan
 var wacht := 2.0
+var werk_plan: Plan = null   ## bouwplek waar hij heen loopt en aan werkt
+var bouwt := false           ## in deze tik aan het bouwen (view: hamerlus)
 var snelheid_mps := 0.0       ## werkelijke loopsnelheid in deze tik, m/s incl. looptempo (0 = stil)
 
 
@@ -38,6 +40,7 @@ func zet_tegel(t: Vector2i) -> void:
 func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	if not kan_bevel(soort):
 		return false
+	werk_plan = null
 	var r := Router.route(w.raster, tegel(), doel)
 	if r.is_empty() and tegel() != doel:
 		return false
@@ -57,7 +60,12 @@ func _klaar() -> void:
 func tick(w: Wereld, dt: float) -> void:
 	vorige = pos
 	snelheid_mps = 0.0
+	bouwt = false
 	if route.is_empty():
+		if werk_plan != null and not werk_plan.klaar:
+			bouwt = true
+			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt / werk_plan.bouwtijd_s)
+			return
 		if bevel.is_empty():
 			_zwerf(w, dt)
 		return

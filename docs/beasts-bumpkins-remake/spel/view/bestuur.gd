@@ -99,6 +99,10 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 		return
 	var t := tegel_onder(pos)
 	if t.x >= 0:
+		var p := w.plan_op(t)
+		if p != null and w.geef_bouwbevel(gekozen, p) > 0:
+			view.markeer(p.tegel)
+			return
 		geef_loopbevel(t)
 
 

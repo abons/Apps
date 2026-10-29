@@ -154,6 +154,24 @@ func _initialize() -> void:
 	_check(w.maak_plan(&"hut", w.kampvuur, 0) == null, "hut op het kampvuur kan niet")
 	_check(w.maak_plan(&"molen", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
 
+	# bouwen: een volwassene loopt naar het plan, werkt tot het klaar is, de plek wordt blokkerend
+	var bouwer: Dorpeling = null
+	var jong: Dorpeling = null
+	for dl in w.dorpelingen:
+		if dl.volwassen():
+			bouwer = dl
+		else:
+			jong = dl
+	_check(bouwer != null and w.geef_bouwbevel([bouwer.id], bp) == 1, "volwassene krijgt bouwbevel")
+	_check(jong != null and w.geef_bouwbevel([jong.id], bp) == 0, "kind kan niet bouwen")
+	var bouwtikken := 0
+	while not bp.klaar and bouwtikken < 1500:
+		w.tik(w.tik_dt)
+		bouwtikken += 1
+	_check(bp.klaar, "hut klaar na %d bouwtikken (%.0f s)" % [bouwtikken, bouwtikken * w.tik_dt])
+	_check(not w.raster.loopbaar(100, 64), "afgebouwde hut blokkeert zijn tegels")
+	_check(bouwer.werk_plan == null and not bouwer.bouwt, "bouwer is vrij na afloop")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

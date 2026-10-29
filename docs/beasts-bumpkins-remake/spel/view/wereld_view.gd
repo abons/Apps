@@ -89,6 +89,7 @@ func _process(dt: float) -> void:
 		var b: Bumpkin = u["bump"]
 		var v := 0.0 if w.gepauzeerd else d.snelheid_mps * w.tempo
 		b.volg(_wereld_pos(d, a), v)
+		b.werk(d.bouwt)
 		b.zet_nacht(donker)
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
 	_werk_pad()
