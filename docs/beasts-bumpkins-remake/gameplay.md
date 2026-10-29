@@ -311,6 +311,7 @@ Vervangt de voorstellen in sectie 6 waar ze botsen.
 | Koe en eigendom | Eigen koe krijgt een bel. **Ook wilde koeien geven melk**; dorpelingen gaan alleen melken als de koe **dicht bij het dorp** staat |
 | Werk naar leeftijd | **Alleen volwassenen werken.** Kinderen en ouderen werken niet, maar **kopen wel** |
 | Wie bouwt | Elke volwassen man bouwt, de bouwer bouwt sneller |
+| Bouwen in de remake (2026-10-29, gebruiker) | **Geen limiet van 4 werkers** (werkers tellen op); **de hut gaat in stappen** (4 bouwstanden, zichtbaar per stand; modern). **Nostalgie:** de bouwer zaagt of hamert bij een **houtstapel (woodpile)** of **steenstapel (stonepile)** bij de bouwplaats, zoals in het origineel. Werk 60 s per hut (origineel); prijs 40 uit de kas volgt met de economie |
 | Besturing (PC) | Selecteren met **selectiekader of klik op een unit**. **Linkerklik = bevel**, **rechterklik = selectie weg**. Lopen kan iedereen; **vechten en werken alleen volwassenen** |
 | Plaatsen | Rooster, 4 deurrichtingen (R draait) |
 | Steen gooien | **Munitie is oneindig** en komt nergens vandaan, zoals in het origineel. Per worp **hurken en een steen van de grond rapen**, dan opstaan en gooien: de bestaande `aanval_steen` (rapen op `pak_s`, loslaten op `release_s`) volgt dat al |
