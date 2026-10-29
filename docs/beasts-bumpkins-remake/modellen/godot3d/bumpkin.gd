@@ -13,7 +13,7 @@ extends Node3D
 signal aangekomen          ## loop_naar() is bij het doel
 signal impact(welke: StringName)  ## bouwen (elke lus) en aanval_zwaard op impact_s; steen bij inslag; voor geluid/treffers
 
-const BUMPKIN_GLB := "res://bumpkin/bumpkin_test.glb"   # later bumpkin_man.glb, zelfde skelet
+const BUMPKIN_GLB := "res://bumpkin/bumpkin_man.glb"   # bumpkin_test.glb is het placeholder-lijf, zelfde skelet
 const BUMPKIN_ANIM := "res://bumpkin/bumpkin_anim.json"
 const MODEL_YAW_OFFSET := 0.0
 const ACCEL := 6.0          # m/s^2
