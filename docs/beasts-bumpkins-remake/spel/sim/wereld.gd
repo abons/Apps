@@ -18,6 +18,7 @@ signal koe_geclaimd(koe: Vee)
 signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
 signal dorpeling_erbij(d: Dorpeling)      ## een kind is geboren
 signal kip_erbij(k: Kip)
+signal rol_veranderd(d: Dorpeling)
 signal volwassen_geworden(d: Dorpeling)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
@@ -922,6 +923,45 @@ func plan_zet(p: Plan) -> bool:
 	plannen.append(p)
 	plan_gezet.emit(p)
 	return true
+
+
+## Afgebouwd gebouw waarvan de voetafdruk `t` bevat, of null.
+func gebouw_op(t: Vector2i) -> Plan:
+	for p in plannen:
+		if p.klaar and p.afdruk().has_point(t):
+			return p
+	return null
+
+
+## Bouwersgilde (missie 1, origineel: "bouwer 2x sneller"): de eerste volwassen man uit `ids` die nog geen bouwer is,
+## loopt naar de gereedschapsloods en wordt daar tegen `bouwer.prijs` bouwer: bouwt `bouwer.tempo` keer zo snel en
+## vecht niet meer. Geeft het aantal (0 of 1).
+func geef_gildebevel(ids: Array, loods: Plan) -> int:
+	if loods == null or not loods.klaar or loods.soort != &"gereedschapsloods" or not kan_bouwer_worden():
+		return 0
+	for id in ids:
+		var d := dorpeling(id)
+		if d != null and d.volwassen() and d.geslacht == "man" and d.rol == "" \
+				and d.geef_bevel(self, "gilde", dichtstbij_loopbaar(loods.deur_tegel())):
+			d.gilde = loods
+			if d.route.is_empty() and d.gilde != null:
+				gilde_aangekomen(d)
+			return 1
+	return 0
+
+
+func kan_bouwer_worden() -> bool:
+	return kas >= int(spel["bouwer"]["prijs"])
+
+
+func gilde_aangekomen(d: Dorpeling) -> void:
+	if d.gilde == null:
+		return
+	d.gilde = null
+	if d.rol == "" and kan_bouwer_worden():
+		kas -= int(spel["bouwer"]["prijs"])
+		d.rol = "bouwer"
+		rol_veranderd.emit(d)
 
 
 func plan_op(t: Vector2i) -> Plan:

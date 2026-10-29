@@ -392,6 +392,48 @@ func _initialize() -> void:
 		ver = maxi(ver, int(Vector2(kp.tegel()).distance_to(Vector2(kp.anker))))
 	_check(ver <= Kip.ZWERF_STRAAL + 1, "kippen blijven bij het hok (max %d tegels)" % ver)
 
+	# bouwersgilde: een man wordt bij de loods bouwer (kost 30), bouwt 2x zo snel en vecht niet
+	var bw := Wereld.new()
+	bw.laad()
+	var ld: Plan = null
+	for y in range(44, 90, 3):
+		for x in range(86, 124, 3):
+			if ld == null:
+				var lp2 := bw.maak_plan(&"gereedschapsloods", Vector2i(x, y), 0)
+				if lp2 != null and bw.bereik[bw.raster.idx(lp2.deur_tegel().x, lp2.deur_tegel().y)] == 1 and bw.plan_zet(lp2):
+					bw._rond_af(lp2)
+					ld = lp2
+	var man: Dorpeling = null
+	var vrouw: Dorpeling = null
+	for dl in bw.dorpelingen:
+		if dl.volwassen() and dl.geslacht == "man" and man == null:
+			man = dl
+		elif dl.volwassen() and dl.geslacht == "vrouw" and vrouw == null:
+			vrouw = dl
+	_check(bw.geef_gildebevel([vrouw.id], ld) == 0, "een vrouw wordt geen bouwer")
+	var bkas := bw.kas
+	_check(bw.geef_gildebevel([man.id], ld) == 1, "man loopt naar de loods")
+	for i in 3000:
+		if man.rol == "bouwer":
+			break
+		bw.tik(bw.tik_dt)
+	_check(man.rol == "bouwer" and bw.kas == bkas - 30, "man is bouwer, kas -30 (%d)" % (bkas - bw.kas))
+	_check(not man.kan_bevel("vecht") and man.kan_bevel("werk"), "bouwer vecht niet, werkt wel")
+	var bh: Plan = null
+	for y in range(44, 90, 3):
+		for x in range(86, 124, 3):
+			if bh == null:
+				var hp2 := bw.maak_plan(&"hut", Vector2i(x, y), 0)
+				if hp2 != null and bw.plan_zet(hp2):
+					bh = hp2
+	man.zet_tegel(bh.deur_tegel())
+	man.route.clear()
+	man.bevel = {}
+	man.werk_plan = bh
+	for i in int(10.0 / bw.tik_dt):
+		bw.tik(bw.tik_dt)
+	_check(absf(bh.voortgang - 20.0 / 60.0) < 0.02, "bouwer: 10 s werk = 20 werker-seconden (%.2f)" % (bh.voortgang * 60.0))
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

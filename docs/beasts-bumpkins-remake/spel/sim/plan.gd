@@ -21,6 +21,7 @@ const DEUREN := {
 	&"molen": {"plek": Vector2(1.1, 2.5), "richting": Vector2i(0, 1)},
 	&"melkerij": {"plek": Vector2(-2.9, 0.16), "richting": Vector2i(-1, 0)},
 	&"kippenhok": {"plek": Vector2(-0.45, -0.7), "richting": Vector2i(0, -1)},
+	&"gereedschapsloods": {"plek": Vector2(0.6, 1.44), "richting": Vector2i(0, 1)},
 }
 
 

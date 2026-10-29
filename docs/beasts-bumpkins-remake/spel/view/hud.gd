@@ -31,7 +31,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen   rechts klik = selectie weg   rechts slepen / Q E = draaien\nWASD/rand = pannen   wiel = zoom   Spatie pauze   1 2 4 tempo   K regen   N seizoen   Esc stop"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nWASD/rand = pannen   wiel = zoom   Spatie pauze   1 2 4 tempo   K regen   N seizoen   Esc stop"
 	pc2.add_child(hulp)
 	add_child(pc2)
 

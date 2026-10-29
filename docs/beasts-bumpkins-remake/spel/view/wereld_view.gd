@@ -43,6 +43,7 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	for d in w.dorpelingen:
 		_maak_unit(d)
 	w.dorpeling_erbij.connect(_maak_unit)
+	w.rol_veranderd.connect(func(d: Dorpeling) -> void: _zet_rol(d))
 	w.volwassen_geworden.connect(func(d: Dorpeling) -> void:   # jongen/meisje-glb wordt man/vrouw
 		var oud: Bumpkin = units[d.id]["bump"]
 		var yaw := oud.rotation.y
@@ -120,8 +121,48 @@ func _maak_unit(d: Dorpeling) -> void:
 	zak.visible = false
 	b.add_child(zak)
 	units[d.id] = {"bump": b, "ring": ring, "baby": bundel, "zak": zak}
+	_zet_rol(d)
 	b.volg(_wereld_pos(d, 0.0), 0.0)
 	b.kijk_naar(Vector3(0, 0, 1), true)
+
+
+## Bouwer: een gele helm op het Head-bot (concept bouwer, "helm v2"), tot er een eigen bouwer-glb is.
+func _zet_rol(d: Dorpeling) -> void:
+	var b: Bumpkin = units[d.id]["bump"]
+	var oud := b.find_child("Bouwerhelm", true, false)
+	if oud != null:
+		oud.queue_free()
+	if d.rol != "bouwer":
+		return
+	var sk := b.find_child("Skeleton3D", true, false) as Skeleton3D
+	if sk == null or sk.find_bone("Head") < 0:
+		return
+	var ba := BoneAttachment3D.new()
+	ba.name = "Bouwerhelm"
+	ba.bone_name = "Head"
+	sk.add_child(ba)
+	var helm := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.12
+	sm.height = 0.24
+	sm.is_hemisphere = true
+	helm.mesh = sm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.86, 0.68, 0.18)
+	m.metallic = 0.3
+	m.roughness = 0.45
+	helm.material_override = m
+	helm.position = Vector3(0, 0.15, 0.01)
+	ba.add_child(helm)
+	var rand := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.15
+	cm.bottom_radius = 0.15
+	cm.height = 0.015
+	rand.mesh = cm
+	rand.material_override = m
+	rand.position = Vector3(0, 0.15, 0.01)
+	ba.add_child(rand)
 
 
 func _maak_koe(k: Vee) -> void:

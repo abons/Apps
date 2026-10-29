@@ -2,6 +2,7 @@ class_name Bestuur
 extends Node
 ## Muisbesturing (besluit gebruiker 2026-10-29): selecteren met een kader of een klik op een unit,
 ## linkerklik op de grond = loopbevel, rechterklik = selectie weg. Rechts slepen draait de camera (rts_camera.gd).
+## Klik op een afgebouwde gereedschapsloods met een selectie: de eerste volwassen man wordt er bouwer (kost kas).
 ## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
 ## Fight- en werkbevelen bestaan in Wereld.geef_bevel (alleen volwassenen); er is nog geen invoer voor.
 
@@ -107,6 +108,10 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 		var p := w.plan_op(t)
 		if p != null and w.geef_bouwbevel(gekozen, p) > 0:
 			view.markeer(p.tegel)
+			return
+		var g := w.gebouw_op(t)
+		if g != null and g.soort == &"gereedschapsloods" and w.geef_gildebevel(gekozen, g) > 0:
+			view.markeer(g.deur_tegel())
 			return
 		geef_loopbevel(t)
 

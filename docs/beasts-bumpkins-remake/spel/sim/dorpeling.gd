@@ -8,6 +8,8 @@ var naam := ""
 var sex_ruw := 0          ## zoals in map1.json: 1 man, 2 vrouw, 13/14 onbekend (vermoedelijk kind, niet geverifieerd)
 var geslacht := "onbekend"
 var leeftijd := "volwassen"   ## volwassen | kind | oud
+var rol := ""                ## "" gewone dorpeling, "bouwer" (bouwersgilde: bouwt sneller, vecht niet)
+var gilde: Plan = null       ## gereedschapsloods waar hij zich laat inschrijven (bevel "gilde")
 var pos := Vector2.ZERO
 var vorige := Vector2.ZERO    ## positie bij de vorige tik, voor interpolatie in de view
 var route: Array[Vector2] = []   ## te volgen punten (tegelmiddens, in tegelcoördinaten), recht getrokken door Router.glad
@@ -39,6 +41,8 @@ func volwassen() -> bool:
 
 ## Lopen kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
+	if soort == "vecht" and rol == "bouwer":
+		return false
 	return soort == "loop" or volwassen()
 
 
@@ -50,7 +54,7 @@ func vrij_voor_gezin() -> bool:
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
 func ledig() -> bool:
 	return bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
-		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null
+		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null
 
 
 func tegel() -> Vector2i:
@@ -65,6 +69,8 @@ func zet_tegel(t: Vector2i) -> void:
 func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	if not kan_bevel(soort):
 		return false
+	if soort != "gilde":
+		gilde = null
 	if soort != "huis" and not wieg.is_empty():   # een bevel van de speler breekt het gezin af
 		w.annuleer_wieg(wieg)
 	if not soort in ["lever", "koop", "oogst", "melk", "raap"]:
@@ -93,6 +99,8 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	bevel = {"soort": soort, "doel": doel}
 	if r.is_empty():
 		binnen = soort == "huis"
+		if soort == "gilde":
+			w.gilde_aangekomen(self)
 		if soort in ["lever", "koop", "oogst", "melk", "raap"]:
 			w.klus_aangekomen(self, soort)
 		_klaar()
@@ -120,7 +128,8 @@ func tick(w: Wereld, dt: float) -> void:
 	if route.is_empty():
 		if werk_plan != null and not werk_plan.klaar:
 			bouwt = true
-			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt / werk_plan.bouwtijd_s)
+			var f: float = float(w.spel["bouwer"]["tempo"]) if rol == "bouwer" else 1.0
+			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt * f / werk_plan.bouwtijd_s)
 			return
 		if bevel.is_empty() and baby <= 0.0:    # met de baby op de arm blijft ze staan
 			_zwerf(w, dt)
@@ -152,6 +161,8 @@ func tick(w: Wereld, dt: float) -> void:
 			w.claim_aangekomen(self)
 		if bevel.get("soort", "") == "huis":
 			binnen = true
+		elif bevel.get("soort", "") == "gilde":
+			w.gilde_aangekomen(self)
 		elif bevel.get("soort", "") in ["lever", "koop", "oogst", "melk", "raap"]:
 			w.klus_aangekomen(self, bevel["soort"])
 		_klaar()

@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -192,6 +192,21 @@ func _start_scenario() -> void:
 				w.kippen[0].leeg = 3.0
 			w.tempo = 2.0
 			cam.zet_direct(view.terrein.tegel_midden(kh.deur_tegel() if kh != null else Vector2i(99, 62)) + Vector3(0, 0.3, 0), 0.6, deg_to_rad(30), 9.0)
+		"bouwer":
+			# loods staat; een man laat zich bouwer maken en bouwt daarna een hut, naast een gewone man op een tweede hut, 4x
+			var ld := _vrij_plan(&"gereedschapsloods", Vector2i(99, 61))
+			if ld != null and w.plan_zet(ld):
+				w._rond_af(ld)
+			var mannen := []
+			for d in w.dorpelingen:
+				if d.volwassen() and d.geslacht == "man":
+					mannen.append(d.id)
+			if ld != null and mannen.size() >= 1:
+				w.dorpeling(mannen[0]).zet_tegel(w.dichtstbij_loopbaar(ld.deur_tegel() + Vector2i(0, 2)))
+				w.geef_gildebevel([mannen[0]], ld)
+			w.tempo = 2.0
+			var dt_ := ld.deur_tegel() if ld != null else Vector2i(101, 63)
+			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
 		"claim":
 			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
 			for d in w.dorpelingen:
