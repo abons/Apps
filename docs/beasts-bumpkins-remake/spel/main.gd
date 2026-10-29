@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|nacht
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -222,6 +222,13 @@ func _start_scenario() -> void:
 					if w.plan_zet(hp):
 						w._rond_af(hp)
 			cam.zet_direct(view.terrein.tegel_midden(o + Vector2i(3, 3)) + Vector3(0, 0.4, 0), 0.5, deg_to_rad(38), 13.0)
+		"nacht":
+			# een hut staat; bij het invallen van de nacht gaan er twee naar binnen en gaan de anderen bij het vuur liggen
+			var nh := _vrij_plan(&"hut", Vector2i(98, 60))
+			if nh != null and w.plan_zet(nh):
+				w._rond_af(nh)
+			w.tempo = 2.0
+			cam.zet_direct(view.terrein.tegel_midden(w.kampvuur) + Vector3(0, 0.4, 0), 0.6, deg_to_rad(36), 14.0)
 		"claim":
 			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
 			for d in w.dorpelingen:

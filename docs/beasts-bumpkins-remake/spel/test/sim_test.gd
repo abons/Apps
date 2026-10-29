@@ -507,6 +507,47 @@ func _initialize() -> void:
 	_check(in_muur == 0, "na het kippenhok staat niemand in een muur (%d)" % in_muur)
 	_check(hokken[0].klaar and hokken[1].klaar, "bouwers lopen door naar het tweede kippenhok")
 
+	# zelfstandig: een geplaatst plan wordt zonder bevel gebouwd; 's nachts 2 in de hut en de rest bij het kampvuur,
+	# 's ochtends weer op; zonder opdracht blijft iedereen bij het dorp
+	var zw := Wereld.new()
+	zw.laad()
+	var zh: Plan = null
+	for r in 10:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if zh == null:
+					var q := zw.maak_plan(&"hut", Vector2i(98 + dx, 60 + dy), 0)
+					if q != null and zw.plan_zet(q):
+						zh = q
+	var zmax := 0.0
+	var in_bed := 0
+	var bij_vuur := 0
+	for i in int(540.0 / zw.tik_dt):
+		zw.tik(zw.tik_dt)
+
+		if i % 50 == 0 and zw.is_nacht():
+			var b1 := 0
+			var v1 := 0
+			for dl in zw.dorpelingen:
+				if dl.slaapt and dl.binnen:
+					b1 += 1
+				if dl.slaapt and dl.bij_vuur:
+					v1 += 1
+			in_bed = maxi(in_bed, b1)
+			bij_vuur = maxi(bij_vuur, v1)
+	_check(zh != null and zh.klaar, "hut zonder bouwbevel gebouwd")
+	_check(in_bed == 2 and bij_vuur == 4, "nacht: %d in het bed van de hut, %d bij het kampvuur" % [in_bed, bij_vuur])
+	var op := 0
+	for dl in zw.dorpelingen:
+		if not dl.slaapt and not dl.binnen:
+			op += 1
+	_check(not zw.is_nacht() and op == 6, "ochtend: iedereen weer op (%d)" % op)
+	for i in int(60.0 / zw.tik_dt):      # een minuut zonder klussen: terug naar het dorp
+		zw.tik(zw.tik_dt)
+	for dl in zw.dorpelingen:
+		zmax = maxf(zmax, Vector2(dl.tegel()).distance_to(Vector2(zw.kampvuur)))
+	_check(zmax <= 7.0, "zonder opdracht blijft iedereen bij het dorp: max %.1f tegels van het kampvuur" % zmax)
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

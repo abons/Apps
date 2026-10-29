@@ -124,7 +124,35 @@ func _maak_unit(d: Dorpeling) -> void:
 	zak.position = Vector3(0, 1.0, -0.2)      # op de rug (gezicht langs +Z)
 	zak.visible = false
 	b.add_child(zak)
-	units[d.id] = {"bump": b, "ring": ring, "baby": bundel, "zak": zak}
+	# slaapzak (origineel `sleepers`: bruine zak met een paarse deken, alleen het hoofd steekt eruit), bij het kampvuur
+	var slaapzak := Node3D.new()
+	slaapzak.name = "Slaapzak"
+	var zakmesh := MeshInstance3D.new()
+	var zc := CapsuleMesh.new()
+	zc.radius = 0.21
+	zc.height = 1.25
+	zakmesh.mesh = zc
+	var zbm := StandardMaterial3D.new()
+	zbm.albedo_color = Color(0.45, 0.29, 0.16)
+	zbm.roughness = 0.95
+	zakmesh.material_override = zbm
+	zakmesh.position = Vector3(0, 0.55, 0)
+	slaapzak.add_child(zakmesh)
+	var deken := MeshInstance3D.new()
+	var dc := CylinderMesh.new()
+	dc.top_radius = 0.225
+	dc.bottom_radius = 0.225
+	dc.height = 0.55
+	deken.mesh = dc
+	var dkm := StandardMaterial3D.new()
+	dkm.albedo_color = Color(0.45, 0.13, 0.55)
+	dkm.roughness = 0.9
+	deken.material_override = dkm
+	deken.position = Vector3(0, 0.62, 0)
+	slaapzak.add_child(deken)
+	slaapzak.visible = false
+	b.add_child(slaapzak)
+	units[d.id] = {"bump": b, "ring": ring, "baby": bundel, "zak": zak, "slaapzak": slaapzak}
 	_zet_rol(d)
 	b.volg(_wereld_pos(d, 0.0), 0.0)
 	b.kijk_naar(Vector3(0, 0, 1), true)
@@ -259,6 +287,13 @@ func _process(dt: float) -> void:
 		var b: Bumpkin = u["bump"]
 		var v := 0.0 if w.gepauzeerd else d.snelheid_mps * w.tempo
 		b.volg(_wereld_pos(d, a), v)
+		# bij het kampvuur liggen: op de zij, wat opgetild zodat de schouder niet in de grond zakt (geen eigen clip)
+		var lig: float = u.get("lig", 0.0)
+		lig = move_toward(lig, 1.0 if (d.slaapt and not d.binnen) else 0.0, dt * 1.5)
+		u["lig"] = lig
+		b.rotation.z = -PI * 0.5 * lig
+		b.position.y += 0.16 * lig
+		(u["slaapzak"] as Node3D).visible = lig > 0.6
 		b.werk(d.bouwt and not w.gepauzeerd)
 		b.zet_nacht(donker)
 		b.visible = not d.binnen

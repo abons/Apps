@@ -20,6 +20,9 @@ var werk_plan: Plan = null   ## bouwplek waar hij heen loopt en aan werkt
 var doel_koe: Vee = null     ## koe die hij gaat claimen (bevel "claim")
 var wieg: Dictionary = {}     ## gezin dat hij met een partner in een hut sticht (Wereld._gezin), {} = geen
 var binnen := false          ## in de hut (onzichtbaar, staat stil op de deurtegel)
+var slaapt := false          ## 's nachts in zijn bed (binnen in `slaapplek`)
+var slaapplek: Plan = null   ## de hut waar hij vannacht slaapt (2 bedden per hut)
+var bij_vuur := false        ## geen bed: 's nachts liggen bij het kampvuur (slaapt = ligt daar al)
 var rust := 0.0              ## s tot hij weer aan een gezin begint (ouder of net volwassen)
 var baby := 0.0              ## s dat de moeder de baby nog draagt; daarna staat het kind er
 var groeit := 0.0            ## s tot het kind volwassen is
@@ -39,11 +42,11 @@ func volwassen() -> bool:
 	return leeftijd == "volwassen"
 
 
-## Lopen kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
+## Lopen en slapen kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
 	if soort == "vecht" and rol == "bouwer":
 		return false
-	return soort == "loop" or volwassen()
+	return soort == "loop" or soort == "slaap" or soort == "vuur" or volwassen()
 
 
 ## Vrij voor een gezin: volwassen, uitgerust, zonder bevel, bouwklus, koe of wieg, en geen baby op de arm.
@@ -54,7 +57,7 @@ func vrij_voor_gezin() -> bool:
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
 func ledig() -> bool:
 	return bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
-		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null
+		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null and slaapplek == null and not slaapt
 
 
 func tegel() -> Vector2i:
@@ -71,6 +74,10 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 		return false
 	if soort != "gilde":
 		gilde = null
+	if soort != "slaap" and soort != "vuur":          # een bevel van de speler wekt hem
+		slaapt = false
+		slaapplek = null
+		bij_vuur = false
 	if soort != "huis" and not wieg.is_empty():   # een bevel van de speler breekt het gezin af
 		w.annuleer_wieg(wieg)
 	if not soort in ["lever", "koop", "oogst", "melk", "raap"]:
@@ -98,7 +105,8 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	route = Router.glad(w.raster, pos, r)
 	bevel = {"soort": soort, "doel": doel}
 	if r.is_empty():
-		binnen = soort == "huis"
+		binnen = soort == "huis" or soort == "slaap"
+		slaapt = soort == "slaap" or soort == "vuur"
 		if soort == "gilde":
 			w.gilde_aangekomen(self)
 		if soort in ["lever", "koop", "oogst", "melk", "raap"]:
@@ -107,8 +115,12 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	return true
 
 
+## Bevel af. Alleen na een loop- of vechtbevel (of claimen, gilde) van de speler blijft hij in de buurt van waar hij stond; na een
+## eigen klus (oogsten, melken, kopen, slapen, ...) zwerft hij terug naar zijn anker in het dorp (besluit gebruiker:
+## zonder opdracht niet te ver van het dorp).
 func _klaar() -> void:
-	anker = tegel()
+	if bevel.get("soort", "") in ["loop", "vecht", "claim", "gilde"]:
+		anker = tegel()
 	bevel = {}
 	wacht = 1.0
 
@@ -136,7 +148,7 @@ func tick(w: Wereld, dt: float) -> void:
 			var f: float = float(w.spel["bouwer"]["tempo"]) if rol == "bouwer" else 1.0
 			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt * f / werk_plan.bouwtijd_s)
 			return
-		if bevel.is_empty() and baby <= 0.0:    # met de baby op de arm blijft ze staan
+		if bevel.is_empty() and baby <= 0.0 and not slaapt:    # met de baby op de arm blijft ze staan; wie ligt, ligt
 			_zwerf(w, dt)
 		return
 	var rest := dt
@@ -166,6 +178,11 @@ func tick(w: Wereld, dt: float) -> void:
 			w.claim_aangekomen(self)
 		if bevel.get("soort", "") == "huis":
 			binnen = true
+		elif bevel.get("soort", "") == "slaap":
+			binnen = true
+			slaapt = true
+		elif bevel.get("soort", "") == "vuur":
+			slaapt = true
 		elif bevel.get("soort", "") == "gilde":
 			w.gilde_aangekomen(self)
 		elif bevel.get("soort", "") in ["lever", "koop", "oogst", "melk", "raap"]:

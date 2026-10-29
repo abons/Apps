@@ -56,6 +56,7 @@ var wiegen: Array[Dictionary] = []        # {moeder, vader, hut: Plan, wacht}
 var akkers := {}                          # tegel -> s groei (>= economie.rijp_s = rijp)
 var _geoogst := {}                        # tegel -> id van de dorpeling die erheen loopt
 var _klus_t := 0.0
+var _was_nacht := false
 var kampvuur := Vector2i.ZERO
 var bereik := PackedByteArray()          # tegels bereikbaar vanaf het kampvuur
 var _onbekend_gemeld := {}               # tegelnamen die al een waarschuwing gaven
@@ -281,8 +282,12 @@ func _economie(dt: float) -> void:
 	for k in vee:
 		k.leeg = maxf(0.0, k.leeg - dt)
 	for d in dorpelingen:
-		for waar in WAREN:
-			d.trek[waar] = float(d.trek.get(waar, 0.0)) + dt
+		if not d.slaapt:          # wie slaapt krijgt geen trek
+			for waar in WAREN:
+				d.trek[waar] = float(d.trek.get(waar, 0.0)) + dt
+	if not is_nacht() and _was_nacht:
+		_wek()
+	_was_nacht = is_nacht()
 	_klus_t += dt
 	if _klus_t < 0.5:
 		return
@@ -370,12 +375,25 @@ func melkbaar(k: Vee) -> bool:
 	return k.leeg <= 0.0 and not k.vast and Vector2(k.tegel()).distance_to(Vector2(kampvuur)) <= float(spel["economie"]["melk_straal"])
 
 
+## Zelfstandig werk, in deze volgorde: wat hij draagt wegbrengen; 's nachts naar bed (een hut met een vrij bed);
+## kopen waar hij trek in heeft; (volwassen) bouwen aan een open plan (bouwers altijd, anderen met hoogstens
+## `zelf_bouwen_per_plan` tegelijk), oogsten, melken, eieren rapen. Een bevel van de speler gaat altijd voor.
 func _kies_klus(d: Dorpeling) -> void:
 	var e: Dictionary = spel["economie"]
 	if d.draagt != "":
 		var m := _dichtste_winkel(d, _winkel_voor(d.draagt, true), false)
 		if m != null and d.geef_bevel(self, "lever", dichtstbij_loopbaar(m.deur_tegel())):
 			d.klus = m
+		return
+	if is_nacht():
+		# geen klus maar de nacht: een bed in een hut, en anders liggen bij het kampvuur
+		var hut := _vrij_bed(d)
+		if hut != null and d.geef_bevel(self, "slaap", dichtstbij_loopbaar(hut.deur_tegel())):
+			d.slaapplek = hut
+		elif hut == null and not d.slaapt:
+			var plek := _plek_bij_vuur(d)
+			if plek.x >= 0 and d.geef_bevel(self, "vuur", plek):
+				d.bij_vuur = true
 		return
 	for waar in WAREN:
 		if float(d.trek.get(waar, 0.0)) < float(e["trek_s"]):
@@ -386,6 +404,9 @@ func _kies_klus(d: Dorpeling) -> void:
 			d.koopt = waar
 			return
 	if not d.volwassen():
+		return
+	var plan := _open_plan(d)
+	if plan != null and geef_bouwbevel([d.id], plan) > 0:
 		return
 	if not molens().is_empty():
 		var beste := Vector2i(-1, -1)
@@ -424,6 +445,92 @@ func _kies_klus(d: Dorpeling) -> void:
 	if kip_best != null and d.geef_bevel(self, "raap", _naast(kip_best.tegel(), d.tegel())):
 		d.raap_kip = kip_best
 		kip_best.vast = true
+
+
+## Dichtste afgebouwde hut met een bed over (bedden_per_hut min wie er vannacht al slaapt), of null.
+func _vrij_bed(d: Dorpeling) -> Plan:
+	var per_hut := int(spel["gezin"]["bedden_per_hut"])
+	var beste: Plan = null
+	var bd := INF
+	for p in plannen:
+		if not p.klaar or p.soort != &"hut":
+			continue
+		var bezet := 0
+		for x in dorpelingen:
+			if x.slaapplek == p:
+				bezet += 1
+		if bezet >= per_hut:
+			continue
+		var af := d.pos.distance_squared_to(Vector2(p.deur_tegel()))
+		if af < bd:
+			bd = af
+			beste = p
+	return beste
+
+
+## Een vrije tegel in de kring rond het kampvuur (1 tot 2,3 tegels), een per slaper.
+func _plek_bij_vuur(d: Dorpeling) -> Vector2i:
+	var bezet := {}
+	for x in dorpelingen:
+		if x != d and x.bij_vuur and not x.bevel.is_empty():
+			bezet[x.bevel["doel"]] = true
+		elif x != d and x.bij_vuur:
+			bezet[x.tegel()] = true
+	for t in spreid(dichtstbij_loopbaar(kampvuur), 40):
+		var af := Vector2(t).distance_to(Vector2(kampvuur))
+		if af >= 1.0 and af <= 2.3 and not bezet.has(t) and bereik[raster.idx(t.x, t.y)] == 1:
+			return t
+	return Vector2i(-1, -1)
+
+
+## 's Ochtends iedereen het bed uit, naast de deur van zijn hut, en wie bij het vuur lag staat op.
+func _wek() -> void:
+	for d in dorpelingen:
+		if d.bij_vuur:
+			d.bij_vuur = false
+			d.slaapt = false
+			if d.bevel.get("soort", "") == "vuur":
+				d.route.clear()
+				d.bevel = {}
+			d.anker = kampvuur
+			d.wacht = rng.randf_range(0.5, 4.0)
+		if d.slaapplek == null:
+			continue
+		var hut := d.slaapplek
+		d.slaapplek = null
+		if d.slaapt:
+			d.slaapt = false
+			d.binnen = false
+			var plekken := spreid(dichtstbij_loopbaar(hut.deur_tegel()), 4)
+			d.zet_tegel(plekken[d.id % plekken.size()] if not plekken.is_empty() else hut.deur_tegel())
+			d.anker = kampvuur        # het dorp
+			d.wacht = rng.randf_range(0.5, 4.0)
+		elif d.bevel.get("soort", "") == "slaap":    # nog onderweg naar bed: laat maar
+			d.route.clear()
+			d.bevel = {}
+
+
+## Dichtste open plan voor deze volwassene: een bouwer neemt elk plan, een ander alleen een plan waar nog minder dan
+## `zelf_bouwen_per_plan` aan werken (zodat er ook geoogst en gemolken wordt). Null als er niets is.
+func _open_plan(d: Dorpeling) -> Plan:
+	var max_n := int(spel.get("zelf_bouwen_per_plan", 2))
+	var beste: Plan = null
+	var bd := INF
+	for p in plannen:
+		if p.klaar:
+			continue
+		if d.rol != "bouwer":
+			var n := 0
+			for x in dorpelingen:
+				if x.werk_plan == p:
+					n += 1
+			if n >= max_n:
+				continue
+		var af := d.pos.distance_squared_to(Vector2(p.tegel))
+		if af < bd:
+			bd = af
+			beste = p
+	return beste
 
 
 func laat_akker_los(t: Vector2i) -> void:
@@ -596,7 +703,7 @@ func _baring(wg: Dictionary) -> void:
 		d.wieg = {}
 		d.binnen = false
 		d.rust = float(g["ouder_rust_s"])
-		d.anker = wg["deur"]
+		d.anker = kampvuur
 	m.zet_tegel(plekken[0] if plekken.size() > 0 else wg["deur"])
 	v.zet_tegel(plekken[1] if plekken.size() > 1 else wg["deur"])
 	m.baby = float(g["baby_s"])

@@ -26,6 +26,15 @@ Opties na `--`: `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, 
 
 `data/origineel/map1.json` komt uit de gedecodeerde originele spelbestanden (auteursrecht): staat in `.gitignore`, net als `assets/`.
 
+## Zelfstandig werk en de nacht
+
+Wie niets omhanden heeft kiest elke 0,5 s zelf (`Wereld._kies_klus`): wat hij draagt wegbrengen, kopen waar hij trek in
+heeft, en als volwassene bouwen aan een open plan (een bouwer altijd, anderen met hoogstens `zelf_bouwen_per_plan` (2)
+tegelijk; een plan hoeft dus niet meer aangeklikt te worden), oogsten, melken, eieren rapen. 's Nachts is er geen klus:
+wie een bed heeft (2 per hut) gaat de hut in, de rest gaat in een slaapzak (origineel `sleepers`) bij het kampvuur liggen;
+'s ochtends staat iedereen op. Zonder opdracht zwerft iedereen rond het kampvuur (anker); alleen na een loop-, vecht-,
+claim- of gildebevel van de speler blijft hij in de buurt van waar hij stond. Een bevel van de speler gaat altijd voor.
+
 ## Wegen
 
 Padtegels (uit de kaart: `road` 1/2/6, plus wat er later bijkomt) worden een keienstrook van 1,3 m (`view/wegen.gd`,
@@ -86,7 +95,7 @@ stronken) is ALLEEN weergave: de sim leest het niet en geen tegel wordt erdoor g
 texturensets (Texture2DArray, 2,8 m per herhaling) uit de hoekgewichten van `TerreinView._splat()`. De koe (klasse 171) komt uit `view/koe.gd`
 (pad, verborgen onderdelen en animatienaam staan alleen daar; nieuwe glb = sync + import). Seizoen: `Natuur.werk_seizoen()` (tint, rotssneeuw) en
 `TerreinView.zet_sneeuwlaag()` (winter), aangeroepen vanuit `WereldView.werk_seizoen()`.
-Scenario's voor frames: overzicht, dorp, selectie, pad, loop, vlag, bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
+Scenario's voor frames: overzicht, dorp, selectie, pad, loop, vlag, bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat), nacht (hut + slaapzakken bij het vuur, --uur=20.6). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
 Uiterlijk per dorpeling: `Bumpkin.glb_voor(geslacht, leeftijd)` kiest een van de zes glb's (man, vrouw, jongen, meisje, oudere man/vrouw; kinderen zijn al 1,11 m in de glb). `sex` 13 = jongen, 14 = meisje is een aanname (niet geverifieerd). Ontbreekt een glb: de man (kind op 0,81x).
 Bouwplaats: houtstapel en steenhoop naast het plan slinken tot 35 % met de voortgang; bouwmenu: hut (B), gereedschapsloods (L, 5x2) en kippenhok (H, 2x2), `Bouwmenu.GEBOUWEN` + `Wereld.BOUWSOORTEN`; glb's op ware grootte, een mensendeur schaalt. Hut klaar = `peasant_hut_rt.glb`, geschaald op de voordeur: 1,15x de langste volwassene (1,37 m) = 1,58 m, dat is de glb op ware grootte; voetafdruk dus 4x4 tegels (7,6 x 7,1 m incl. hek). Die glb (25 MB) staat niet in git: `blender -b -P ../modellen/peasant_hut_realtime.py`, anders blijft het een bruine kist.
 Hoogte (rotsboog, strand) is alleen weergave; de sim is plat.
