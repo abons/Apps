@@ -1,0 +1,273 @@
+# Audioplan Beasts & Bumpkins-remake (Godot 4.7.2)
+
+Stand 2026-10-29. Alleen analyse en inventaris, het spel is niet aangepast. **Niets beluisterd**: alles over de originele klanken is afgeleid uit bestandsnamen, groottes, kanalen en een eenvoudige signaalmeting (duur, RMS, nuldoorgangen). Zo gemerkt met **[?]**. Het originele audiomateriaal is auteursrechtelijk beschermd, alleen voor eigen gebruik en **gaat nooit in git**; dit bestand bevat alleen tekst.
+
+Lokale kopie (niet in git): `SC/audio_origineel/{BBRBANK,BBSPRAUT,BBSUMMER,BBWINTER,SPEECH0}/` met `SC` = `C:/Users/Axel/AppData/Local/Temp/claude/E--werk-androidApps-Apps/16e99493-ac86-47c7-921f-1d215c266f51/scratchpad/` (416 wav, ca. 9,5 MB). Bron: `\\axel-laptop\Users\axelb\beasts\beastnbump\extracted_audio\`.
+
+## 1. Origineel (1996)
+
+### 1a. Wat de extractiescripts dekken
+
+| bestand | wat het doet | dekking |
+| --- | --- | --- |
+| `extract_audio.ps1` | `.FAT` (magic `0.30`, 8 byte kop, 16 byte per entry: offset, size, kanalen, vlag) naar WAV, **16-bit PCM, 22050 Hz aangenomen** (parameter) | `BBRBANK`, `BBSPRAUT`, `BBSUMMER`, `BBWINTER` |
+| `extract_speech.ps1` | `.BOX`: zoekt het pad `c:\windows\desktop\b&bwork\compressenglish\<naam>.M10`, dan `PT`-kop (8 byte), **8-bit unsigned, 11025 Hz aangenomen** | alle `*.BOX`, maar alleen `SPEECH0` heeft M10-audio |
+
+| bevinding | detail |
+| --- | --- |
+| `SPEECH0..4.BOX` zijn **byte-identiek** | alle vijf 2.408.044 byte, zelfde md5. De padnaam zegt `compressenglish`; talen zijn dus niet verspreid over de vijf. Eén set telt, 267 fragmenten |
+| `MISC.BOX`, `MISSIONS.BOX`, `VIDEO.BOX`, `MISTEXT*.BOX` | **geen audio**: lettertypen/strings (`.FDF`, `.TXT`, `.SYN`), 60 missies (`.MIS`), 1248 sprites (`.MFB`) |
+| `BBRBANK.FAT` | 88 entries, **79 geëxtraheerd**. De 9 ontbrekende (2, 20, 40, 44, 55, 82, 85, 86, 87; allemaal mono, samen ca. 223 KB, ca. 5 s) zijn geldig en passen in het bestand: de map is onvolledig, **opnieuw extraheren** |
+| Overige FAT | `BBSPRAUT` 24/24, `BBSUMMER` 30/30, `BBWINTER` 16/16 compleet |
+| Vlagwoord per FAT-entry | `0x01010001` bij 86 van 88; entries 36 en 75 hebben `0x02010001` **[?]** (loop-vlag of formaat). Geen samplefrequentie in de kop: 22050 Hz is een aanname, de signaalmeting (piek 0,9 genormaliseerd, geen ruisbeeld) klopt ermee |
+| Muziek | **geen in de geëxtraheerde bestanden**. Alle FAT-klanken duren 0,04 tot 6,3 s. `QMIXER95.DLL` (Q-Sound-mixer), `MIX.DAT`, `REFLECT.DAT` zijn geen muziek. Muziek zit waarschijnlijk op de cd of in `BEASTS.EXE` **[?]**; `INTRO/OUTRO/CREDITS/EALOGO.VID` zijn 0 byte (weggelaten). Niet onderzocht: `M*.VID`/`MAP*.VID` (1 tot 3 MB, waarschijnlijk kaart-/missiebeelden, geen audio) |
+
+### 1b. Effecten: de vier banken (149 wav)
+
+Alles is een **one-shot**; er zit geen lus of omgevingsklank van betekenis in. Seizoensbanken delen onderling klanken (`BBWINTER_006..012` is gelijk aan `BBSPRAUT_000..003/007..009`; `BBSUMMER_008/009` is gelijk aan `BBSPRAUT_018/019`): spel laadt vermoedelijk **`BBRBANK` + één seizoensbank**.
+
+| bank | entries (stereo / mono) | bestandspatroon | duur | MB | vermoeden (afgeleid) |
+| --- | --- | --- | --- | --- | --- |
+| `BBRBANK` | 88 (16 / 72), 79 geëxtraheerd | `BBRBANK_nnn_{mono,stereo}.wav` | 0,04 tot 3,0 s | 3,2 | basisbank: acties en voorwerpen. 000/001 (2,4 s, 99 Hz, luid) = **donder** **[?]**; 003 tot 005 (1,2 tot 1,6 s, zacht, ruisig) = regen/wind **[?]**; 006 tot 016 stereo 0,2 tot 1,2 s = spreuk/explosie/vuur; mono 018 tot 063 korte tikken en plofjes (0,04 tot 0,7 s) = klik/munt/slag/bouw; mono 064 tot 081 (0,4 tot 3,0 s) = langere dier-, mens- of poortgeluiden |
+| `BBSUMMER` | 30 (6 / 24) | `BBSUMMER_nnn_*.wav` | 0,1 tot 3,4 s | 2,0 | 000 tot 002 stereo 0,7 tot 0,9 s met zeer hoge toonhoogte (ca. 8,5 kHz) = **krekel/insect/vogel** **[?]**; 020 tot 025 mono 1,2 tot 2,2 s, laag = dierstemmen (koe?) **[?]**; 026 tot 029 stil, 1,4 tot 3,4 s = omgeving |
+| `BBSPRAUT` | 24 (15 / 9) | `BBSPRAUT_nnn_*.wav` | 0,5 tot 2,0 s | 2,0 | lente/herfst: 000 tot 003 en 007 tot 009 stereo laag = wind/blad **[?]**; 010 tot 013 hoger = vogel/regen **[?]** |
+| `BBWINTER` | 16 (11 / 5) | `BBWINTER_nnn_*.wav` | 0,3 tot 6,3 s | 2,1 | 000 tot 003 en 005 (6,3 s mono, 480 Hz) = **wind** **[?]**; 004 = windvlaag **[?]** |
+
+**Wat dit betekent:** het origineel kent seizoensgebonden omgevingsklank, maar als **korte stukjes die willekeurig worden afgespeeld**, geen doorlopende lus. Voor ons: eigen lussen en one-shots met een scheduler, de stukken uit de originele banken zijn hooguit referentie.
+
+### 1c. Spraak: `SPEECH0` (267 fragmenten, 11025 Hz, 8-bit, mono)
+
+Patroon: `SPEECH0_nnn_<NAAM>.M10.wav`, 0,04 tot 6,5 s (gemiddeld 0,2 tot 2,0 s, mediaan ca. 0,7 s), 2,2 MB. De volgorde in het archief is per naam gemengd, niet gegroepeerd. **Aanname: PF/PM lijnen = selectie, bevel, werk, klacht** (zie 1d, niet gecontroleerd). Voorvoegsels (de lettercodes zijn de eenheden uit `concept/lijst.md`):
+
+| voorvoegsel | n | gemiddeld | vermoedelijk |
+| --- | --- | --- | --- |
+| `PM` 1 tot 42 | 42 | 0,6 s | **man (peasant male)**: selectie, bevel, werk |
+| `PF` 1 tot 46 | 46 | 0,7 s | **vrouw (peasant female)** |
+| `YPB`, `YPG` | 2 + 2 | 0,7 / 0,9 s | **jongen, meisje** (young peasant boy/girl) |
+| `OPM`, `OPF` | 2 + 2 | 0,9 / 0,5 s | **oudere man, oudere vrouw** |
+| `BAB`, `Pop2baby`, `Popbaby2`, `popp` | 3 + 3 | 0,1 tot 0,8 s | baby: gehuil en geboorte-"plop" |
+| `MONKP`, `MONKF` | 4 + 7 | 0,7 tot 0,9 s | monnik |
+| `PRE` 1 tot 13 | 13 | 0,8 s | priester |
+| `PIK` 1 tot 11, `FOOT` 1 tot 4, `CAV`, `KN`, `ARC`, `FLAG`, `FB` | 11, 4, 4, 4, 4, 5, 3 | 0,2 tot 0,9 s | piekenier, voetsoldaat, cavalerist, ridder, boogschutter, vlagdrager, ?, **[?]** |
+| `WIZ` 1 tot 12, `MAG` 1 tot 6 | 12, 6 | 0,5 / 1,0 s | tovenaar, spreukklanken |
+| `JES`, `TG`, `TAX`, `TOW`, `BUL` | 5, 5, 5, 5, 4 | 0,4 tot 0,8 s | nar, ?, belastinginner, ?, (beul?) **[?]** |
+| `GHOS`, `ZOM`, `VAM`, `DEM`, `DVOX`, `EX` | 4, 1, 5, 7, 7, 6 | 0,9 tot 1,5 s | spook, zombie, vampier, demon, duivelsstem, ? |
+| `crow` 1 tot 13 | 13 | 2,0 s | **menigte/volkslawaai** (applaus, gemurmel) |
+| `munch3`, `chickdie`, `pig3`, `wbark2`, `wolfbite`, `wolfgrwl`, `Fart2/4/5/6`, `Beertent` | 1,1,1,1,1,1,4,1 | 0,1 tot 0,8 s | **kauwen, kippendood, varken, wolf blaffen/bijten/grommen**, scheten, bierfeest |
+| `MISC1..6`, `FON1..3`, `DS1` | 6, 3, 1 | 0,8 / 1,7 / 6,5 s | losse stingers en een lang fragment (verhaal/intro) |
+
+### 1d. Wat het origineel doet
+
+| gedrag | bron | zekerheid |
+| --- | --- | --- |
+| Dorpelingen hebben **eigen stemsets per geslacht en leeftijd** (man 42, vrouw 46, jongen/meisje 2, oud 2) | bestandsnamen | goed |
+| Selectie- en bevelgeluid per eenheid; spraakbellen/denkwolken in beeld (`concept/lijst.md` noemt denkwolken, `gameplay.md` sectie 2) | namen + gameplay.md | geluid bij tekst **[?]** |
+| Eigen klanken voor wolf, kip, varken, kauwen, baby: dieren en geboorte zijn hoorbaar | namen | goed |
+| Seizoensbank bepaalt omgevingsklank; weer (donder, regen) in de basisbank | bankindeling | **[?]** |
+| Eenheden buiten missie 1 (vampier, demon, spook, zombie) hebben eigen stemmen: pas bij missie 2+ nodig | namen | goed |
+
+**Luisterlijst voor Axel (15 minuten):** speel `PM1,PM2,PM10,PM30,PF1,PF20,YPB1,YPG1,OPM1,OPF1,crow1,wolfgrwl`, `BBRBANK_000/003/017/064`, `BBSUMMER_000/020/026`, `BBWINTER_005`, `BBSPRAUT_000/010`. Dan staat vast of de aannames hierboven kloppen, en of 22050/11025 Hz de juiste snelheid is.
+
+## 2. Eigen Android-versie (`beasts-src`)
+
+`app/src/main/res/raw/`, 2,4 MB, **69 bestanden**: 62 mp3 (ElevenLabs) en 7 wav (eigen synthese). Code: `Voice.kt` (`SoundPool`, 4 stromen, eigen draad omdat `SoundPool.play` op het toestel 31 tot 127 ms blokkeert), aangeroepen vanuit `GameView.kt`. Bestanden worden op **naam** gezocht (`getIdentifier`); `Voice.Line.fallback` valt terug op het gewone bevelfragment. Besluiten: `design.md` > *Stemfragmenten bij een tik* en *Een verkoop is te zien en te horen*.
+
+| groep | bestanden | n | inhoud | trigger (`GameView.kt`) |
+| --- | --- | --- | --- | --- |
+| Selectie `voice_select_{m,f,b,g}_0..3` | mp3, ca. 1,6 tot 1,8 s | 16 | tussenwerpsels zonder woorden: m "Hm? Mm? Hnh? Oi?", f "Hm? Mm-hm? Ah? Oh?", b/g "Hm? Mm? Huh? Oh?" | `tap` bij `world.select(man)` (`:794`) |
+| Bevel `voice_order_{m,f,b,g}_0..3` | mp3, ca. 1,6 tot 1,8 s | 16 | "Hup! Aye. Mm. Hop!", f "Hup! Mm. Ha! Oh!", b/g "Hup! Ha! Hop! Oh!" | `tap`: lopen, aanvallen, enlist, bouwhulp (`:861 tot :972`) |
+| Lokroep `voice_{cattle,sheep,hens}_{m,f,b,g}_0..1` | mp3, ca. 2 s | 24 | "Hoi! Hoi!" (koe), "Tsk, tsk!" (schaap), "Tuk, tuk, tuk!" (kip) | bij aankomst bij het dier en bij de poort (`herding`, `:1108`, `:1112`) |
+| Dier `voice_{moo,baa,cluck}_0..1` | mp3, 3 tot 4,5 s | 6 | ElevenLabs **Sound Effects**, echte boerderijgeluiden | bij tik op dier (`:826`, `:880`) en bij de poort (`:1113`) |
+| Eigen synthese `voice_{build_0,build_1,coin_0,crop_0,milk_0,wool_0,eggs_0}.wav` | wav | 7 | hamer (2x), munt, oogst, melk, wol, eieren; **plaatshouders**, op toestel goedgekeurd (`todo.md` van beasts-src) | `Sound.COIN` (`:1149`), `Sound.taking(goods)` (`:1177`), `Sound.BUILD` (`:1210`) |
+
+Stemmen (alle vier **taalneutraal**, dus ook bruikbaar in elke taalversie): Jerry B. (m, "Warm, Friendly Storyteller"), Louise (f, "Warm and Friendly"), Dibsy (b, "Sweet and Childish"), Emmaline (g, "young British girl"). Spreiding en volume gaan via `Voice.Spot` (pan en volume uit schermpositie), **geen** afstandsdemping zoals 3D; `KNOCK_GAP = 0,30 s` knijpt bellers af.
+
+**Herbruik in Godot:**
+
+| wat | oordeel |
+| --- | --- |
+| 32 selectie/bevel (man, vrouw, jongen, meisje) | **ja, direct**: past op de besluiten (sectie 7 gameplay.md: "beasts-src-fragmenten hergebruiken waar ze passen"). Convert naar `.ogg` |
+| 24 lokroepen + 6 dierklanken | **ja**: koe moo en lokroep passen bij missie 1; schaap/kip pas later |
+| 7 eigen wav | ja, eigen werk, rechtenvrij; kwaliteit laag, vervangen zodra er een betere is (hamer, melken, oogst) |
+| Ouderen | **ontbreken**: oudere man/vrouw krijgen m/f met lagere toonhoogte (pitch 0,88 tot 0,92) of nieuwe stemmen |
+| **Licentie (open, uit gameplay.md vraag 13)** | De 62 mp3 zijn gegenereerd met ElevenLabs op het toenmalige plan (2026-09-03, via de browser, gebruiker ingelogd). Welk plan het was staat nergens vastgelegd. Voorwaarde van ElevenLabs (te verifiëren, niet in het repo): commercieel gebruik alleen met een **betaald** abonnement op het moment van genereren; gratis plan = niet-commercieel met bronvermelding. Voor **privé/niet-gepubliceerd** gebruik (beasts is niet gepubliceerd) is het geen probleem; voor publicatie moet het plan vaststaan of moeten we opnieuw genereren |
+
+## 3. Geluidslijst missie 1 en eerste speelbare slice
+
+Missie 1 (Aorta): 6 dorpelingen (man, vrouw, kinderen), vlag, kampvuur, bron, koeien, bomen (den en spar), rotsboog, zee-ring, paddenstoelen, zilveren beker; geen vijanden (zie `map1.md`). Seizoen en weer ook in missie 1 (besluit). Prioriteit: **P1** = slice kan niet zonder, **P2** = missie 1 af, **P3** = later.
+
+Bron: **B** = hergebruik beasts-src, **C** = CC0-bibliotheek, **G** = genereren (ElevenLabs SFX/voice), **R** = zelf opnemen.
+
+### 3a. Stemmen en acties
+
+| geluid | prio | n | bron | opmerking |
+| --- | --- | --- | --- | --- |
+| Selectie man / vrouw / jongen / meisje | P1 | 4 x 4 | B | direct uit de 16 `select` |
+| Bevel man / vrouw / jongen / meisje | P1 | 4 x 4 | B | 16 `order` |
+| Selectie en bevel **oudere man / vrouw** | P2 | 2 x 4 + 2 x 4 | G | lage, dunne stem; of B met pitch 0,9 als noodoplossing |
+| Groepsselectie | P1 | 0 | n.v.t. | alleen de **leider** spreekt (zie 4) |
+| Bouwen: hamer, zaag | P2 | 4 + 3 | B (hamer 2), C | Freesound CC0 `hammer wood nail`, `handsaw` |
+| Oogsten, maaien | P2 | 3 | B (`crop`), C | Freesound `scythe grass swipe` |
+| Steen rapen, gooien, inslag | P2 | 2 + 3 + 3 | C | `pebble pickup`, `whoosh short`, `stone impact dirt`; moment: `pak_s`, `release_s`, `impact('steen')` |
+| Melken | P2 | 3 | B (`milk`), C | later opnieuw: `milk squirt bucket` |
+| Eten (bij nood), eieren/wol | P3 | 3 | B | `eggs`, `wool` |
+| Geboorte (baby "plop" en gehuil) | P3 | 2 | G | origineel heeft `Pop2baby`; wij: eigen baby-SFX |
+
+### 3b. Voetstappen per ondergrond
+
+| ondergrond | prio | n | bron | opmerking |
+| --- | --- | --- | --- | --- |
+| Gras | P1 | 6 varianten | C | Freesound `footsteps grass`; Sonniss GDC *Footstep* packs; Kenney heeft geen gras. Zacht, dof |
+| Pad / aarde | P1 | 6 | C | `footsteps dirt gravel`; sneller tempo, +10 % pitch in lijn met besluit "pad is iets sneller" |
+| Zand | P2 | 6 | C | `footsteps sand beach` (zandstrand zuid/oost) |
+| Sneeuw | P2 | 6 | C | `footsteps snow crunch`, wintertegels |
+| Rots / steen | P3 | 4 | C | rotsboog; alleen als er lopen mogelijk is |
+| Water (door ondiep) | P3 | 4 | C | `splash shallow` |
+
+Aanpak: voetstap via animatie-event (`footstep_l/r`) op de loopklip, ondergrond per tegel (splat-map) opvragen; zacht voor een groep (alleen de dichtstbijzijnde 3 klinken).
+
+### 3c. Omgeving en seizoenen
+
+| geluid | prio | n | bron | opmerking |
+| --- | --- | --- | --- | --- |
+| **Kampvuur** (lus, 3D bij het vuur, 2 tot 12 m) | P1 | 1 lus + 3 knallen | C | Freesound `campfire loop crackle` |
+| **Wind** laag, boven open land (lus) | P1 | 1 | C | `wind ambience grass`; speelt altijd |
+| **Wind door dennen** (lus, zweeft in bomen) | P2 | 1 | C | `wind pine trees` |
+| **Water en kust** (golven op strand, lus, 3D langs de ring) | P1 | 1 + 3 | C | `ocean waves beach loop`; plaats langs kusttegels, niet 1x globaal |
+| **Bron/waterput** (kabbelend, 3D) | P2 | 1 + 2 | C | `water well bucket`, `spring trickle` |
+| **Regen** (lus, licht en zwaar) + dakklank op gebouwen | P2 | 2 + 1 | C | `rain loop light/heavy`; donder: origineel `BBRBANK_000/001` is **vermoedelijk** donder (alleen persoonlijk) of C `thunder distant` |
+| **Vogels dag** (lente/zomer, one-shots plus lus) | P1 | 1 lus + 8 | C | `birds morning forest`, Sonniss; per seizoen minder |
+| **Krekels nacht** (zomer/herfst) | P2 | 1 lus | C | `crickets night loop` |
+| **Uil** (nacht, one-shot, ver) | P2 | 3 | C | `owl hoot distant` |
+| **Winter**: stille wind, krakende sneeuw, geen insecten | P2 | 1 lus | C | `wind winter cold howl` |
+| Gras bladeren fladderen / boomkruin | P3 | 1 | C | `leaves rustle` |
+
+Geen eigen muziek in het origineel gevonden. **Muziek** (bus `Muziek`): per seizoen een rustig thema of stilte; P3, bron C (Kevin MacLeod CC-BY, Pixabay/Sonniss) of G (Suno/ElevenLabs Music) **[?]**: eerst vragen (zie 5).
+
+### 3d. Koe, dier en overig
+
+| geluid | prio | n | bron | opmerking |
+| --- | --- | --- | --- | --- |
+| **Koe loeien** | P1 | 2 + 4 | B (`moo`) + C | `cow moo` ca. 4 s; zware en lichte variant |
+| **Koebel** (eigen koe, met stap) | P1 | 4 | C of G | `cow bell` (bel zonder dier), ritme op loopfase |
+| **Kauwen / grazen** | P2 | 3 | C (origineel `munch3` alleen eigen) | `cow chewing grass` |
+| **Melken** | P2 | 3 | B + C | zie 3a |
+| Lokroep naar koe | P1 | 8 | B | `voice_cattle_*` |
+| Schaap, kip | P3 | 6 + 6 | B | later |
+| Wolf: grom, blaf, hap | P3 | 3 + 2 + 2 | C of G | vanaf missie 2 |
+| Zombie, vampier, spook, demon | P3 | n.v.t. | G | vanaf missie 2+ |
+
+### 3e. Interface
+
+| geluid | prio | n | bron | opmerking |
+| --- | --- | --- | --- | --- |
+| Klik/hover, bouwmenu, plaatsen en draaien (R) | P1 | 4 | C | Kenney *UI Audio*, *Interface Sounds* (CC0) |
+| Bouwen geslaagd / niet mogelijk | P1 | 2 | C | |
+| Munt, kas (verkoop) | P2 | 2 | B (`coin`) | |
+| Missie klaar, verloren (stinger) | P2 | 2 | G of C | korte fanfare, cartoonachtig hoornsignaal |
+| Zilveren beker oppakken, vlag | P2 | 2 | C | `item pickup chime` |
+| Seizoenswissel, dag-nacht (zacht) | P3 | 2 | C | |
+
+Totaal ruwweg **P1: 9 klanken + 32 stemmen, P2: ca. 20, P3: de rest** (geen exacte telling zolang de bibliotheek niet is doorzocht). Libraries (kandidaten, **bestandsnamen niet gecontroleerd, zoek op de term**):
+
+| bron | licentie | gebruik |
+| --- | --- | --- |
+| Freesound, filter **CC0** | CC0, geen bronvermelding (let op de filter: alleen CC0, niet CC-BY) | voetstappen, wind, kampvuur, golven, dieren |
+| **Sonniss GDC Game Audio Bundle** (jaarlijks) | royalty-free, commercieel toegestaan, geen bronvermelding, **geen CC0** (voorwaarden bewaren) | omgeving en foley |
+| **Kenney** (UI Audio, Impact Sounds, RPG Audio) | CC0 | UI en slagen |
+| OpenGameArt, filter CC0 | CC0 per bestand | aanvulling |
+| ElevenLabs Sound Effects / Voice | afhankelijk van plan, zie 2 | ontbrekende stemmen en een paar SFX |
+| Zelf opnemen (telefoon) | eigen | koebel, hek/poort, hamer op hout |
+
+## 4. Godot-implementatie
+
+### 4a. Bussen en AudioManager
+
+`AudioManager` als autoload (`audio_manager.gd`), de enige plek die `AudioStreamPlayer*` aanmaakt.
+
+| bus | voor | effecten |
+| --- | --- | --- |
+| Master | alles, vloer van de eindvolume | limiter, ca. -1 dB plafond |
+| SFX | acties, voetstappen, vuur, dieren | licht hoogdoorlaat 60 Hz |
+| Stem | stemmen van eenheden (bij `Master`, geen eigen kind van SFX) | compressor met **sidechain** naar Stem op bus Ambient (ducken 3 tot 4 dB) |
+| Ambient | wind, water, vogels, regen | lichte reverb, laag volume |
+| Muziek | thema's | gedempt wanneer Stem klinkt |
+
+Volumeschuiven per bus in opties (dB, niet lineair; 0 tot -40 dB, daaronder uit). Instellingen opslaan in `user://`.
+
+### 4b. 3D-geluid voor een RTS-camera (2 tot 40 m)
+
+| keuze | waarde |
+| --- | --- |
+| Luisteraar | **`AudioListener3D` op het camerabrandpunt** (de grond onder het scherm midden, 1 tot 2 m omhoog), **niet** op de `Camera3D`: dan bepaalt de zoom niet hoe hard een koe klinkt |
+| `unit_size` | stem 8 (hoorbaar in beeld), voetstap 4, kampvuur 6, golven 12 |
+| `max_distance` | stem 45 m, voetstap 25 m, kampvuur 30 m, golven 60 m, wind 0 (geen 3D, gewone `AudioStreamPlayer`) |
+| `attenuation_model` | `ATTENUATION_INVERSE_DISTANCE` voor eenheden (zachter dan het standaard kwadraat), `ATTENUATION_LOGARITHMIC` voor omgeving |
+| `panning_strength` | 0,6 (de camera kijkt schuin van boven; volle panning klinkt vreemd) |
+| Hoogdoorlaat bij afstand | `attenuation_filter_cutoff_hz` 5000 voor eenheden, de standaard laten werken |
+| Doppler | uit |
+| Zoom | `AudioManager` zet SFX-volume af naar het uitzoomniveau: -3 dB per 10 m camerahoogte boven 20 m |
+| Mono | voor 3D-bronnen altijd **mono**; stereo alleen voor `Ambient`-lussen zonder 3D |
+
+### 4c. Stemmen: prioriteit, cooldown, selectie
+
+| regel | waarde |
+| --- | --- |
+| Per eenheid | minimaal 3 s tussen twee stemlijnen; nooit dezelfde variant twee keer achter elkaar (shuffle-bag) |
+| Globaal | maximaal 2 gelijktijdige Stem-lijnen; een nieuwe krijgt voorrang als prioriteit hoger of de vorige > 40 % klaar |
+| Prioriteit | 3 meldingen (aanval, vlucht, missie) > 2 bevel > 1 selectie > 0 klaagzang/sfeer |
+| Groep | bij groepsselectie spreekt **alleen de dichtstbijzijnde eenheid**; bij een bevel aan een groep ook één |
+| Dubbelklik | een bevel binnen 0,3 s na de vorige (beasts-src `KNOCK_GAP`) speelt niets |
+| Verwerking | stemklikken meteen spelen op `play()` (Godot blokkeert niet, in tegenstelling tot Android `SoundPool`) |
+| Oude eenheden | pitch 0,9; baby/kind: pitch 1,08 en geluid van jongen/meisje |
+| Koe | `moo` bij tik op dier (zoals beasts-src), lokroep pas wanneer de dorpeling bij het dier staat |
+
+### 4d. Omgeving: dag/nacht en seizoen
+
+Sim-signalen (geen spelregels in audio): `dagdeel_veranderd(naam)`, `seizoen_veranderd(naam)`, `weer_veranderd(soort)`. `AmbienceLayers` houdt één `AudioStreamPlayer` per **laag** (wind, wind-dennen, vogels, krekels, winterwind, regen_licht, regen_zwaar, golven) en tweent `volume_db` met `create_tween()` over **3 tot 6 s** (lineair in dB, daarna `stop()` bij -60 dB zodat er geen stille streams meedraaien).
+
+| laag | dag | nacht | lente | zomer | herfst | winter | regen |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| wind laag | aan | aan | aan | aan | harder | harder | harder |
+| vogels | aan | uit | aan | aan | weinig | uit | uit |
+| krekels | uit | aan | uit | aan | zacht | uit | uit |
+| uil (one-shot, 20 tot 60 s random) | uit | aan | uit | aan | aan | aan | uit |
+| winterwind | uit | uit | uit | uit | uit | aan | uit |
+| regenlus | uit | uit | - | - | - | - | aan (licht/zwaar) |
+
+Eenmalige klanken (uil, vogelroep, donder) via een **scheduler** (random interval, random positie in de buurt van de camera, 3D op 15 tot 35 m), niet als eindeloze lus. Dag/nacht-overgang: crossfade 6 s rond zonsopgang/zonsondergang.
+
+### 4e. Importinstellingen
+
+| type | formaat | instellingen |
+| --- | --- | --- |
+| Korte SFX en stemmen (< 3 s) | `.ogg` Vorbis q4 (ca. 128 kbps), mono 44,1 kHz; of `.wav` 16-bit mono met `compress/mode=ADPCM` | `loop=false` |
+| Lussen (wind, vuur, golven, regen) | `.ogg` stereo/mono, q5, 30 tot 60 s | `loop=true`, `loop_offset=0`, geluid **zelf naadloos** maken (crossfade binnen het bestand) |
+| Muziek | `.ogg` stereo q5 | `loop=true`, via `Muziek` |
+| Variaties | `AudioStreamRandomizer` met 3 tot 6 klanken, `random_pitch=1,05`, `random_volume_offset_db=1,5` | gebruik die voor voetstappen, hamer, loeien |
+| Mp3 uit beasts-src | omzetten naar `.ogg` (mp3-import werkt, maar ogg is de standaard voor lussen en is kleiner) | ffmpeg |
+| Normaliseren | -16 LUFS voor stemmen, -23 LUFS voor omgeving, piek -1 dBTP | achteraf in Godot met bus-volume bijstellen |
+
+### 4f. Polyphony en pool
+
+| onderdeel | advies |
+| --- | --- |
+| `max_polyphony` per `AudioStreamPlayer3D` | 1 voor een eenheid (nieuwe stem snijdt de oude af), 4 voor voetstappen in een groep, 2 voor kampvuur-knallen |
+| Pool | `AudioManager` houdt een pool van ca. **24** `AudioStreamPlayer3D` en één van **8** `AudioStreamPlayer` (UI); herbruik het oudste vrije exemplaar, geen `queue_free()` per klank |
+| Globale limiet | 32 gelijktijdige 3D-stemmen; een nieuwe verdringt de **zachtste of verste** van dezelfde bus |
+| Afstandsafkap | buiten `max_distance` niet eens starten (scheelt CPU) |
+| Streaming | alle lussen en muziek gestreamd; korte klanken in geheugen, ca. 3 MB totaal voor P1 |
+| `AudioStreamPolyphonic` | voor UI-geluiden, niet voor 3D |
+
+## 5. Open vragen voor Axel
+
+| # | vraag | invloed |
+| --- | --- | --- |
+| 1 | **Originele stemmen en klanken lokaal gebruiken voor privé-spel**, naast nieuwe gegenereerde? Of volledig nieuw/eigen (aanbevolen als de remake ooit gepubliceerd wordt)? Origineel gaat nooit in git en nooit in een build voor anderen | bepaalt of 1c als bron dient of alleen als referentie |
+| 2 | Welk **ElevenLabs-plan** was actief op 2026-09-03 (gratis of betaald)? Zonder dat is de licentie van de 62 mp3 onbekend. Voor privégebruik geen probleem; bij publicatie opnieuw genereren of plan vaststellen | herbruik 62 mp3 |
+| 3 | Wil je een **luistersessie** (de lijst in 1d) zodat ik de 22050/11025 Hz-aanname, de classificatie van de banken en de PM/PF-lijnen kan vastleggen? | 1b en 1c |
+| 4 | **Ouderen**: nieuwe stemmen (ElevenLabs, ca. 16 fragmenten) of m/f met lagere pitch als noodoplossing? | P2 |
+| 5 | **Muziek**: ja/nee, en zo ja welke bron (CC0, genereren, eigen)? Het origineel heeft hier geen bestand voor, de cd-audio is niet gevonden | muziekbus |
+| 6 | **Bibliotheek**: mag ik CC0 downloaden (Freesound-inlog nodig) of lever jij een map? Sonniss GDC-bundels zijn groot (meer dan 30 GB) | sectie 3 |
+| 7 | De 9 ontbrekende `BBRBANK`-entries: opnieuw laten extraheren (alleen nodig als origineel een bron blijft) | 1a |
+| 8 | **Taal**: lijnen zijn nu taalneutraal (geen woorden). Houden we dat, of echte Nederlandse/Engelse zinnen (bijv. "Yes?", "Ja baas?")? Dat kost per taal een set | stemmenset |
