@@ -48,3 +48,17 @@ Grotendeels wel, maar niet volledig.
 `modellen/peasant_hut.py` bouwt de hut in Blender 5.2 na naar `House.png` (217×147, uit `abons/Unity_bumpkins`), zelfde camera (iso 2:1), render op 4×. 12 Opus-rondes van meten tegen de sprite; Sonnet stopte twee keer na 2–3 rondes. Draaien: `blender -b -P peasant_hut.py -- 4`.
 - ⚠️ De vergelijkingsplaat bevat de originele sprite en blijft daarom uit deze publieke repo.
 - Les: een Gemini-plaat van de sprite als detailreferentie scheelt rondes raden; volgende gebouw eerst plaat, dan eventueel Tripo, dan Blender.
+- Animatieklaar voor realtime 3D (2026-10-29): beide deuren zijn een leeg object op de scharnieras (`deur_voor`, `deur_aanbouw`; planken als kinderen), open naar buiten = negatieve hoek om lokaal Z (Blender), om lokaal Y in glTF/Godot. Achter de deuren een donker interieur (vloer, tafel met kaars, haard), achter het luik een binnenruit voor nachtlicht door de kieren. Ankers als lege objecten in de glb: `rook_bron`, `deur_voor_drempel`, `deur_aanbouw_drempel`, `kaars` (venster).
+- De 2D-passes (`-- 4 pass=…` of `all`, uitvoer in `modellen/render/`) bestaan nog in het script maar zijn verlaten: de game wordt echt 3D.
+
+### Real-time asset voor Godot (2026-10-29)
+`modellen/peasant_hut_realtime.py` maakt van de Cycles-hut een glTF zonder procedurele nodes en zonder halmen. Eerst `peasant_hut.py` (schrijft `peasant_hut.blend`), dan `blender -b -P peasant_hut_realtime.py -- [res=2048] [vergelijk]`, ~4,5 min op de RTX 2060. Uit: `peasant_hut_rt.glb` (LOD0), `peasant_hut_rt_lod1.glb` (LOD1), texturen ook los in `modellen/rt_textures/`, met `vergelijk` ook `peasant_hut_rt_vergelijk.png` (Cycles | EEVEE LOD0 | EEVEE LOD1).
+- Per materiaalgroep een atlas, in Cycles gebakken van de echte objecten: kleur (jpg), normaal (OpenGL, jpg 95), ORM (R AO, G ruwheid). Groepen: `steen` (stenen, kozijnen), `riet` (koepel, aanbouwdak, band), `hout` (hout, specie, gras, deuren), plus `riet_kaart` (alfa) en `lod1`.
+- Riet: koepel en aanbouwdak dragen de gebakken halmen; daarop alfakaarten (glTF MASK, tweezijdig) op dezelfde lagen als de halmen (de rnd-volgorde uit `peasant_hut.py` wordt via `ast` nagespeeld), rafelige zoom, kuif als gekruiste kaarten. Kaarttextuur = echte halmen, ortho van boven gerenderd.
+- Stenen blijven echte stenen: gedecimeerd (18 %), verborgen vlakken weg, een UV-cel per steen.
+- Budget: LOD0 ~112k driehoeken (stenen 68k, riet-kaarten 18k, hout 13k), 4 atlassen van 2k (kleur + normaal) + 3× ORM 1k, glb ~25 MB. LOD1 ~6k driehoeken, een atlas van 1k, glb ~2 MB.
+- LOD: Godot 4 kent geen LOD-namen in glTF. Twee glb's naast elkaar, wissel via `visibility_range_end` (LOD0) en `visibility_range_begin` (LOD1) op ~25–30 m. Beide hebben dezelfde scharnieren en ankers; LOD1-meshes heten `*_lod1`.
+- Namen in LOD0: `deur_voor` › `voordeur`, `deur_aanbouw` › `aanbouwdeur`, `luik`, `ruit`, `tafelkaars`, `kaarsvlam`, `haardvuur`, ankers als lege nodes. Materialen `ruit`, `kaarsvlam`, `haardvuur` zijn vlak en emissief (ruit overdag 0, 's nachts zet de game hem aan).
+- ⚠️ OptiX faalt op deze driver (kernel compile error), het script neemt CUDA.
+- ⚠️ Selected-to-active cast per pixel naar elk bronobject apart: 460 stenen = 13 min per 512-bake. Het script voegt de bronnen per groep samen en geeft Object-coördinaten, Generated en Object Info > Random mee als attributen: 2 s.
+- Afwijking t.o.v. Cycles: riet iets geler en minder contrast (std 0,11 tegen 0,15), laagranden minder scherp, kuif lichter; achterkant (hoek 350–100°) en aanbouw achter/rechts hebben in de bron geen stenen.
