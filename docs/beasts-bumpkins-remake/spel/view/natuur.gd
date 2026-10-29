@@ -75,7 +75,7 @@ static func _vervang_materialen(root: Node) -> void:
 				mi.mesh.surface_set_material(s, sm)
 				if TINT.has(nm):
 					_tint_mats.append({"mat": sm, "naam": nm, "lod1": lod1})
-			elif nm.begins_with("rots_") or nm.begins_with("klif_") or nm == "steenhoop":
+			elif nm.begins_with("rots_") or nm.begins_with("klif_") or nm == "steenhoop" or nm == "bronplas":
 				var st := ShaderMaterial.new()
 				st.shader = _steen_shader
 				st.set_shader_parameter("albedo_tex", m.albedo_texture)

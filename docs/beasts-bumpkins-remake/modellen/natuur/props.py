@@ -1,4 +1,5 @@
-"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, bron,
+"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, bron (put, latere
+missies), bronplas (de spring van missie 1: kring keien om een plasje),
 hek_segment, hek_paal, poort, akker_kaal, akker_rijp.
 
 Hout en steen: tegelbare Poly Haven-sets met UV in meters; losse keien (steenhoop, kampvuur) en de
@@ -21,7 +22,7 @@ from mathutils import Matrix, Vector, noise
 import natuur_lib as L
 from atlas import CEL
 
-ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "bron", "hek_segment",
+ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "bron", "bronplas", "hek_segment",
         "hek_paal", "poort", "akker_kaal", "akker_rijp"]
 ALLEEN = [n for n in L.OPTS.get("alleen", ",".join(ALLE)).split(",") if n]
 
@@ -855,6 +856,38 @@ def bron():
     for o in (wo, so):
         o.parent = huis
     return [huis]
+
+
+def bronplas():
+    """De spring (klasse 144) van missie 1: een kring van ~14 keien om een ondiep plasje, buiten ~2 m
+    (een tegel). Geen gebouw: het bronhuisje (`bron`) is de put (well, klasse 47/118) van latere missies."""
+    rnd = random.Random(144)
+    keien = []
+    n = 14
+    for k in range(n):
+        a = 2 * math.pi * k / n + rnd.uniform(-0.08, 0.08)
+        r = 0.78 + rnd.uniform(-0.05, 0.05)
+        sz = rnd.uniform(0.16, 0.23)
+        keien.append((L_kei(rnd), (sz * rnd.uniform(1.1, 1.4), sz, sz * rnd.uniform(0.6, 0.8)),
+                      Vector((r * math.cos(a), r * math.sin(a), sz * 0.3)), a + rnd.uniform(-0.3, 0.3)))
+    for k in range(4):   # een paar kleine erbij, ongelijk
+        a = rnd.uniform(0, 2 * math.pi)
+        sz = rnd.uniform(0.09, 0.13)
+        keien.append((L_kei(rnd), (sz * 1.2, sz, sz * 0.7), Vector((0.98 * math.cos(a), 0.98 * math.sin(a), sz * 0.25)),
+                      rnd.uniform(0, 6.28)))
+    o = gebakken_keien("bronplas", keien, res=512, mos=0.15)
+    w = L.Bouwer()
+    c = w.v((0, 0, 0.07))
+    seg = 24
+    ring = [w.v((0.74 * math.cos(2 * math.pi * i / seg), 0.74 * math.sin(2 * math.pi * i / seg), 0.07)) for i in range(seg)]
+    for i in range(seg):
+        a0, a1 = 2 * math.pi * i / seg, 2 * math.pi * (i + 1) / seg
+        w.f([ring[i], ring[(i + 1) % seg], c], [(0.5 + 0.5 * math.cos(a0), 0.5 + 0.5 * math.sin(a0)),
+                                                (0.5 + 0.5 * math.cos(a1), 0.5 + 0.5 * math.sin(a1)), (0.5, 0.5)], 0)
+    water = L.pbr("water", (0.03, 0.08, 0.14), nrm=water_normaal(), ruw=0.06, alfa_waarde=0.85, blend=True)
+    wo = L.obj("bronplas_water", w.mesh("bronplas_water", [water]))
+    wo.parent = o
+    return [o]
 
 
 # --- Hek en poort ------------------------------------------------------------------------------
