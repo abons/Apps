@@ -3,7 +3,8 @@ extends Node
 ## Bouwmenu (stap 5, gameplay.md §7): knop "Hut" of B, ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
 ## R draait, linkerklik plaatst een Plan in Wereld, rechterklik of Esc stopt. Shift bij het plaatsen houdt de modus aan.
 ## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
-## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de hut-glb (terugval: bruine kist).
+## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de hut-glb, geschaald op
+## de voordeur (DEUR_M, iets groter dan een volwassene; terugval: bruine kist).
 ## Moet NA Bestuur in de boom staan: dan krijgt het de invoer eerst en neemt het de linkerklik van het kiezen over.
 
 const GROND_Y := 0.25
@@ -12,6 +13,8 @@ const HOOGTE := 2.4
 const HUT_GLB := "res://assets/peasant_hut_rt.glb"
 const STAPELS := ["houtstapel", "steenhoop"]
 const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
+const VOLWASSENE_M := 1.37     ## de man, langste volwassene (bumpkin_basis.py; vrouw en ouderen 1,31-1,33)
+const DEUR_M := VOLWASSENE_M * 1.15   ## gewenste hoogte van de voordeur: iets groter dan een volwassene
 
 var w: Wereld
 var bestuur: Bestuur
@@ -174,7 +177,13 @@ func _plan_klaar(p: Plan) -> void:
 	var hut: Node3D = _hut_scene.instantiate()
 	var box := _omhulsel(hut, Transform3D.IDENTITY)
 	var r := p.afdruk()
+	# Schaal uit de voordeur (mesh "voordeur"); zonder deur passend op de voetafdruk.
 	var schaal := minf(r.size.x, r.size.y) * w.tegel_m * 0.95 / maxf(box.size.x, box.size.z)
+	var deur := hut.find_child("voordeur", true, false)
+	if deur != null:
+		var dh := _omhulsel_van(hut, deur).size.y
+		if dh > 0.1:
+			schaal = DEUR_M / dh
 	hut.scale = Vector3.ONE * schaal
 	hut.rotation.y = p.draai * PI * 0.5
 	var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
@@ -185,6 +194,17 @@ func _plan_klaar(p: Plan) -> void:
 	ghost.get_parent().add_child(hut)
 	k.queue_free()
 	_kisten.erase(p)
+
+
+## Omhulsel van `doel` in het assenstelsel van `wortel`.
+static func _omhulsel_van(wortel: Node3D, doel: Node) -> AABB:
+	var t := Transform3D.IDENTITY
+	var n := doel.get_parent()
+	while n != null and n != wortel:
+		if n is Node3D:
+			t = (n as Node3D).transform * t
+		n = n.get_parent()
+	return _omhulsel(doel, t)
 
 
 static func _omhulsel(n: Node, t: Transform3D) -> AABB:

@@ -164,7 +164,7 @@ func _start_scenario() -> void:
 					ids.append(d.id)
 				w.geef_bouwbevel(ids, p)
 			w.tempo = 4.0
-			cam.zet_direct(view.terrein.tegel_midden(Vector2i(101, 65)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(30), 13.0)
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(102, 66)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(30), 16.0)
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))

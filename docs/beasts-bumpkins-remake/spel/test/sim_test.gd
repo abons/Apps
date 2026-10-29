@@ -148,7 +148,7 @@ func _initialize() -> void:
 
 	# bouwplan: hut op gras naast het kampvuur kan, op het kampvuur of dubbel niet
 	var vrij := Vector2i(100, 64)
-	_check(w.raster.loopbaar(100, 64) and w.raster.loopbaar(101, 65), "testplek (100,64) is vrij")
+	_check(w.raster.loopbaar(100, 64) and w.raster.loopbaar(103, 67), "testplek (100,64) is vrij")
 	var bp := w.maak_plan(&"hut", vrij, 0)
 	_check(bp != null and w.plan_zet(bp), "hut kan op een vrije plek")
 	_check(w.maak_plan(&"hut", vrij + Vector2i(1, 1), 0) == null, "tweede hut er half overheen kan niet")

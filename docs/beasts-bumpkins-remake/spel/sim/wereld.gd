@@ -15,7 +15,8 @@ signal plan_gezet(plan: Plan)
 signal plan_klaar(plan: Plan)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
-const BOUWSOORTEN := {&"hut": Vector2i(2, 2)}
+## Voetafdruk in tegels (2 m). Hut 4x4: op ware grootte (deur 1,58 m, zie Bouwmenu.DEUR_M) is de glb 7,6 x 7,1 m incl. hek.
+const BOUWSOORTEN := {&"hut": Vector2i(4, 4)}
 var plannen: Array[Plan] = []
 
 var spel: Dictionary
