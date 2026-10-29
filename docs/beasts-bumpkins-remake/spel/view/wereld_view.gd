@@ -101,7 +101,20 @@ func _maak_unit(d: Dorpeling) -> void:
 	bundel.position = Vector3(0, 0.85, 0.2)
 	bundel.visible = false
 	b.add_child(bundel)
-	units[d.id] = {"bump": b, "ring": ring, "baby": bundel}
+	var zak := MeshInstance3D.new()
+	zak.name = "Graanzak"
+	var zm := SphereMesh.new()
+	zm.radius = 0.16
+	zm.height = 0.36
+	zak.mesh = zm
+	var zmat := StandardMaterial3D.new()
+	zmat.albedo_color = Color(0.72, 0.6, 0.38)
+	zmat.roughness = 0.95
+	zak.material_override = zmat
+	zak.position = Vector3(0, 1.0, -0.2)      # op de rug (gezicht langs +Z)
+	zak.visible = false
+	b.add_child(zak)
+	units[d.id] = {"bump": b, "ring": ring, "baby": bundel, "zak": zak}
 	b.volg(_wereld_pos(d, 0.0), 0.0)
 	b.kijk_naar(Vector3(0, 0, 1), true)
 
@@ -167,6 +180,7 @@ func _process(dt: float) -> void:
 		b.visible = not d.binnen
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
 		(u["baby"] as MeshInstance3D).visible = d.baby > 0.0
+		(u["zak"] as MeshInstance3D).visible = d.draagt != ""
 	_werk_koeien(a, dt)
 	_werk_pad()
 	_werk_markeringen(dt)

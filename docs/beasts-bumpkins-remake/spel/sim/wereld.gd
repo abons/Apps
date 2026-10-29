@@ -23,7 +23,10 @@ signal volwassen_geworden(d: Dorpeling)
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
 ## hut 7,6 x 7,1 m incl. hek (deur 1,58 m, zie Bouwmenu.DEUR_M), gereedschapsloods 8,9 x 3,6 m incl. het ijzer aan de
 ## zijkant, kippenhok 2,4 x 2,4 m (stromat).
-const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2)}
+## Molen (= bakkerij, beasts-src SHOP) 8,2 x 5,8 m incl. wieken; akker 2x2 tegels, elk een akker-glb van 2 x 2 m.
+const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2),
+	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2)}
+const NIET_BLOKKEREND := [&"akker"]       ## loopbaar na de bouw (beasts-src Ground.FIELD is begaanbaar)
 var plannen: Array[Plan] = []
 
 var spel: Dictionary
@@ -37,6 +40,9 @@ var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 1
 var _generator_t := 0.0
 var _volgende_koe_id := 1
 var wiegen: Array[Dictionary] = []        # {moeder, vader, hut: Plan, wacht}
+var akkers := {}                          # tegel -> s groei (>= economie.rijp_s = rijp)
+var _geoogst := {}                        # tegel -> id van de dorpeling die erheen loopt
+var _klus_t := 0.0
 var kampvuur := Vector2i.ZERO
 var bereik := PackedByteArray()          # tegels bereikbaar vanaf het kampvuur
 var _onbekend_gemeld := {}               # tegelnamen die al een waarschuwing gaven
@@ -232,7 +238,127 @@ func tik(dt: float) -> void:
 			_rond_af(p)
 	_werk_generator(dt)
 	_gezin(dt)
+	_economie(dt)
 	_check_missie()
+
+
+# ---------------------------------------------------------------- graan en brood (beasts-src: akker -> winkel -> kopen)
+
+## Akkers groeien in lente en zomer; bij het begin van de winter sterft wat rijp staat (gameplay.md 3, Grid.wither).
+## Elke halve seconde kiest wie niets omhanden heeft een klus: graan wegbrengen, brood kopen, of (volwassen) oogsten.
+func _economie(dt: float) -> void:
+	var e: Dictionary = spel["economie"]
+	var rijp := float(e["rijp_s"])
+	var s := seizoen()
+	if s <= 1:
+		for t in akkers:
+			akkers[t] = minf(rijp, akkers[t] + dt)
+	elif s == 3 and int((tijd_s - dt) / seizoen_duur()) != int(tijd_s / seizoen_duur()):
+		for t in akkers:
+			if akkers[t] >= rijp:
+				akkers[t] = 0.0
+	for d in dorpelingen:
+		d.trek += dt
+	_klus_t += dt
+	if _klus_t < 0.5:
+		return
+	_klus_t = 0.0
+	for d in dorpelingen:
+		if d.ledig():
+			_kies_klus(d)
+
+
+func molens() -> Array[Plan]:
+	var uit: Array[Plan] = []
+	for p in plannen:
+		if p.klaar and p.soort == &"molen":
+			uit.append(p)
+	return uit
+
+
+func brood() -> int:
+	var n := 0
+	for m in molens():
+		n += m.voorraad
+	return n
+
+
+func rijp(t: Vector2i) -> bool:
+	return akkers.has(t) and akkers[t] >= float(spel["economie"]["rijp_s"])
+
+
+func _dichtste_molen(d: Dorpeling, met_brood: bool) -> Plan:
+	var beste: Plan = null
+	var bd := INF
+	for m in molens():
+		if met_brood and m.voorraad <= 0:
+			continue
+		var af := d.pos.distance_squared_to(Vector2(m.deur_tegel()))
+		if af < bd:
+			bd = af
+			beste = m
+	return beste
+
+
+func _kies_klus(d: Dorpeling) -> void:
+	var e: Dictionary = spel["economie"]
+	if d.draagt != "":
+		var m := _dichtste_molen(d, false)
+		if m != null and d.geef_bevel(self, "lever", dichtstbij_loopbaar(m.deur_tegel())):
+			d.klus = m
+		return
+	if d.trek >= float(e["trek_s"]):
+		var m := _dichtste_molen(d, true)
+		if m != null and d.geef_bevel(self, "koop", dichtstbij_loopbaar(m.deur_tegel())):
+			d.klus = m
+			return
+	if not d.volwassen() or molens().is_empty():
+		return
+	var beste := Vector2i(-1, -1)
+	var bd := INF
+	for t in akkers:
+		if rijp(t) and not _geoogst.has(t):
+			var af := d.pos.distance_squared_to(Vector2(t))
+			if af < bd:
+				bd = af
+				beste = t
+	if beste.x >= 0 and d.geef_bevel(self, "oogst", beste):
+		d.klus_tegel = beste
+		_geoogst[beste] = d.id
+
+
+func laat_akker_los(t: Vector2i) -> void:
+	_geoogst.erase(t)
+
+
+## Aangekomen voor een klus: even staan (oogsten of aan de toonbank), daarna `klus_af`.
+func klus_aangekomen(d: Dorpeling, soort: String) -> void:
+	var e: Dictionary = spel["economie"]
+	match soort:
+		"oogst": d.bezig = float(e["oogst_s"])
+		"koop": d.bezig = float(e["toonbank_s"])
+		_: d.bezig = 0.3
+
+
+func klus_af(d: Dorpeling) -> void:
+	var e: Dictionary = spel["economie"]
+	if d.klus_tegel.x >= 0:
+		var t := d.klus_tegel
+		_geoogst.erase(t)
+		if rijp(t):
+			akkers[t] = 0.0
+			d.draagt = "graan"
+	elif d.klus is Plan:
+		var m: Plan = d.klus
+		if d.draagt != "":
+			m.voorraad += 1         # beasts-src restock
+			d.draagt = ""
+		elif m.voorraad > 0:
+			m.voorraad -= 1         # beasts-src visit: de kas krijgt de broodprijs
+			kas += int(e["brood_prijs"])
+			d.trek = 0.0
+	d.klus = null
+	d.klus_tegel = Vector2i(-1, -1)
 
 
 # ---------------------------------------------------------------- gezin (port van beasts-src World.family)
@@ -660,6 +786,7 @@ func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
 		return null
 	var m: Vector2i = BOUWSOORTEN[soort]
 	var p := Plan.new(soort, tegel, posmod(draai, 4), m.x, m.y)
+	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(soort), 60.0))
 	return p if kan_bouwen(p) else null
 
 
@@ -713,6 +840,18 @@ func geef_bouwbevel(ids: Array, p: Plan) -> int:
 func _rond_af(p: Plan) -> void:
 	p.klaar = true
 	var r := p.afdruk()
+	if p.soort == &"molen":
+		p.voorraad = int(spel["economie"]["molen_start"])
+	if p.soort in NIET_BLOKKEREND:
+		for c in range(r.position.x, r.end.x):
+			for rij in range(r.position.y, r.end.y):
+				akkers[Vector2i(c, rij)] = 0.0
+		for d in dorpelingen:
+			if d.werk_plan == p:
+				d.werk_plan = null
+				d.bouwt = false
+		plan_klaar.emit(p)
+		return
 	for c in range(r.position.x, r.end.x):
 		for rij in range(r.position.y, r.end.y):
 			raster.blok[raster.idx(c, rij)] = 1

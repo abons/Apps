@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -161,6 +161,19 @@ func _start_scenario() -> void:
 			w.tempo = 4.0
 			var mid := view.terrein.tegel_midden(eerste.deur_tegel() if eerste != null else Vector2i(99, 65))
 			cam.zet_direct(mid + Vector3(0, 0.6, 0), 0.6, deg_to_rad(32), 13.0)
+		"molen":
+			# molen + twee akkers bij het dorp; de akkers staan al bijna rijp, de dorpelingen oogsten, brengen en kopen, 4x
+			var m := _vrij_plan(&"molen", Vector2i(96, 60))
+			if m != null and w.plan_zet(m):
+				w._rond_af(m)
+			for bij in [Vector2i(104, 60), Vector2i(107, 60)]:
+				var a := _vrij_plan(&"akker", bij)
+				if a != null and w.plan_zet(a):
+					w._rond_af(a)
+			for t in w.akkers:
+				w.akkers[t] = 50.0
+			w.tempo = 4.0
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(102, 62)) + Vector3(0, 0.6, 0), 0.6, deg_to_rad(36), 24.0)
 		"claim":
 			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
 			for d in w.dorpelingen:

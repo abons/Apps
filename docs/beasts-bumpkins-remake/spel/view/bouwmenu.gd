@@ -15,7 +15,11 @@ const GEBOUWEN := {
 	&"hut": {"tekst": "Hut", "toets": KEY_B, "glb": "res://assets/peasant_hut_rt.glb", "hoogte": 2.4},
 	&"gereedschapsloods": {"tekst": "Loods", "toets": KEY_L, "glb": "res://assets/gereedschapsloods_rt.glb", "hoogte": 2.4},
 	&"kippenhok": {"tekst": "Kippenhok", "toets": KEY_H, "glb": "res://assets/kippenhok_rt.glb", "hoogte": 1.2},
+	&"molen": {"tekst": "Molen", "toets": KEY_M, "glb": "res://assets/molen_rt.glb", "hoogte": 3.0},
+	&"akker": {"tekst": "Akker", "toets": KEY_G, "glb": "", "hoogte": 0.3},   # geen glb: per tegel akker_kaal + akker_rijp
 }
+const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
+
 const STAPELS := ["houtstapel", "steenhoop"]
 const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
 const VOLWASSENE_M := 1.37     ## de man, langste volwassene (bumpkin_basis.py; vrouw en ouderen 1,31-1,33)
@@ -34,6 +38,8 @@ var _kisten := {}          ## Plan -> kist
 var _stapels := {}         ## Plan -> [Node3D]
 var terrein: TerreinView   ## optioneel: grondhoogte voor stapels en hut (anders GROND_Y)
 var _scenes := {}          ## soort -> PackedScene
+var _wieken: Array[Node3D] = []
+var _gewas := {}           ## akkertegel -> Node3D (akker_rijp, groeit mee met Wereld.akkers)
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -123,6 +129,15 @@ func _plan_onder(pos: Vector2) -> Plan:
 
 
 func _process(_dt: float) -> void:
+	if not w.gepauzeerd:
+		for wk in _wieken:
+			wk.rotate_object_local(Vector3.UP, WIEKEN_RAD_S * _dt * w.tempo)   # as = lokale Y (README gebouwen)
+	var rijp := float(w.spel["economie"]["rijp_s"])
+	for t in _gewas:
+		var g: Node3D = _gewas[t]
+		var f: float = w.akkers.get(t, 0.0) / rijp
+		g.visible = f > 0.05
+		g.scale = Vector3(1.0, maxf(0.05, f), 1.0)
 	for p in _stapels:
 		for s: Node3D in _stapels[p]:
 			s.scale = Vector3.ONE * lerpf(1.0, STAPEL_RESTANT, p.voortgang)
@@ -153,7 +168,7 @@ func _toon_plan(p: Plan) -> void:
 	_kisten[p] = mi
 	ghost.get_parent().add_child(mi)
 	var lijst: Array[Node3D] = []
-	var plekken := _stapelplekken(p, STAPELS.size())
+	var plekken := _stapelplekken(p, STAPELS.size() if p.soort != &"akker" else 0)
 	for i in plekken.size():
 		var n := Natuur.instantie(STAPELS[i])
 		if n == null:
@@ -199,6 +214,11 @@ func _plan_klaar(p: Plan) -> void:
 	var k: MeshInstance3D = _kisten.get(p)
 	if k == null:
 		return
+	if p.soort == &"akker":
+		_maak_akker(p)
+		k.queue_free()
+		_kisten.erase(p)
+		return
 	var glb: String = GEBOUWEN[p.soort]["glb"]
 	if not _scenes.has(p.soort) and ResourceLoader.exists(glb):
 		_scenes[p.soort] = load(glb)
@@ -227,8 +247,31 @@ func _plan_klaar(p: Plan) -> void:
 	var midden := box.get_center() * schaal
 	hut.position = m - Vector3(midden.x, box.position.y * schaal, midden.z).rotated(Vector3.UP, hut.rotation.y)
 	ghost.get_parent().add_child(hut)
+	var wk := hut.find_child("wieken", true, false) as Node3D
+	if wk != null:
+		_wieken.append(wk)
 	k.queue_free()
 	_kisten.erase(p)
+
+
+## Akker af: per tegel de kale grond en het gewas erop, dat in _process meegroeit met Wereld.akkers.
+func _maak_akker(p: Plan) -> void:
+	var r := p.afdruk()
+	for c in range(r.position.x, r.end.x):
+		for rij in range(r.position.y, r.end.y):
+			var t := Vector2i(c, rij)
+			var kaal := Natuur.instantie("akker_kaal")
+			if kaal != null:
+				kaal.position = _grond(t)
+				kaal.rotation.y = p.draai * PI * 0.5
+				ghost.get_parent().add_child(kaal)
+			var rijp := Natuur.instantie("akker_rijp")
+			if rijp != null:
+				rijp.position = _grond(t)
+				rijp.rotation.y = p.draai * PI * 0.5
+				rijp.visible = false
+				ghost.get_parent().add_child(rijp)
+				_gewas[t] = rijp
 
 
 ## Omhulsel van `doel` in het assenstelsel van `wortel`.

@@ -12,6 +12,14 @@ const STANDEN := 4
 var bouwtijd_s := 60.0     ## werker-seconden tot klaar (origineel: hut 60 s); werkers tellen op, geen limiet
 var voortgang := 0.0       ## 0..1
 var klaar := false
+var voorraad := 0          ## molen: brood op het schap (beasts-src Building.stock)
+
+## Voordeur per soort bij draai 0, in meters vanaf het midden van de voetafdruk (x, z), uit de glb-ankers
+## (`deur_voor_drempel`, `deur_drempel`) min het midden van het omhulsel; de deur kijkt langs `richting`.
+const DEUREN := {
+	&"hut": {"plek": Vector2(-1.53, 0.07), "richting": Vector2i(-1, 0)},
+	&"molen": {"plek": Vector2(1.1, 2.5), "richting": Vector2i(0, 1)},
+}
 
 
 func _init(s: StringName, t: Vector2i, d: int, b: int, di: int) -> void:
@@ -28,21 +36,25 @@ func stand() -> int:
 	return STANDEN if klaar else clampi(1 + int(voortgang * (STANDEN - 1)), 1, STANDEN - 1)
 
 
-## Richting waarin de deur kijkt, in tegels: de hut-glb heeft zijn voordeur aan -x, en draaien gaat zoals
-## Bouwmenu (rotation.y = draai * 90 graden): 0 -> (-1,0), 1 -> (0,1), 2 -> (1,0), 3 -> (0,-1).
+## Richting waarin de deur kijkt, in tegels, na draaien zoals Bouwmenu (rotation.y = draai * 90 graden).
 func deur_richting() -> Vector2i:
-	return [Vector2i(-1, 0), Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1)][draai]
+	var r: Vector2i = DEUREN.get(soort, DEUREN[&"hut"])["richting"]
+	return Vector2i(Vector2(r).rotated(-draai * PI * 0.5).round())
 
 
-## De tegel voor de deur, net buiten de voetafdruk, midden op die zijde.
+## De tegel voor de deur: het deuranker naar tegels, dan langs de deurrichting tot net buiten de voetafdruk.
 func deur_tegel() -> Vector2i:
 	var r := afdruk()
-	var m := r.position + r.size / 2
-	match draai:
-		0: return Vector2i(r.position.x - 1, m.y)
-		1: return Vector2i(m.x, r.end.y)
-		2: return Vector2i(r.end.x, m.y)
-		_: return Vector2i(m.x, r.position.y - 1)
+	var d: Dictionary = DEUREN.get(soort, DEUREN[&"hut"])
+	var plek: Vector2 = (d["plek"] as Vector2).rotated(-draai * PI * 0.5) / 2.0   # tegels (2 m)
+	var m := Vector2(r.position) + Vector2(r.size) * 0.5 + plek
+	var t := Vector2i(int(floor(m.x)), int(floor(m.y)))
+	t.x = clampi(t.x, r.position.x, r.end.x - 1)
+	t.y = clampi(t.y, r.position.y, r.end.y - 1)
+	var stap := deur_richting()
+	while r.has_point(t):
+		t += stap
+	return t
 
 
 func afdruk() -> Rect2i:

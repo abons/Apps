@@ -153,7 +153,7 @@ func _initialize() -> void:
 	_check(bp != null and w.plan_zet(bp), "hut kan op een vrije plek")
 	_check(w.maak_plan(&"hut", vrij + Vector2i(1, 1), 0) == null, "tweede hut er half overheen kan niet")
 	_check(w.maak_plan(&"hut", w.kampvuur, 0) == null, "hut op het kampvuur kan niet")
-	_check(w.maak_plan(&"molen", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
+	_check(w.maak_plan(&"kerk", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
 	var lm: Vector2i = Wereld.BOUWSOORTEN[&"gereedschapsloods"]
 	_check(Plan.new(&"gereedschapsloods", Vector2i.ZERO, 1, lm.x, lm.y).afdruk().size == Vector2i(2, 5), "loods kwartslag gedraaid is 2x5")
 
@@ -296,6 +296,41 @@ func _initialize() -> void:
 		_check(gz.wiegen.is_empty() and vd.wieg.is_empty() and not vd.binnen, "loopbevel breekt het gezin af")
 	else:
 		_check(false, "tweede gezin gevonden om af te breken")
+
+	# graan en brood: molen (start 8 brood), akker rijpt in 60 s, oogsten -> naar de molen, trek -> kopen = kas +3
+	var ec := Wereld.new()
+	ec.laad()
+	var molen: Plan = null
+	var akker: Plan = null
+	for y in range(44, 90, 3):
+		for x in range(86, 124, 3):
+			if molen == null:
+				var mp := ec.maak_plan(&"molen", Vector2i(x, y), 0)
+				if mp != null and ec.bereik[ec.raster.idx(mp.deur_tegel().x, mp.deur_tegel().y)] == 1 and ec.plan_zet(mp):
+					ec._rond_af(mp)
+					molen = mp
+			elif akker == null:
+				var ap2 := ec.maak_plan(&"akker", Vector2i(x, y), 0)
+				if ap2 != null and ec.bereik[ec.raster.idx(x, y)] == 1 and ec.plan_zet(ap2):
+					ec._rond_af(ap2)
+					akker = ap2
+	_check(molen != null and molen.voorraad == 8, "molen staat met 8 brood")
+	_check(akker != null and ec.akkers.size() == 4 and ec.raster.loopbaar(akker.tegel.x, akker.tegel.y), "akker: 4 tegels, loopbaar")
+	var md := molen.deur_tegel()
+	_check(not molen.afdruk().has_point(md) and molen.afdruk().grow(1).has_point(md), "molendeur (%s) grenst aan de voetafdruk" % md)
+	var kas0 := ec.kas
+	for i in int(70.0 / ec.tik_dt):
+		ec.tik(ec.tik_dt)
+	_check(ec.kas > kas0, "na 70 s is er brood gekocht: kas %d -> %d" % [kas0, ec.kas])
+	var geleverd := false
+	var vr := molen.voorraad
+	for i in int(120.0 / ec.tik_dt):
+		ec.tik(ec.tik_dt)
+		if molen.voorraad > vr:
+			geleverd = true
+		vr = molen.voorraad
+	_check(geleverd, "graan geoogst en naar de molen gebracht")
+	_check(ec.akkers.size() == 4, "akker blijft 4 tegels na het oogsten")
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
