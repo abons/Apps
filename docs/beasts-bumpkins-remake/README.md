@@ -74,4 +74,4 @@ Grotendeels wel, maar niet volledig.
   2. Vijf andere personages, gebouwen en koe in het spel zetten (nu alle zes = man).
   3. Gebouwen: rieten dak opnieuw bakken in melkerij/kippenhok (stralen raken de onderlaag).
   4. Personages boven ~6: andere aanpak nodig (gebeeldhouwde of basismodel-mens), geen extra procedurele rondes.
-  5. Conceptronde 3 afmaken (Chrome eerst herstarten): voetsoldatengilde downloaden (`gemini.google.com/app/47d87ca270c534fc`), boogschuttersgilde, stadhuis, brouwerij, draagprops.
+  5. Conceptronde 3 afmaken (Chrome eerst herstarten): voetsoldatengilde (gedownload naar `lokaal/concept/`, beoordeling open), boogschuttersgilde, stadhuis, brouwerij, draagprops.
