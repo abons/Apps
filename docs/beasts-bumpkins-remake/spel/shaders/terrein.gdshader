@@ -20,6 +20,7 @@ uniform float normaal_sterkte = 0.8;
 varying vec3 wp;
 varying vec4 vc;
 varying vec2 pa;
+varying vec3 nw;
 
 float hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -43,6 +44,7 @@ void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vc = COLOR;
 	pa = UV;
+	nw = NORMAL;
 	// planaire afbeelding langs wereld-x (u) en wereld-z (v): raakvlak = +x, binormaal volgt de OpenGL-normaalmap (Y+ = omhoog)
 	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
 	BINORMAL = normalize(cross(NORMAL, TANGENT));
@@ -53,7 +55,12 @@ void fragment() {
 	vec2 dx = dFdx(uv);
 	vec2 dy = dFdy(uv);
 	float som = vc.x + vc.y + vc.z + vc.w;
-	float w[5] = float[5](vc.x, vc.y, vc.z, vc.w, max(0.0, 1.0 - som));
+	// steile helling (klifwand, rotsrand): rots erbij en getriplanarde mapping, zodat de wand niet uitgerekt wordt
+	float steil = smoothstep(0.5, 0.8, 1.0 - normalize(nw).y);
+	float w[5] = float[5](vc.x * (1.0 - steil), vc.y * (1.0 - steil), max(vc.z, steil), vc.w * (1.0 - steil), max(0.0, 1.0 - som) * (1.0 - steil));
+	vec3 an = abs(normalize(nw));
+	vec3 tb = pow(an, vec3(4.0));
+	tb /= tb.x + tb.y + tb.z;
 	// overgangen: scherper dan het lineaire verloop, met ruis erdoorheen
 	float b[5];
 	float tot = 0.0;
@@ -75,10 +82,17 @@ void fragment() {
 		float wi = b[i] / tot;
 		if (wi > 0.004) {
 			vec3 a1 = textureGrad(kleur_tex, vec3(uv, float(i)), dx, dy).rgb;
+			if (i == 2 && steil > 0.01) {
+				vec2 ux = wp.zy / herhaling_m;
+				vec2 uz = wp.xy / herhaling_m;
+				vec3 ax = textureGrad(kleur_tex, vec3(ux, 2.0), dFdx(ux), dFdy(ux)).rgb;
+				vec3 az = textureGrad(kleur_tex, vec3(uz, 2.0), dFdx(uz), dFdy(uz)).rgb;
+				a1 = a1 * tb.y + ax * tb.x + az * tb.z;
+			}
 			vec3 a2 = textureGrad(kleur_tex, vec3(uv * 0.29 + vec2(0.37, 0.61), float(i)), dx * 0.29, dy * 0.29).rgb;
 			vec3 a = mix(a1, a2, 0.38);
 			alb += a * wi;
-			nrm += (textureGrad(normaal_tex, vec3(uv, float(i)), dx, dy).rgb * 2.0 - 1.0) * wi;
+			nrm += (textureGrad(normaal_tex, vec3(uv, float(i)), dx, dy).rgb * 2.0 - 1.0) * wi * (i == 2 ? 1.0 - steil : 1.0);
 			ruw += textureGrad(ruw_tex, vec3(uv, float(i)), dx, dy).r * wi;
 			if (i < 2) { droogw += wi; }
 		}
@@ -91,7 +105,7 @@ void fragment() {
 	alb = mix(alb, alb * aarde_kleur, clamp(pa.y, 0.0, 1.0));
 	// sneeuw (niet onder water, onregelmatige rand)
 	float dek = clamp(sneeuw * 1.6 - 0.5 + (fbm(wp.xz * 0.35) - 0.5) * 0.9, 0.0, 1.0);
-	dek *= smoothstep(-0.12, 0.06, wp.y);
+	dek *= smoothstep(-0.12, 0.06, wp.y) * (1.0 - 0.8 * steil);
 	dek = smoothstep(0.1, 0.5, dek);
 	alb = mix(alb, vec3(0.90, 0.93, 0.98) * (0.93 + 0.07 * fijn), dek);
 	alb *= 1.0 - 0.28 * nat;

@@ -417,13 +417,13 @@ def vlag_textuur():
         h = terrein.fbm(N, 4, 1, 5)
         h = (h - h.min()) / np.ptp(h)
         h2 = terrein.fbm(N, 24, 2, 3)
-        basis = np.array([0.55, 0.12, 0.62])
-        donker = np.array([0.10, 0.02, 0.12])
-        licht = np.array([0.80, 0.35, 0.85])
-        f = np.clip((h - 0.35) * 2.2, 0, 1)[..., None]
-        c = basis * (1 - f) + donker * f
-        c = c * (0.85 + 0.3 * h2[..., None])
-        c = c + (licht - c) * np.clip((0.3 - h) * 2.5, 0, 1)[..., None] * 0.5
+        # effen paars doek, licht gesleten: zachte variatie (+-5 %) en iets verschoten naar de vrije rand
+        basis = np.array([0.50, 0.14, 0.58])
+        licht = np.array([0.62, 0.30, 0.68])
+        y0, x0 = np.mgrid[0:N, 0:N]
+        slijt = np.clip(0.5 * h2 + 0.5 * h, 0, 1) * np.clip((x0 / N - 0.35) * 1.4, 0, 1)
+        c = basis * (0.95 + 0.10 * h2[..., None])
+        c = c + (licht - c) * (0.45 * slijt)[..., None]
         # weefsel
         y, x = np.mgrid[0:N, 0:N]
         c *= (0.93 + 0.07 * np.sin(x * 1.6) * np.sin(y * 1.6))[..., None]

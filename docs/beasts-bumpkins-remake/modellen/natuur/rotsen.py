@@ -94,6 +94,17 @@ def lagen(Z, stap, kracht, warp=None):
     return Z * (1 - kracht) + trap * kracht
 
 
+def plaat(X, Y, cx, cy, h, rx, ry, draai=0.0, kant=0.0, helling=0.45, wand=3.2):
+    """Hoekige plaat: schuin plat bovenvlak (helling in richting `kant`) op een rechthoekige voet met steile wanden
+    (geen piramide: de wanden zijn bijna verticaal, de top is een vlak)."""
+    c, s = math.cos(draai), math.sin(draai)
+    dx, dy = X - cx, Y - cy
+    u, v = (c * dx + s * dy) / rx, (-s * dx + c * dy) / ry
+    d = np.maximum(np.abs(u), np.abs(v))
+    boven = h + helling * (math.cos(kant) * u * rx + math.sin(kant) * v * ry)
+    return np.clip(np.minimum(boven, wand * h * (1 - d)), 0, None)
+
+
 # --- Vormen ---------------------------------------------------------------------------------
 def vorm(naam, X, Y):
     rnd = random.Random(naam)
@@ -114,18 +125,20 @@ def vorm(naam, X, Y):
         Z = piek(X, Y, 0.05, 0.0, 1.6, 1.05, 1.05, scherp=0.62, vierkant=0.85, draai=0.0)
         Z = np.maximum(Z, piek(X, Y, -0.35, 0.3, 1.25, 0.6, 0.6, scherp=0.56, vierkant=0.7))
         strata = (0.24, 0.6)
-    elif naam == "rots_4":     # grote piramide met lagen (rock04)
-        Z = piek(X, Y, 0.0, 0.0, 2.2, 1.05, 1.05, scherp=0.62, vierkant=0.9)
-        Z = np.maximum(Z, piek(X, Y, 0.35, -0.25, 1.75, 0.6, 0.55, scherp=0.56, vierkant=0.7))
+    elif naam == "rots_4":     # gelaagde hoekige platen op elkaar (rock04)
+        Z = plaat(X, Y, 0.1, 0.05, 1.7, 0.95, 0.9, draai=0.35, kant=2.2, helling=0.5)
+        Z = np.maximum(Z, plaat(X, Y, -0.45, -0.35, 1.2, 0.55, 0.6, draai=-0.5, kant=0.4, helling=0.45))
+        Z = np.maximum(Z, plaat(X, Y, 0.5, -0.45, 1.0, 0.45, 0.5, draai=0.9, kant=-1.0, helling=0.35))
+        Z = np.maximum(Z, plaat(X, Y, -0.35, 0.55, 0.85, 0.5, 0.4, draai=0.2, kant=1.2, helling=0.3))
         strata = (0.26, 0.65)
     elif naam == "rots_5":     # lage dubbele kam (rock05)
         Z = np.maximum(piek(X, Y, -0.35, 0.25, 1.35, 0.75, 0.7, scherp=0.62, vierkant=0.8, draai=0.3),
                        piek(X, Y, 0.4, -0.2, 1.05, 0.65, 0.65, scherp=0.62, vierkant=0.8, draai=-0.2))
         strata = (0.24, 0.6)
-    else:                      # rots_6: twee toppen naast elkaar (rock06)
-        Z = np.maximum(piek(X, Y, -0.4, -0.15, 1.45, 0.65, 0.75, scherp=0.65, vierkant=0.75),
-                       piek(X, Y, 0.35, 0.3, 1.5, 0.65, 0.7, scherp=0.65, vierkant=0.75))
-        Z = np.maximum(Z, piek(X, Y, 0.0, 0.0, 0.45, 1.0, 1.0, scherp=0.62, vierkant=0.9))
+    else:                      # rots_6: twee hoekige platen die tegen elkaar leunen (rock06)
+        Z = plaat(X, Y, -0.35, -0.1, 1.45, 0.6, 0.8, draai=0.25, kant=0.0, helling=0.55)
+        Z = np.maximum(Z, plaat(X, Y, 0.4, 0.25, 1.35, 0.6, 0.75, draai=-0.3, kant=math.pi, helling=0.5))
+        Z = np.maximum(Z, plaat(X, Y, 0.05, -0.55, 0.7, 0.55, 0.35, draai=0.1, kant=-1.5, helling=0.3))
         strata = (0.24, 0.6)
     # voet tot aan de tegelrand: een lage sokkel die bij de rand naar 0 gaat
     rand = np.maximum(np.abs(X), np.abs(Y))
@@ -169,8 +182,8 @@ def klif(naam, X, Y):
             if abs(sv + 0.1) < 0.15:
                 break
             cx, cy = rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6)
-        h = rnd.uniform(2.15, 2.45)
-        r = rnd.uniform(0.6, 0.85)
+        h = rnd.uniform(2.05, 2.25)
+        r = rnd.uniform(0.7, 0.95)
         Z = np.maximum(Z, piek(X, Y, cx, cy, h, r, r * rnd.uniform(0.8, 1.2), scherp=0.45, vierkant=0.4,
                                 draai=rnd.uniform(0, 3)) * binnen)
     return Z, s
@@ -185,12 +198,12 @@ def hoogteveld(naam):
         fade = 1.0
     else:
         Z, s = klif(naam, X, Y)
-        stap, kr = 0.17, 0.5
+        stap, kr = 0.32, 0.75        # grotere lagen: platen en richels, geen spitse bladen
         # detail dooft uit naar de tegelranden (lassen)
         rand = np.maximum(np.abs(X), np.abs(Y))
         fade = 0.3 + 0.7 * smooth(1.0, 0.7, rand)
         # op de stap meer reliëf, op het plateau en het gras minder
-        fade = fade * (0.5 + 0.5 * np.exp(-((s + 0.2) / 0.6) ** 2))
+        fade = fade * (0.5 + 0.5 * np.exp(-((s + 0.2) / 0.6) ** 2)) * 0.55
     hoog = Z > 0.02
     g = ruis2(X, Y, 1.6, sd, 4)
     Z = Z + (0.28 * g + 0.06) * fade * smooth(0.0, 0.25, Z)

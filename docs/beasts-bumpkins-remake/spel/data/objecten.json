@@ -8,14 +8,14 @@
     "98":  {"naam": "vlag",         "origineel": "flagpost",    "model": "natuur:vlag",      "schaal": 1.5, "voetafdruk": [1, 1], "blokkeert": false},
     "103": {"naam": "dorpeling",    "origineel": "villager",    "model": "bumpkin_man",      "voetafdruk": [1, 1], "blokkeert": false, "spawn": true},
     "143": {"naam": "kampvuur",     "origineel": "campfire",    "model": "natuur:kampvuur",  "schaal": 1.3, "voetafdruk": [1, 1], "blokkeert": true},
-    "144": {"naam": "bron",         "origineel": "spring",      "model": "natuur:bron",      "schaal": 0.55, "voetafdruk": [1, 1], "blokkeert": true},
+    "144": {"naam": "bron",         "origineel": "spring",      "model": "natuur:bron",      "schaal": 0.55, "voetafdruk": [2, 2], "blokkeert": true},
     "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "natuur:zilveren_beker", "schaal": 1.6, "voetafdruk": [1, 1], "blokkeert": false},
     "171": {"naam": "koe_generator","origineel": "generator",   "model": "koe",              "voetafdruk": [1, 1], "blokkeert": false},
     "1000":{"naam": "boom_bos",     "origineel": "(gegenereerd op bosgrond)", "model": "natuur:den_groot", "varianten": [["den_groot", 0.4], ["spar", 0.3], ["jonge_den", 0.3]], "voetafdruk": [1, 1], "blokkeert": true}
   },
   "decoratie": {
     "_uitleg": "ALLEEN WEERGAVE, niet in de sim: Wereld leest deze sectie niet, ze blokkeert geen tegel en telt niet als object. TerreinView strooit ze (gehasht per tegel, dus elke run gelijk). 'op' = tegelsoorten, 'kans' = per tegel, 'afstand' = minimale afstand in tegels tot een kaartobject.",
-    "rotsen": {"modellen": ["rots_1", "rots_2", "rots_3", "rots_4", "rots_5", "rots_6"], "op": {"rots": 1.0, "rotsrand": 0.55}, "schaal": [1.0, 1.15], "schaal_y": 0.6},
+    "rotsen": {"modellen": ["rots_1", "rots_2", "rots_3", "rots_4", "rots_5", "rots_6"], "kans": 0.5, "schaal": [0.9, 1.7], "zak": 0.3},
     "struiken": {"modellen": [["struik_klein", 0.55], ["struik_bloem", 0.45]], "op": {"gras": 0.045, "bosgrond": 0.06}, "afstand": 3, "dorp_vrij": 6, "schaal": [0.8, 1.4]},
     "stronken": {"modellen": [["stronk", 1.0]], "op": {"bosgrond": 0.05}, "afstand": 2, "schaal": [0.9, 1.3]}
   },

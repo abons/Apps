@@ -145,6 +145,10 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(118, 58)) + Vector3(0, 0.6, 0), -2.2, deg_to_rad(28), 7.0)
 		"rots":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(108, 44)), 0.4, deg_to_rad(30), 20.0)
+		"klif":
+			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
+			w.dorpeling(3).anker = Vector2i(108, 47)
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(109, 49)) + Vector3(0, 1.0, 0), -1.1, deg_to_rad(22), 11.0)
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
@@ -158,6 +162,8 @@ func _scenario_stap() -> void:
 			_selectie_stap()
 		"pad":
 			_pad_stap()
+		"klif":
+			_klif_stap()
 		"loop":
 			if _stap == 0 and szt >= 0.3:
 				bestuur.gekozen = [1, 2, 3, 4, 5, 6]
@@ -210,3 +216,14 @@ func _pad_stap() -> void:
 		_stap = 2
 	elif _stap == 2:
 		pass
+
+
+func _klif_stap() -> void:
+	if _stap == 0 and szt >= 0.5:
+		bestuur.gekozen = [3]
+		view.gekozen = bestuur.gekozen
+		bestuur.geef_loopbevel(Vector2i(111, 55))
+		w.tempo = 1.0
+		_stap = 1
+	elif _stap == 1:
+		cam.doel_focus = cam.doel_focus.lerp(view.unit_pos(3) + Vector3(1.5, 1.0, 0), 0.08)
