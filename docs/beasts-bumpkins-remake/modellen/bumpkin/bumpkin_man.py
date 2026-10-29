@@ -54,7 +54,7 @@ from bumpkin_basis import Bouwer, keten, ring, srgb  # noqa: E402
 
 # Maat voor de rig: smallere schouders dan de rig-standaard (0,40 tussen de gewrichten maakt de jas
 # 0,52 breed; de sprite is ~0,40 over de jas).
-MAAT_MAN = {"schouder": 0.31}
+MAAT_MAN = {"schouder": 0.31, "kop": 0.25}            # kop 8% kleiner dan de rig-standaard 0,27
 DELEN = ["lijf", "haar", "snor", "hemd", "tuinbroek", "riem", "laarzen"]
 TINTBAAR = {"lijf": "huid", "haar": "haar", "snor": "haar", "hemd": "hemd", "tuinbroek": "paars", "laarzen": "laars"}
 VAST = {"lijf": (3,), "tuinbroek": (6,), "riem": (0, 1)}     # regio's met echte kleur (mat_vast)
@@ -63,21 +63,37 @@ TEXEL_REGIO = {("lijf", 2): 1.4 / 1.9, ("lijf", 4): 1.4 / 1.9, ("lijf", 5): 0.6 
 
 # Albedo per deel (lineair). Iets lichter dan de sprite-middentoon: die is al belicht.
 KLEUR = {
-    "haar": srgb("#a5522c"), "huid": srgb("#d8925e"), "paars": srgb("#7a3888"),
+    "haar": srgb("#97492a"), "huid": srgb("#d8925e"), "paars": srgb("#7a3888"),
     "hemd": srgb("#8d977f"), "metaal": srgb("#a4a4a0"), "snor": srgb("#6e3a1e"),
     "riem": srgb("#5a3a1f"), "gesp": srgb("#efbf00"), "laars": srgb("#4e2c15"), "zool": srgb("#2a1a0e"),
 }
 
 
+# Gezicht naar bust12/avatar_man: lang en hol, droeve opgetrokken wenkbrauwen, zware hangende leden met
+# wallen, lange hangende neus met een bult, scheve mond met hangende hoeken onder de hangsnor.
+KOP = dict(
+    oog=(0.0128, 0.0026, 0.0066),
+    gezicht=dict(mond="snor", lach=-0.006, mondbreed=0.022, tris=1500,
+                 vorm=dict(neus_h=0.034, neus_r=0.0125, neus_breed=0.016, neus_vleugel=0.013, neus_bult=0.003,
+                           neus_hang=0.004, neus_x=0.0015, richel=0.005, brauw_binnen=(0.0065, 0.0055),
+                           brauw_buiten=-0.003, lid_hang=(0.0008, 0.0016), lidkap=0.0022, wal=0.0024, lip_o=0.0052,
+                           wang_hol=(0.0075, 0.0065), jukbeen=0.0055, kin=0.008, kin_z=0.04, nlf=(0.0026, 0.002),
+                           mond_scheef=0.003, kaakhoek=0.0045, asym=0.001, rimpels=0.0004, seed=12)),
+)
+
+
 def bouw(sk, coll):
     d = {}
     d["hemd"] = BD.bouw_hemd(sk, coll)
-    d["tuinbroek"] = BD.bouw_tuinbroek(sk, coll)
+    d["tuinbroek"] = BD.bouw_tuinbroek(sk, coll, dik=0.88)
     d["riem"] = BD.bouw_riem(sk, coll)
     d["laarzen"] = BD.bouw_laarzen(sk, coll)
-    d["lijf"] = BD.bouw_lijf(sk, coll)
+    d["lijf"] = BD.bouw_lijf(sk, coll, kopvorm=KOP)
     d["snor"] = BD.bouw_snor(sk, coll)
-    d["haar"] = BD.bouw_haar(sk, coll)
+    d["haar"] = BD.bouw_haar(sk, coll, extra=lambda B, sk_, kop: BD.krul_kaarten(B, sk_, 70, seed=12))
+    BD.krullen_op_schil(sk, 400 if BB.SNEL else 1150, seed=3, rc=(0.006, 0.0105), rt=(0.0026, 0.0037),
+                        lengte=(0.014, 0.028), diep=0.0035, groep=5, spreid=0.12)          # ringelkrullen in groepjes (bake)
+    BD.haar_hoog(sk, KLEUR["haar"])
     return d
 
 
@@ -123,7 +139,6 @@ MAN = BB.Personage(
     bak_ext={"haar": (0.024, 0.05), "laarzen": (0.005, 0.02), "hemd": (0.005, 0.018), "riem": (0.004, 0.015),
              "tuinbroek": (0.004, 0.015), "lijf": (0.008, 0.025), "snor": (0.006, 0.02)},
     kleurbak=("haar",),
-    krullen=lambda sk, coll: {"haar": [BB.krullen(sk, coll, 1500 if BB.SNEL else 4200)]},
     sprites=("m_still", "m_walk"),
     props=lambda sk, rig, delen: maak_strootje(sk, rig),
     extra={"mat": {"snor": "mat_haar"},

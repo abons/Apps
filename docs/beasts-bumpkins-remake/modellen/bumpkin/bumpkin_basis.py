@@ -43,7 +43,9 @@ SCRATCH = os.path.join(os.environ.get("TEMP", ""), "claude", "E--werk-androidApp
 REF = OPTS.get("ref", os.path.join(SCRATCH, "bumpkin", "ref"))
 T0 = time.time()
 GRIJS = 0.86                       # gemiddelde luminantie van een tintbare textuur; tint = kleur / GRIJS
+KAART_REGIO, KAART_TEXEL = 3, 2.4  # haarkaarten (alpha): regio in een haar-deel, eigen texeldichtheid
 GEWICHT, HOOG, VERF = {}, {}, {}   # registers per soort (gevuld door bumpkin_delen)
+LAAG = {}                          # soort -> fn(o, sk, naam): vervorming van de laag-poly (plooien)
 C = None                           # het actieve Personage
 
 
@@ -316,6 +318,7 @@ class Kop:
         self.k = k = sk.kh
         self.kz = sk.kz
         self.kaak = kaak
+        self.vormfn = None
         self.C = np.array([0, -0.004 * k, self.zz(1.118)])
         self.a, self.b, self.top, self.bot = [x * k for x in schedel]
         self.ogen = [self.punt(self.theta_bij_z(ph, self.zz(ogen_z)), ph, 0.0) for ph in (ogen_ph, -ogen_ph)]
@@ -336,6 +339,36 @@ class Kop:
         d = rng.normal(size=(260, 3))
         self.klontdir = d / np.linalg.norm(d, axis=1, keepdims=True)
         self.klontw = rng.uniform(0.55, 1.0, 260)
+        # gezichtsvorm (bumpkin_delen.gezicht_vorm): f(P (n, 3)) -> verschuiving (m) langs de straal.
+        # Pas gezet als ogen/mond/neus op de kale schedel liggen; daarna volgt punt() het gezicht.
+        self.vormfn = None
+
+    def punten(self, TH, PH, vorm=True):
+        """punt() over arrays (zelfde vorm als TH/PH, plus een as van 3)."""
+        TH, PH = np.broadcast_arrays(np.asarray(TH, float), np.asarray(PH, float))
+        d = np.stack([np.sin(TH) * np.sin(PH), -np.sin(TH) * np.cos(PH), np.cos(TH)], -1)
+        cz = np.where(d[..., 2] > 0, self.top, self.bot)
+        r = 1 / np.sqrt((d[..., 0] / self.a) ** 2 + (d[..., 1] / self.b) ** 2 + (d[..., 2] / cz) ** 2)
+        p = d * r[..., None]
+        q = np.where(p[..., 2] < 0, (-p[..., 2] / self.bot) ** 2, 0.0)
+        p[..., 0] *= 1 + self.kaak[0] * q - self.kaak[1] * q * q
+        p[..., 1] = p[..., 1] * (1 - self.kaak[2] * q) - 0.01 * self.k * q
+        voor = p[..., 1] < 0
+        p[..., 1] = np.where(voor, p[..., 1] * (0.9 + 0.1 * np.minimum(1, np.abs(p[..., 0]) / (0.08 * self.k)) ** 2),
+                             p[..., 1])
+        P = self.C + p
+        if vorm and self.vormfn is not None:
+            sh = P.shape
+            Pf = P.reshape(-1, 3)
+            Pf = Pf + self.vormrichting(d.reshape(-1, 3)) * self.vormfn(Pf)[:, None]
+            P = Pf.reshape(sh)
+        return P
+
+    @staticmethod
+    def vormrichting(d):
+        """Richting van de gezichtsvorm: de straal, maar platter in z (een neus steekt naar voren uit)."""
+        d = np.asarray(d, float) * np.array([1.0, 1.0, 0.35])
+        return d / (np.linalg.norm(d, axis=-1, keepdims=True) + 1e-9)
 
     def zz(self, z0):
         return self.kz + (z0 - 1.0) * self.k
@@ -344,8 +377,9 @@ class Kop:
     def richting(tht, ph):
         return np.array([math.sin(tht) * math.sin(ph), -math.sin(tht) * math.cos(ph), math.cos(tht)])
 
-    def punt(self, tht, ph, extra=0.0):
-        """Punt op de schedel: polair tht vanaf de kruin, ph om z (0 = voor, -Y; +ph = naar +X)."""
+    def punt(self, tht, ph, extra=0.0, vorm=True):
+        """Punt op de schedel: polair tht vanaf de kruin, ph om z (0 = voor, -Y; +ph = naar +X).
+        Met vorm (en een gezet vormfn) ligt het punt op het gebeeldhouwde gezicht."""
         d = self.richting(tht, ph)
         cz = self.top if d[2] > 0 else self.bot
         r = 1 / math.sqrt((d[0] / self.a) ** 2 + (d[1] / self.b) ** 2 + (d[2] / cz) ** 2)
@@ -356,6 +390,8 @@ class Kop:
             p[1] = p[1] * (1 - self.kaak[2] * q) - 0.01 * self.k * q
         if p[1] < 0:                                              # gezicht platter
             p[1] *= 0.9 + 0.1 * min(1, (abs(p[0]) / (0.08 * self.k))) ** 2
+        if vorm and self.vormfn is not None:
+            p = p + self.vormrichting(d[None])[0] * float(self.vormfn((self.C + p)[None])[0])
         if extra:
             p = p + d * extra
         return self.C + p
@@ -516,6 +552,24 @@ def hoog(o, sk, coll):
     P = P + Nn * hgt[:, None]
     me.vertices.foreach_set("co", P.ravel())
     me.update()
+    vervang = getattr(sk, "hoog_extra", {}).get(naam)
+    if vervang:                                                   # b.v. het hoofd: echte hoog-poly-bron
+        bron, regios = vervang
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        lay = bm.faces.layers.int.get("regio")
+        weg = [f for f in bm.faces if f[lay] in regios]
+        bmesh.ops.delete(bm, geom=weg, context="FACES")
+        bm.to_mesh(me)
+        bm.free()
+        k = bron.copy()
+        k.data = bron.data.copy()
+        coll.objects.link(k)
+        ontkies()
+        h.select_set(True)
+        k.select_set(True)
+        bpy.context.view_layer.objects.active = h
+        bpy.ops.object.join()
     return h
 
 
@@ -707,7 +761,9 @@ def atlas(delen):
         lay = me.uv_layers.get("UVMap") or me.uv_layers.new(name="UVMap")
         reg = np.zeros(len(me.polygons), np.int32)
         me.attributes["regio"].data.foreach_get("value", reg)
-        fac = np.array([C.TEXEL_REGIO.get((naam, int(r)), 1.0) for r in reg]) * C.TEXEL[naam]
+        fac = np.array([C.TEXEL_REGIO.get((naam, int(r)), KAART_TEXEL / C.TEXEL[naam]
+                                          if (C.soort(naam) == "haar" and int(r) == KAART_REGIO) else 1.0)
+                        for r in reg]) * C.TEXEL[naam]
         tot = np.zeros(len(me.polygons), np.int32)
         me.polygons.foreach_get("loop_total", tot)
         lay.data.foreach_set("uv", (uvm.reshape(-1, 2) * np.repeat(fac, tot)[:, None]).astype(np.float32).ravel())
@@ -755,6 +811,9 @@ def bak_alles(delen, sk, coll):
     if C.KRULLEN:
         for nm, objs in C.KRULLEN(sk, coll).items():
             highs[nm] += objs
+    for nm, makers in getattr(sk, "hoog_makers", {}).items():     # b.v. haarstrengen (bumpkin_delen)
+        for mk in makers:
+            highs[nm].append(mk(coll))
     km = bak_mat("_bak_kleur", "kleur")
     for hs in highs.values():
         for h in hs:
@@ -823,6 +882,7 @@ def componeer(B, mpp, sk):
     H = np.zeros(n)
     ruw = np.full(n, 0.85)
     met = np.zeros(n)
+    alfa = np.ones(n)
     D = {k: deel == C.DELEN.index(k) for k in C.DELEN}
     z = P[:, 2]
 
@@ -836,7 +896,7 @@ def componeer(B, mpp, sk):
 
     cx = type("CX", (), {})()
     cx.P, cx.U, cx.V, cx.z, cx.reg, cx.n, cx.s, cx.J, cx.sk = P, U, V, z, reg, n, s, J, sk
-    cx.kl, cx.H, cx.ruw, cx.met, cx.zet, cx.D = kl, H, ruw, met, zet, D
+    cx.kl, cx.H, cx.ruw, cx.met, cx.zet, cx.D, cx.alfa = kl, H, ruw, met, zet, D, alfa
     cx.r_groot, cx.r_fijn, cx.wf, cx.B, cx.ys, cx.xs, cx.KLEUR = r_groot, r_fijn, wf, B, ys, xs, C.KLEUR
     for nm in C.DELEN:
         f = VERF.get(C.soort(nm))
@@ -844,6 +904,8 @@ def componeer(B, mpp, sk):
             continue
         cx.Dm, cx.naam, cx.tint = D[nm], nm, C.TINTBAAR.get(nm)
         f(cx)
+    if "_slijtage" in VERF:                                       # vuil en sleet over alle delen
+        VERF["_slijtage"](cx)
     # tintbare delen naar lichtgrijs: textuur = kleur / tint (tint = basiskleur / GRIJS); vaste regio's echt
     vast = np.zeros(n, bool)
     for nm, regs in C.VAST.items():
@@ -851,6 +913,8 @@ def componeer(B, mpp, sk):
     for nm, sleutel in C.TINTBAAR.items():
         mm = D[nm] & ~vast
         kl[mm] = kl[mm] / (C.KLEUR[sleutel] / GRIJS)[None]
+    C.ALFA = alfa
+    C.KAARTMASK = np.isin(deel, [C.DELEN.index(k) for k in C.DELEN if C.soort(k) == "haar"]) & (reg == KAART_REGIO)
     return ys, xs, kl, H, ruw, met, deel, vast
 
 
@@ -884,10 +948,14 @@ def bewaar(arr, naam, data, jpg=False):
     """arr (h, w, 3) waarden 0..1 (al sRGB of data); rij 0 = onderkant (Blender-volgorde)."""
     os.makedirs(C.TEX, exist_ok=True)
     pad = os.path.join(C.TEX, naam + (".jpg" if jpg else ".png"))
-    img = bpy.data.images.new(naam, arr.shape[1], arr.shape[0], alpha=False)
+    img = bpy.data.images.new(naam, arr.shape[1], arr.shape[0], alpha=arr.shape[2] == 4)
+    tweeling = os.path.join(C.TEX, naam + (".png" if jpg else ".jpg"))
+    if os.path.exists(tweeling) and not naam.endswith(("_normaal", "_orm")):
+        os.remove(tweeling)                                       # geen verouderde kleurkaart naast de nieuwe
     if data:
         img.colorspace_settings.name = "Non-Color"
-    a = np.concatenate([np.clip(arr, 0, 1), np.ones((*arr.shape[:2], 1))], 2).astype(np.float32)
+    a = np.clip(arr, 0, 1) if arr.shape[2] == 4 else np.concatenate([np.clip(arr, 0, 1), np.ones((*arr.shape[:2], 1))], 2)
+    a = a.astype(np.float32)
     img.pixels.foreach_set(a.ravel())
     img.filepath_raw = pad
     img.file_format = "JPEG" if jpg else "PNG"
@@ -914,7 +982,8 @@ def texturen(B, mpp, sk):
     aov = np.where(oogje, 0.9, ao[ys, xs])
     ao[ys[oogje], xs[oogje]] = 0.9
     hr_ = np.isin(deel, [C.DELEN.index(k) for k in C.extra.get("haardelen", C.KLEURBAK)])
-    kl = kl * np.where(hr_, 0.8 + 0.2 * aov, 0.45 + 0.55 * aov)[:, None]                      # holtes ook in de kleur (leesbaar op 20 m)
+    huid_ = (deel == C.DELEN.index("lijf")) if "lijf" in C.DELEN else np.zeros(len(deel), bool)
+    kl = kl * np.where(hr_, 0.8 + 0.2 * aov, np.where(huid_, 0.78 + 0.22 * aov, 0.45 + 0.55 * aov))[:, None]  # holtes in de kleur
     K = np.zeros((h, w, 3), np.float32)
     K[ys, xs] = naar_srgb(kl)
     # normaal: gebakken (vorm, plooien, lokken) + reliëf uit numpy (weefsel, naden, steken)
@@ -931,13 +1000,17 @@ def texturen(B, mpp, sk):
     hm = np.zeros((h, w), bool)
     hm[ys[hr_], xs[hr_]] = True
     zacht = (nb + np.roll(nb, 1, 0) + np.roll(nb, -1, 0) + np.roll(nb, 1, 1) + np.roll(nb, -1, 1)) / 5
-    zacht = zacht * 0.65 + np.array([0, 0, 1.0]) * 0.35
+    zacht = zacht * 0.85 + np.array([0, 0, 1.0]) * 0.15
     nb[hm] = zacht[hm]
     hn = C.extra.get("haar_normaal")                          # < 1: lokken nog vlakker (pluishaar, geen folie)
     if hn is not None:
         v = nb[hm] * hn + np.array([0, 0, 1.0]) * (1 - hn)
         nb[hm] = v / (np.linalg.norm(v, axis=-1, keepdims=True) + 1e-9)
     nb[ys[oogje], xs[oogje]] = (0, 0, 1)
+    kaart = C.ALFA < 0.999 if np.ndim(C.ALFA) else np.zeros(len(ys), bool)
+    kaart |= np.isin(deel, [C.DELEN.index(k) for k in C.DELEN if C.soort(k) == "haar"]) & \
+        (getattr(C, "KAARTMASK", np.zeros(len(ys), bool)))
+    nb[ys[kaart], xs[kaart]] = (0, 0, 1)                          # haarkaarten: plat, reliëf uit de schilder
     # whiteout-menging
     n = np.stack([nb[..., 0] + nd[..., 0], nb[..., 1] + nd[..., 1], nb[..., 2] * nd[..., 2]], -1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True) + 1e-9
@@ -948,9 +1021,14 @@ def texturen(B, mpp, sk):
     ORM[ys, xs, 1] = ruw
     ORM[ys, xs, 2] = met
     K = dilateer(K, mask, 10)
+    A = np.ones((h, w), np.float32)
+    A[ys, xs] = C.ALFA
+    C.HEEFT_ALFA = bool((A < 0.999).any())
+    if C.HEEFT_ALFA:
+        K = np.concatenate([K, A[..., None]], 2)
     Nimg = dilateer(Nimg.astype(np.float32), mask, 10)
     ORM = dilateer(ORM, mask, 10)
-    kleur = bewaar(K, C.naam + "_kleur", False, jpg=True)
+    kleur = bewaar(K, C.naam + "_kleur", False, jpg=K.shape[2] == 3)
     normaal = bewaar(Nimg, C.naam + "_normaal", True)
     orm = bewaar(ORM[::2, ::2] if RES >= 2048 else ORM, C.naam + "_orm", True)
     log("texturen", f"{time.time() - t1:.1f}s")
@@ -970,7 +1048,7 @@ def gltf_groep():
     return GLTF_GROEP
 
 
-def pbr(naam, kleur, nrm, orm_img, tint=(1, 1, 1)):
+def pbr(naam, kleur, nrm, orm_img, tint=(1, 1, 1), alfa=False):
     """Principled met de atlas; tint als Mix(Multiply) -> glTF baseColorFactor."""
     m = bpy.data.materials.new(naam)
     m.use_nodes = True
@@ -1000,7 +1078,12 @@ def pbr(naam, kleur, nrm, orm_img, tint=(1, 1, 1)):
     g = nt.nodes.new("ShaderNodeGroup")
     g.node_tree = gltf_groep()
     nt.links.new(sp.outputs["Red"], g.inputs["Occlusion"])
-    m.use_backface_culling = True
+    m.use_backface_culling = not alfa
+    if alfa:                                                      # glTF alphaMode MASK (afronden = knip op 0,5)
+        rd = nt.nodes.new("ShaderNodeMath")
+        rd.operation = "ROUND"
+        nt.links.new(t.outputs["Alpha"], rd.inputs[0])
+        nt.links.new(rd.outputs[0], b.inputs["Alpha"])
     return m
 
 
@@ -1017,7 +1100,9 @@ def materialen(delen, kleur, normaal, orm):
             sl = C.TINTBAAR[naam]
             mn = C.extra.get("mat", {}).get(naam, "mat_" + naam)
             if mn not in cache:
-                cache[mn] = pbr(mn, kleur, normaal, orm, tuple(np.clip(C.KLEUR[sl] / GRIJS, 0, 1)))
+                cache[mn] = pbr(mn, kleur, normaal, orm, tuple(np.clip(C.KLEUR[sl] / GRIJS, 0, 1)),
+                                alfa=(C.soort(naam) == "haar" and getattr(C, "HEEFT_ALFA", False) and
+                                      bool(np.isin(reg, (KAART_REGIO,)).any())))
             me.materials.append(cache[mn])
             me.materials.append(vast)
             idx = np.isin(reg, C.VAST.get(naam, ())).astype(np.int32)
@@ -1048,7 +1133,11 @@ def vlakke_kleuren(delen):
             o.data.materials.append(vlak_mat(naam + "_" + k, C.KLEUR[k], 0.35 if k == "gesp" else 0.8))
         reg = np.zeros(len(o.data.polygons), np.int32)
         o.data.attributes["regio"].data.foreach_get("value", reg)
-        o.data.polygons.foreach_set("material_index", np.minimum(reg, len(o.data.materials) - 1))
+        idx = np.minimum(reg, len(o.data.materials) - 1)
+        if naam == "lijf":                                        # oogbollen/tanden wit
+            o.data.materials.append(vlak_mat("lijf_oog", srgb("#e8e0d4"), 0.2))
+            idx = np.where(reg == 3, len(o.data.materials) - 1, idx)
+        o.data.polygons.foreach_set("material_index", idx)
 
 
 # --- Studio: camera en licht zoals de hut (2:1-iso, yaw 225, pitch 30, ortho) ------------------
@@ -1324,6 +1413,9 @@ def bouw_personage(p):
     rig = R.bouw_rig(maat)
     sk = Skelet(rig)
     delen = p.bouw(sk, coll)
+    for naam, o in delen.items():
+        if p.soort(naam) in LAAG:
+            LAAG[p.soort(naam)](o, sk, naam)
     log("driehoeken", driehoeken(delen.values()), {k: driehoeken([o]) for k, o in delen.items()})
     if VLAK:
         vlakke_kleuren(delen)

@@ -55,7 +55,7 @@ STAFARM = {"LeftArm": (14, 0, 8), "LeftForeArm": (62, 0, 0), "LeftHand": (0, 0, 
 def na_animatie(rig):
     BB.houding_additief(rig, HOUDING)
     BB.houding_additief(rig, STAFARM, acties=("idle", "lopen", "rennen"))
-    BD.plaats_staf(rig, bpy.data.objects["prop_staf"])
+    BD.plaats_staf(rig, bpy.data.objects["prop_staf"], binnen=0.0)
 
 
 DELEN = ["lijf", "haar", "hemd", "tuniek", "broek", "riem", "laarzen", "prop_staf"]
@@ -71,7 +71,7 @@ KLEUR = {
     "haar": srgb("#dedce4"), "huid": srgb("#d9987a"), "hemd": srgb("#7c807a"), "paars": srgb("#60406f"),
     "broek": srgb("#4f4b46"), "laars": srgb("#4e2d1b"), "zool": srgb("#2a1a0e"), "riem": srgb("#3e2a1c"),
     "gesp": srgb("#a8823a"), "snor": srgb("#f0eef4"), "metaal": srgb("#a4a4a0"),
-    "hout": srgb("#4a3424"), "rank": srgb("#3a3a1c"), "blad": srgb("#5a7a32"),
+    "hout": srgb("#4a3424"), "rank": srgb("#4a5a22"), "blad": srgb("#5a7a32"),
 }
 
 KOP = dict(
@@ -80,14 +80,21 @@ KOP = dict(
     neusprof=((0.032, 0.011, 0.01, 0.014), (0.012, 0.016, 0.017, 0.002), (-0.008, 0.025, 0.024, -0.004),
               (-0.024, 0.026, 0.022, -0.006), (-0.036, 0.018, 0.013, 0.002)),
     oog=(0.0122, 0.0024, 0.0062),
-    haar_c=(0, 0.02, 1.17), haar_r=(0.17, 0.13, 0.155, 0.165, 0.15),
+    haar_c=(0, 0.015, 1.15), haar_r=(0.114, 0.12, 0.125, 0.14, 0.13),        # dunne schil, pieken erop
     haargrens=[(0.0, 1.22), (0.5, 1.21), (0.9, 1.17), (1.25, 1.13), (1.6, 1.12), (2.3, 1.08), (3.1416, 1.06)],
-    klont=(0.16, 0.05),
+    klont=(0.07, 0.02),
     gezicht=dict(stoppels=False, mond="lach", lach=0.009, mondbreed=0.025, spleet=0.003, open=0.007, onderlip=0.0035,
                  bovenlip=0.002, lip="#a86058", iris="#6a7080", wang=0.35, neusrood=0.45, rimpel=2.2,
                  voorhoofd=(0.034, 0.043, 0.052, 0.061, 0.07), kraai=(-0.4, -0.15, 0.1, 0.35, 0.6), wal=1.6,
                  lid=0.002, schijf_lid=0.0018, oog_open=(0.0112, 0.0052), brauw=(0.021, 0.007, 0.0062),
-                 tand="#d8c8a0", extra=None),
+                 tand="#d8c8a0", extra=None, tris=1300,
+                 # concept/bust00: grote hangneus, diepe oogkassen met wallen, ingevallen tandeloze mond met
+                 # vooruitstekende kin, holle wangen, diepe neus-mondplooien, veel rimpels
+                 vorm=dict(neus_h=0.03, neus_r=0.0118, neus_hang=0.004, neus_breed=0.0142, neus_vleugel=0.011,
+                           neus_bult=0.002, richel=0.0052, oogkas=0.008, wal=0.0026, lidkap=0.002,
+                           lid_hang=(0.0006, 0.0012), wang_hol=0.0062, jukbeen=0.0062, mond_in=0.006, kin=0.009,
+                           kin_z=0.033, nlf=(0.0036, 0.0032), rimpels=0.0007, slaap=0.004, asym=0.0012,
+                           brauw_binnen=(0.002, 0.0), mond_scheef=0.002, seed=21)),
 )
 
 TUNIEK0 = [(0.958, 0.122, 0.09, 0.088, 0.05), (0.935, 0.17, 0.112, 0.108, 0.045), (0.9, 0.178, 0.13, 0.124, 0.03),
@@ -103,16 +110,7 @@ def rimpels_wang(cx, c, h, huid, reg_h):
     kop = cx.sk.kop
     kk = kop.k
     P = cx.P
-    for sx in (1, -1):
-        for off in (0.0, 0.008, 0.016):
-            a = kop.neus + np.array([sx * (0.028 + off), 0.004, -0.008 - off]) * kk
-            b = kop.mond + np.array([sx * (0.042 + off * 1.4), 0.006, -0.02 - off]) * kk
-            ab = b - a
-            t = np.clip((P - a) @ ab / (ab @ ab), 0, 1)
-            d = np.linalg.norm(P - (a + t[:, None] * ab), axis=1) / kk
-            g = BD.gauss(d, 0.0016) * huid * (1.0 if off == 0 else 0.6)
-            h -= 0.0008 * kk * g
-            c *= (1 - 0.22 * g)[:, None]
+    # de plooien zelf zitten nu in de gezichtsvorm (vorm: nlf, rimpels); hier alleen levervlekjes
     vl = (BD.ruis(P, 70, 131) > 0.55) & huid
     c[vl] = c[vl] * 0.85 + srgb("#8a5a3a") * 0.15
 
@@ -125,8 +123,15 @@ def extra_lijf(B, sk, kop):
     BD.bouw_tanden(B, sk, kop, [(0.011, 0.009, 0.008)], dz=0.003)
 
 
+def wild(B, sk, kop):
+    """Wilde witte plukken die schuin uit de zijkanten en de kruin steken."""
+    BD.pieken(B, sk, 40, seed=5, lengte=(0.045, 0.09), breed=(0.02, 0.03), zmin=1.05, boven=0.05, kaarten=True,
+              voor=0.6)
+
+
 def bouw(sk, coll):
     sk.haarlicht = (0.75, 1.2)
+    sk.haarhuid = 0.4                                   # dunne kruin, kale slapen
     sk.stof = {"tuniek": dict(weef=0.004, vlek=0.2, kraag=0.85, vuil=0.35, vuil_hoogte=0.14),
                "broek": dict(vuil=1.2)}
     d = {}
@@ -137,8 +142,11 @@ def bouw(sk, coll):
                                 gesp_h=0.024, breed=0.016)
     d["laarzen"] = BD.bouw_laarzen(sk, coll)
     d["lijf"] = BD.bouw_lijf(sk, coll, kopvorm=KOP, extra=extra_lijf)
-    d["haar"] = BD.bouw_haar(sk, coll)
-    d["prop_staf"] = BD.bouw_staf(sk, coll, lengte=1.45, ranken=2, bladeren=20)
+    d["haar"] = BD.bouw_haar(sk, coll, extra=wild)
+    BD.schil_strengen(sk, 160 if BB.SNEL else 380, BD.rond((0, 0.15, 1), 0.3), BD.naar_grens(sk.kop, 0.003), seed=9,
+                      dikte=(0.001, 0.0016), licht=(0.85, 1.1))
+    BD.haar_hoog(sk, KLEUR["haar"], donker=0.75, punt=1.08, warm=0.03)
+    d["prop_staf"] = BD.bouw_staf(sk, coll, lengte=1.45, ranken=2, bladeren=22, rank_dik=1.6, blad=1.25)
     return d
 
 
@@ -147,14 +155,11 @@ OUDERE_MAN = BB.Personage(
     bak_ext={"haar": (0.03, 0.06), "laarzen": (0.005, 0.02), "hemd": (0.005, 0.018), "tuniek": (0.006, 0.02),
              "broek": (0.004, 0.015), "riem": (0.004, 0.015), "lijf": (0.008, 0.025), "prop_staf": (0.004, 0.012)},
     kleurbak=("haar",),
-    krullen=lambda sk, coll: {"haar": [BB.krullen(sk, coll, 1500 if BB.SNEL else 7000, lengte=(0.025, 0.05),
-                                                  rc=(0.003, 0.006), rt=(0.0016, 0.0024), draai=(0.4, 1.0),
-                                                  licht=(0.95, 1.12), warm=(-0.04, 0.03), seed=21)]},
     sprites=("elderm", "elderm"),
     na_animatie=na_animatie,
     extra={"bust": "bust00", "weefsel": ("hemd", "tuniek"), "prop_delen": {"prop_staf": "prop_L"},
            "zichtbare_props": ("prop_staf",),
-           "vergelijk_actie": ("idle", 0), "haar_normaal": 0.35},
+           "vergelijk_actie": ("idle", 0)},
 )
 
 if __name__ == "__main__":

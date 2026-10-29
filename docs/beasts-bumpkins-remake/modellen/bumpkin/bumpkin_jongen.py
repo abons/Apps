@@ -33,7 +33,7 @@ from bumpkin_basis import srgb  # noqa: E402
 
 MAAT_JONGEN = {"hoogte": 1.11, "kop": 0.33, "schouder": 0.25, "been": 0.47}
 DELEN = ["lijf", "haar", "tuniek", "broek", "riem", "laarzen"]
-SOORT = {"lijf": "lijf", "haar": "glad", "tuniek": "kledij", "broek": "broek", "riem": "riem", "laarzen": "laarzen"}
+SOORT = {"lijf": "lijf", "haar": "haar", "tuniek": "kledij", "broek": "broek", "riem": "riem", "laarzen": "laarzen"}
 TINTBAAR = {"lijf": "huid", "haar": "haar", "tuniek": "paars", "broek": "broek", "laarzen": "laars"}
 VAST = {"lijf": (3,), "riem": (0, 1)}
 TEXEL = {"lijf": 1.9, "haar": 1.2, "tuniek": 1.0, "broek": 1.0, "riem": 1.0, "laarzen": 1.1}
@@ -50,14 +50,19 @@ KOP = dict(
     neus=(0, -0.104, -0.026),
     neusprof=((0.026, 0.009, 0.009, 0.012), (0.01, 0.012, 0.012, 0.006), (-0.006, 0.018, 0.016, 0.0),
               (-0.016, 0.019, 0.015, -0.002), (-0.023, 0.013, 0.01, 0.004)),
-    oog=(0.0152, 0.007, 0.008),
+    oog=(0.014, 0.0055, 0.0068),
     haar_c=(0, 0.012, 1.18), haar_r=(0.118, 0.124, 0.132, 0.15, 0.13),
     haargrens=[(0.0, 1.172), (0.5, 1.168), (0.9, 1.15), (1.25, 1.14), (1.6, 1.12), (2.3, 1.06), (3.1416, 1.03)],
     klont=(0.05, 0.015),
     gezicht=dict(stoppels=False, mond="lach", lach=0.012, mondbreed=0.036, onderlip=0.004, bovenlip=0.0022,
                  spleet=0.003, open=0.008, lip="#c06a62", iris="#5a3a22", wang=0.5, neusrood=0.2, rimpel=0.0, kraai=(),
                  wal=0.3, lid=0.007, schijf_lid=0.007, oog_open=(0.0142, 0.0082), brauw=(0.0255, 0.004, 0.0036),
-                 tand="#ece4cc"),
+                 tand="#ece4cc", tris=1300,
+                 # bust02: lang smal gezicht, brede grijns met lachplooien, holle wangen, spitse kin, grote ogen
+                 vorm=dict(neus_h=0.019, neus_r=0.0085, neus_breed=0.011, neus_vleugel=0.0082, neus_brug=0.0028,
+                           richel=0.0018, oogkas=0.0055, wal=0.0008, jukbeen=0.0055, wang_hol=0.0015, wang_vol=0.002,
+                           kin=0.0075, kin_breed=0.012, kin_z=0.04, nlf=(0.0016, 0.0013), lip_b=0.0024,
+                           lip_o=0.0028, snuit=0.0034, mond_scheef=0.0015, brauw_binnen=0.0015, asym=0.0008, seed=2)),
 )
 
 # tuniek: (z0, a, voor, achter, halve opening); staande kraag met een korte V-spleet
@@ -82,15 +87,37 @@ def bouw(sk, coll):
                                 gesp_h=0.034, breed=0.018)
     d["laarzen"] = BD.bouw_laarzen(sk, coll)
     d["lijf"] = BD.bouw_lijf(sk, coll, kopvorm=KOP, extra=extra_lijf)
-    d["haar"] = BD.bouw_haar_glad(sk, coll)
+    d["haar"] = BD.bouw_haar_glad(sk, coll, extra=kapsel)
+    BD.schil_strengen(sk, 220 if BB.SNEL else 520, BD.rond((0, 0.3, 1), 0.18), BD.naar_grens(sk.kop, 0.004), seed=5,
+                      dikte=(0.0013, 0.002))
+    BD.haar_hoog(sk, KLEUR["haar"], donker=0.7, punt=1.25)
     return d
+
+
+def kapsel(B, sk, kop):
+    """Pottenkapsel: pony van spitse lokken tot op de wenkbrauwen, lokken over de oren, korter achter."""
+    import numpy as np
+    rng = np.random.default_rng(8)
+    i = 0
+    for ph in [x * 0.21 for x in range(-4, 5)]:
+        BD.lok_meridiaan(B, sk, ph + rng.uniform(-0.05, 0.05), 0.32 + rng.uniform(-0.06, 0.06),
+                         0.011 + rng.uniform(-0.004, 0.004), 0.019 + rng.uniform(-0.003, 0.003), 0.0065,
+                         licht=rng.uniform(0.9, 1.1), seed=i, buig=rng.uniform(-0.3, 0.3), naar_voren=0.15)
+        i += 1
+    for s in (1, -1):
+        for ph in (1.15, 1.5, 1.85, 2.25, 2.7):
+            BD.lok_meridiaan(B, sk, s * (ph + rng.uniform(-0.06, 0.06)), 0.4 + rng.uniform(-0.08, 0.08),
+                             0.028 if ph < 2 else 0.014, 0.021, 0.0068, licht=rng.uniform(0.9, 1.1), seed=i,
+                             buig=s * rng.uniform(-0.2, 0.4))
+            i += 1
+    BD.lok_meridiaan(B, sk, 3.1416, 0.45, 0.012, 0.022, 0.0068, seed=i)
 
 
 JONGEN = BB.Personage(
     "jongen", MAAT_JONGEN, DELEN, SOORT, TINTBAAR, VAST, TEXEL, KLEUR, bouw, texel_regio=TEXEL_REGIO,
     bak_ext={"haar": (0.01, 0.03), "laarzen": (0.005, 0.02), "tuniek": (0.006, 0.02), "broek": (0.004, 0.015),
-             "riem": (0.004, 0.015), "lijf": (0.008, 0.025)},
-    kleurbak=(), sprites=("kidm", "kidm"),
+             "riem": (0.004, 0.015), "lijf": (0.005, 0.016)},
+    kleurbak=("haar",), sprites=("kidm", "kidm"),
     extra={"bust": "bust02", "weefsel": ("tuniek", "broek"), "haardelen": ("haar",)},
 )
 

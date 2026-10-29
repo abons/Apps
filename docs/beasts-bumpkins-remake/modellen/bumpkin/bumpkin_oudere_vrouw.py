@@ -55,7 +55,7 @@ def na_animatie(rig):
 
 
 DELEN = ["lijf", "haar", "kraag", "jasje", "jurk", "riem", "laarzen", "prop_staf"]
-SOORT = {"lijf": "lijf", "haar": "glad", "kraag": "kraag", "jasje": "kledij", "jurk": "kledij", "riem": "riem",
+SOORT = {"lijf": "lijf", "haar": "haar", "kraag": "kraag", "jasje": "kledij", "jurk": "kledij", "riem": "riem",
          "laarzen": "laarzen", "prop_staf": "staf"}
 TINTBAAR = {"lijf": "huid", "haar": "haar", "kraag": "kraag", "jasje": "groen", "jurk": "paars", "laarzen": "laars"}
 VAST = {"lijf": (3,), "jasje": (4,), "riem": (0, 1), "prop_staf": (0, 1, 2)}
@@ -83,7 +83,13 @@ KOP = dict(
                  bovenlip=0.0018, lip="#a86060", iris="#5a6a8a", wang=0.4, neusrood=0.3, rimpel=2.0,
                  voorhoofd=(0.034, 0.043, 0.052, 0.061), kraai=(-0.4, -0.15, 0.1, 0.35, 0.6), wal=1.4,
                  lid=0.003, schijf_lid=0.0028, oog_open=(0.0112, 0.0056), brauw=(0.0215, 0.006, 0.0032),
-                 tand="#ddd0b0", wimper=0.0013),
+                 tand="#ddd0b0", wimper=0.0013, tris=1300,
+                 # bust17/concept: lange haakneus, holle wangen, ingevallen mond, puntige kin, veel rimpels
+                 vorm=dict(neus_h=0.028, neus_r=0.0092, neus_bult=0.0042, neus_hang=0.005, neus_breed=0.0112,
+                           neus_vleugel=0.0085, neus_brug=0.0038, richel=0.0042, oogkas=0.0075, wal=0.002,
+                           lidkap=0.0018, wang_hol=0.007, jukbeen=0.0062, mond_in=0.0038, kin=0.0082, kin_z=0.034,
+                           kin_breed=0.013, nlf=(0.0034, 0.003), rimpels=0.0008, slaap=0.004, asym=0.0011,
+                           mond_scheef=-0.0018, seed=17)),
 )
 
 # jasje: open voor (halve opening 0,045-0,06), tot op de heup; jurk: hoge ronde hals, tot de enkels
@@ -102,16 +108,7 @@ def rimpels_wang(cx, c, h, huid, reg_h):
     kop = cx.sk.kop
     kk = kop.k
     P = cx.P
-    for sx in (1, -1):
-        for off in (0.0, 0.008, 0.016):
-            a = kop.neus + np.array([sx * (0.024 + off), 0.004, -0.01 - off]) * kk
-            b = kop.mond + np.array([sx * (0.04 + off * 1.4), 0.006, -0.02 - off]) * kk
-            ab = b - a
-            t = np.clip((P - a) @ ab / (ab @ ab), 0, 1)
-            d = np.linalg.norm(P - (a + t[:, None] * ab), axis=1) / kk
-            g = BD.gauss(d, 0.0016) * huid * (1.0 if off == 0 else 0.6)
-            h -= 0.0008 * kk * g
-            c *= (1 - 0.2 * g)[:, None]
+    # de plooien zelf zitten nu in de gezichtsvorm (vorm: nlf, rimpels); hier alleen levervlekjes
     vl = (BD.ruis(P, 70, 132) > 0.58) & huid
     c[vl] = c[vl] * 0.88 + srgb("#8a5a3a") * 0.12
 
@@ -125,13 +122,30 @@ def extra_lijf(B, sk, kop):
 
 
 def extra_haar(B, sk, kop):
-    BD.knot(B, sk, kop)
+    """Naar achteren gekamd in een opgerolde knot."""
+    import numpy as np
+    c = BD.knot_spiraal(B, sk, plek=(0, 0.1, 0.125), r=0.05, buis=0.021, slagen=1.8)
+    doel = c - kop.Ch
+    for i, ph in enumerate(np.linspace(-2.6, 2.6, 13)):
+        tb = kop.theta_bij_z(ph, kop.haargrens(ph) + 0.004 * kop.k, lambda t, p: kop.haarpunt(t, p, False))
+        van = kop.haarpunt(tb, ph, False) - kop.Ch
+        BD.lok_tussen(B, sk, van, doel + np.array([0.02 * np.sin(ph), -0.01, 0]) * kop.k, 0.028, 0.0045, n=8,
+                      licht=0.92 + 0.16 * ((i * 3) % 5) / 4, seed=i, tip=0.6, kaart=1.25, verleng=0.0)
+    # losse pluisjes bij de slapen en in de nek
+    rng = np.random.default_rng(3)
+    for ph in (0.95, -0.95, 1.25, -1.25, 2.9, -2.9, 3.14):
+        tb = kop.theta_bij_z(ph, kop.haargrens(ph) + 0.01 * kop.k, lambda t, p: kop.haarpunt(t, p, False))
+        q = kop.haarpunt(tb, ph, False, 0.002 * kop.k)
+        u = BD.straal(kop, q)
+        d = np.array([0, 0, -1.0]) + u * 0.5 + rng.normal(size=3) * 0.2
+        pad = [q + d * 0.03 * kop.k * t + u * 0.004 * kop.k * t for t in np.linspace(0, 1, 4)]
+        BD.haarkaart(B, sk, pad, 0.008 * kop.k, nrm=[u] * 4, tip=0.3)
 
 
 def bouw(sk, coll):
     sk.stof = {"jasje": dict(weef=0.0045, vlek=0.16, kraag=0.88, manchet="manchet"),
                "jurk": dict(weef=0.004, vlek=0.14, vuil=0.55, vuil_hoogte=0.2)}
-    sk.haarstijl = {"kruin": (0, 0.115, 0.0), "strengen": 70, "warm": (0.0, 0.0, 0.02)}
+    sk.rok_kuit = 0.68                                  # lange rok volgt het scheenbeen: laars blijft eronder
     d = {}
     d["jasje"] = BD.bouw_kledij(sk, coll, "jasje", JASJE, mouw_dik=1.02, mouw_wijd=1.12, manchet=6)
     d["jurk"] = BD.bouw_kledij(sk, coll, "jurk", JURK, mouwen=False, kraag=(0.012,))
@@ -140,6 +154,11 @@ def bouw(sk, coll):
     d["laarzen"] = BD.bouw_laarzen(sk, coll)
     d["lijf"] = BD.bouw_lijf(sk, coll, kopvorm=KOP, extra=extra_lijf)
     d["haar"] = BD.bouw_haar_glad(sk, coll, extra=extra_haar)
+    import numpy as np
+    knot = sk.kop.C + np.array([0, 0.1, 0.125]) * sk.kop.k - sk.kop.Ch
+    BD.schil_strengen(sk, 200 if BB.SNEL else 460, BD.naar_grens(sk.kop, 0.002), BD.rond(knot, 0.08), seed=4,
+                      dikte=(0.0011, 0.0016))
+    BD.haar_hoog(sk, KLEUR["haar"], donker=0.75, punt=1.12, warm=0.03)
     d["kraag"] = BD.bouw_kraag(sk, coll, "kraag", z0=sk.z(0.992), r_in=0.064, r_uit=0.13, zak=0.045, plooien=14,
                                plooi=0.0, schulp=0.018, hoog_=0.008)
     d["prop_staf"] = BD.bouw_staf(sk, coll, lengte=0.66, ranken=1, bladeren=16, krul=False, seed=7, dik=1.05)
@@ -150,7 +169,7 @@ OUDERE_VROUW = BB.Personage(
     "oudere_vrouw", MAAT_OUD, DELEN, SOORT, TINTBAAR, VAST, TEXEL, KLEUR, bouw, texel_regio=TEXEL_REGIO,
     bak_ext={"haar": (0.01, 0.03), "laarzen": (0.005, 0.02), "jasje": (0.006, 0.02), "jurk": (0.006, 0.02),
              "riem": (0.004, 0.015), "lijf": (0.008, 0.025), "kraag": (0.004, 0.012), "prop_staf": (0.004, 0.012)},
-    kleurbak=(), sprites=("elderf", "elderf"),
+    kleurbak=("haar",), sprites=("elderf", "elderf"),
     na_animatie=na_animatie,
     extra={"bust": "bust17", "weefsel": ("jasje", "jurk"), "haardelen": ("haar",),
            "prop_delen": {"prop_staf": "prop_L"}, "zichtbare_props": ("prop_staf",),
