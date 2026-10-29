@@ -16,6 +16,8 @@ Alles van Poly Haven, licentie **CC0** (publiek domein, geen naamsvermelding nod
 | farm_soil | akkergrond (2026-10-29) | https://polyhaven.com/a/farm_soil |
 | forest_ground_04 | ondergrond van de terreintexturen gras en bosgrond (2026-10-29) | https://polyhaven.com/a/forest_ground_04 |
 | clay_roof_tiles | dakpannen van de bron, paars gemaakt (2026-10-29) | https://polyhaven.com/a/clay_roof_tiles |
+| white_plaster_rough_01 | kalkpleister gereedschapsloods en molen (2026-10-29) | https://polyhaven.com/a/white_plaster_rough_01 |
+| rusty_metal_02 | aambeeld van de gereedschapsloods, naaf van de molen (2026-10-29) | https://polyhaven.com/a/rusty_metal_02 |
 
 Natuur (`../natuur/`) gebruikt ook rock_surface (rotsen, bron, poort), mossy_rock (mos op rotsen),
 rough_wood (hek, vlaggenstok) en weathered_brown_planks (deuren); alles daar staat in `natuur/README.md`.
