@@ -230,6 +230,73 @@ func _initialize() -> void:
 	v2.tik(v2.tik_dt)
 	_check(v2.uitslag == "verloren", "1 dorpeling: verloren")
 
+	# gezin: alleen met een vrij bed; stel naar de hut, 12 s binnen, baby 5 s op de arm, kind 150 s
+	var gz := Wereld.new()
+	gz.laad()
+	var hutten := 0
+	for y in range(40, 92, 5):
+		for x in range(84, 126, 5):
+			if hutten >= 3:
+				break
+			var hp := gz.maak_plan(&"hut", Vector2i(x, y), 0)
+			if hp != null and gz.bereik[gz.raster.idx(hp.deur_tegel().x, hp.deur_tegel().y)] == 1 and gz.plan_zet(hp):
+				gz._rond_af(hp)
+				hutten += 1
+	_check(hutten == 3 and gz.bedden() == 6, "3 hutten = 6 bedden (%d)" % gz.bedden())
+	for i in 50:
+		gz.tik(gz.tik_dt)
+	_check(gz.wiegen.is_empty(), "6 mensen in 6 bedden: geen gezin")
+	var vierde: Plan = null
+	for y in range(40, 92, 5):
+		for x in range(84, 126, 5):
+			if vierde == null:
+				var hp := gz.maak_plan(&"hut", Vector2i(x, y), 1)
+				if hp != null and gz.bereik[gz.raster.idx(hp.deur_tegel().x, hp.deur_tegel().y)] == 1 and gz.plan_zet(hp):
+					gz._rond_af(hp)
+					vierde = hp
+	var wtikken := 0
+	while gz.wiegen.is_empty() and wtikken < 600:
+		gz.tik(gz.tik_dt)
+		wtikken += 1
+	_check(gz.wiegen.size() == 1 and gz.ruimte() == 1, "vierde hut: een stel gaat na %.1f s naar binnen, het tweede wacht (ruimte %d)" % [wtikken * gz.tik_dt, gz.ruimte()])
+	var gtikken := 0
+	while gz.dorpelingen.size() == 6 and gtikken < 6000:
+		gz.tik(gz.tik_dt)
+		gtikken += 1
+	_check(gz.dorpelingen.size() == 7, "kind geboren na %.0f s" % (gtikken * gz.tik_dt))
+	var nieuw: Dorpeling = gz.dorpelingen[6]
+	_check(nieuw.leeftijd == "kind" and gz.raster.loopbaar_v(nieuw.tegel()), "nieuwe dorpeling is een kind op een loopbare tegel")
+	_check(gz.ruimte() + gz.wiegen.size() == 1, "na de geboorte: 1 bed over of al door het tweede stel genomen")
+	for i in int(151.0 / gz.tik_dt):
+		gz.tik(gz.tik_dt)
+	_check(nieuw.leeftijd == "volwassen", "kind is na 150 s volwassen")
+	var ouders := 0
+	for dl in gz.dorpelingen:
+		if dl.rust > 0.0 or not dl.wieg.is_empty():
+			ouders += 1
+	_check(ouders >= 1, "ouders en nieuwe volwassene rusten of zitten in een nieuw gezin (%d)" % ouders)
+	# een bevel van de speler breekt een gezin af (eerst een vijfde hut, anders is er geen bed meer)
+	for y in range(40, 92, 5):
+		for x in range(84, 126, 5):
+			var hp := gz.maak_plan(&"hut", Vector2i(x, y), 2)
+			if hp != null and gz.bereik[gz.raster.idx(hp.deur_tegel().x, hp.deur_tegel().y)] == 1 and gz.plan_zet(hp):
+				gz._rond_af(hp)
+				break
+		if gz.ruimte() > 0:
+			break
+	var lopend: Dictionary = {}
+	for i in 3000:
+		if not gz.wiegen.is_empty():
+			lopend = gz.wiegen[0]
+			break
+		gz.tik(gz.tik_dt)
+	if not lopend.is_empty():
+		var vd: Dorpeling = lopend["vader"]
+		gz.geef_bevel([vd.id], "loop", gz.kampvuur + Vector2i(2, 2))
+		_check(gz.wiegen.is_empty() and vd.wieg.is_empty() and not vd.binnen, "loopbevel breekt het gezin af")
+	else:
+		_check(false, "tweede gezin gevonden om af te breken")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

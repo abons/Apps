@@ -72,8 +72,8 @@ func _process(_dt: float) -> void:
 	var weer := "regen" if w.regent() else "droog"
 	var doel: Dictionary = w.spel.get("missie", {})
 	label.text = "%02d:%02d%s  dag %d  %s  %s
-kas: %d   dorpelingen: %d/%d   koeien: %d/%d
+kas: %d   dorpelingen: %d/%d   koeien: %d/%d   bedden: %d
 geselecteerd: %d   tempo: %s" % [
 		h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer,
-		w.kas, w.dorpelingen.size(), int(doel.get("dorpelingen", 0)), w.eigen_koeien(), int(doel.get("koeien", 0)),
+		w.kas, w.dorpelingen.size(), int(doel.get("dorpelingen", 0)), w.eigen_koeien(), int(doel.get("koeien", 0)), w.bedden(),
 		bestuur.gekozen.size(), tempo]

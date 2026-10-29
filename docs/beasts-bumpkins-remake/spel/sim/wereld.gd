@@ -16,6 +16,8 @@ signal plan_klaar(plan: Plan)
 signal koe_erbij(koe: Vee)
 signal koe_geclaimd(koe: Vee)
 signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
+signal dorpeling_erbij(d: Dorpeling)      ## een kind is geboren
+signal volwassen_geworden(d: Dorpeling)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -34,6 +36,7 @@ var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
 var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 171), (-1,-1) = geen
 var _generator_t := 0.0
 var _volgende_koe_id := 1
+var wiegen: Array[Dictionary] = []        # {moeder, vader, hut: Plan, wacht}
 var kampvuur := Vector2i.ZERO
 var bereik := PackedByteArray()          # tegels bereikbaar vanaf het kampvuur
 var _onbekend_gemeld := {}               # tegelnamen die al een waarschuwing gaven
@@ -228,7 +231,151 @@ func tik(dt: float) -> void:
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
 	_werk_generator(dt)
+	_gezin(dt)
 	_check_missie()
+
+
+# ---------------------------------------------------------------- gezin (port van beasts-src World.family)
+
+## Bedden van afgebouwde hutten.
+func bedden() -> int:
+	var n := 0
+	for p in plannen:
+		if p.klaar and p.soort == &"hut":
+			n += int(spel["gezin"]["bedden_per_hut"])
+	return n
+
+
+## Plek voor nog een kind: bedden min iedereen, min de wiegen en de baby's die er al aan komen (beasts-src
+## roomToGrowOf; zonder de wiegen kiezen twee paren in dezelfde tik hetzelfde laatste bed).
+func ruimte() -> int:
+	var n := bedden() - dorpelingen.size() - wiegen.size()
+	for d in dorpelingen:
+		if d.baby > 0.0:
+			n -= 1
+	return n
+
+
+func _gezin(dt: float) -> void:
+	var g: Dictionary = spel["gezin"]
+	for i in dorpelingen.size():          # op index: een geboorte voegt er een toe
+		var d := dorpelingen[i]
+		d.rust = maxf(0.0, d.rust - dt)
+		if d.groeit > 0.0:
+			d.groeit = maxf(0.0, d.groeit - dt)
+			if d.groeit <= 0.0:
+				d.leeftijd = "volwassen"
+				d.rust = float(g["ouder_rust_s"])   # net volwassen en meteen een gezin is een sneeuwbal
+				volwassen_geworden.emit(d)
+		if d.baby > 0.0:
+			d.baby = maxf(0.0, d.baby - dt)
+			if d.baby <= 0.0:
+				_geboren(d)
+	for wg in wiegen.duplicate():
+		var m: Dorpeling = wg["moeder"]
+		var v: Dorpeling = wg["vader"]
+		if not (m.binnen and v.binnen):
+			continue
+		wg["wacht"] -= dt
+		if wg["wacht"] <= 0.0:
+			_baring(wg)
+	_zoek_paar()
+
+
+## Een vrije man en vrouw en een vrije hut: samen naar binnen.
+func _zoek_paar() -> void:
+	if ruimte() <= 0:
+		return
+	var man: Dorpeling = null
+	var vrouw: Dorpeling = null
+	for d in dorpelingen:
+		if not d.vrij_voor_gezin():
+			continue
+		if d.geslacht == "man" and man == null:
+			man = d
+		elif d.geslacht == "vrouw" and vrouw == null:
+			vrouw = d
+	if man == null or vrouw == null:
+		return
+	var hut: Plan = null
+	var beste := INF
+	for p in plannen:
+		if not p.klaar or p.soort != &"hut" or _hut_bezet(p):
+			continue
+		var af := vrouw.pos.distance_squared_to(Vector2(p.deur_tegel()))
+		if af < beste:
+			beste = af
+			hut = p
+	if hut == null:
+		return
+	var deur := dichtstbij_loopbaar(hut.deur_tegel())
+	var wg := {"moeder": vrouw, "vader": man, "hut": hut, "wacht": float(spel["gezin"]["wieg_s"]), "deur": deur}
+	vrouw.wieg = wg
+	man.wieg = wg
+	if not (vrouw.geef_bevel(self, "huis", deur) and man.geef_bevel(self, "huis", deur)):
+		annuleer_wieg(wg)
+		return
+	wiegen.append(wg)
+
+
+func _hut_bezet(p: Plan) -> bool:
+	for wg in wiegen:
+		if wg["hut"] == p:
+			return true
+	return false
+
+
+## Het gezin gaat niet door (bevel van de speler): wie binnen zit komt naar buiten.
+func annuleer_wieg(wg: Dictionary) -> void:
+	wiegen.erase(wg)
+	for k in ["moeder", "vader"]:
+		var d: Dorpeling = wg[k]
+		d.wieg = {}
+		if d.binnen:
+			d.binnen = false
+		elif d.bevel.get("soort", "") == "huis":
+			d.route.clear()
+			d.bevel = {}
+
+
+## Zij komt met de baby op de arm naar buiten, hij een tegel verder (beasts-src birth: niet op elkaar).
+func _baring(wg: Dictionary) -> void:
+	wiegen.erase(wg)
+	var g: Dictionary = spel["gezin"]
+	var m: Dorpeling = wg["moeder"]
+	var v: Dorpeling = wg["vader"]
+	var plekken := spreid(wg["deur"], 2)
+	for d in [m, v]:
+		d.wieg = {}
+		d.binnen = false
+		d.rust = float(g["ouder_rust_s"])
+		d.anker = wg["deur"]
+	m.zet_tegel(plekken[0] if plekken.size() > 0 else wg["deur"])
+	v.zet_tegel(plekken[1] if plekken.size() > 1 else wg["deur"])
+	m.baby = float(g["baby_s"])
+
+
+## De baby is een kind: jongen of meisje uit een hash van tegel en aantal (geen rng: hetzelfde spel, hetzelfde kind).
+func _geboren(moeder: Dorpeling) -> void:
+	var g: Dictionary = spel["gezin"]
+	var d := Dorpeling.new()
+	var hoogste := 0
+	for x in dorpelingen:
+		hoogste = maxi(hoogste, x.id)
+	d.id = hoogste + 1
+	d.naam = "dorpeling%d" % d.id
+	var t := moeder.tegel()
+	var meisje := _hash2(t.x * 7 + dorpelingen.size(), t.y * 13 + 3) < 0.5
+	d.geslacht = "vrouw" if meisje else "man"
+	d.leeftijd = "kind"
+	d.sex_ruw = 14 if meisje else 13
+	d.groeit = float(g["opgroeien_s"])
+	var plek := spreid(t, 2)
+	d.zet_tegel(plek[1] if plek.size() > 1 else t)
+	d.anker = kampvuur
+	d.wacht = 2.0
+	dorpelingen.append(d)
+	dorpeling_erbij.emit(d)
 
 
 # ---------------------------------------------------------------- koeien en missie

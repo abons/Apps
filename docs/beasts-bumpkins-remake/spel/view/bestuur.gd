@@ -73,7 +73,7 @@ func kies_in_rechthoek(r: Rect2, toevoegen := false) -> void:
 	if not toevoegen:
 		gekozen.clear()
 	for d in w.dorpelingen:
-		if _voor_camera(d.id) and r.has_point(_scherm(d.id)) and not d.id in gekozen:
+		if not d.binnen and _voor_camera(d.id) and r.has_point(_scherm(d.id)) and not d.id in gekozen:
 			gekozen.append(d.id)
 	view.gekozen = gekozen
 
@@ -83,7 +83,7 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 	var beste := -1
 	var bd := PICK_PX
 	for d in w.dorpelingen:
-		if not _voor_camera(d.id):
+		if d.binnen or not _voor_camera(d.id):
 			continue
 		var af := _scherm(d.id).distance_to(pos)
 		if af < bd:

@@ -39,26 +39,14 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	_ring_mat.no_depth_test = false
 
 	for d in w.dorpelingen:
-		var b := Bumpkin.new()
-		b.name = "Dorpeling_%d" % d.id
-		var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd)
-		if g != "":
-			b.glb = g
-		elif d.leeftijd == "kind":
-			b.scale = Vector3.ONE * 0.81         # terugval op de man; lijst.md: kind 0,81x
-		add_child(b)
-		var ring := MeshInstance3D.new()
-		ring.name = "Selectiering"
-		ring.mesh = _ring_mesh
-		ring.material_override = _ring_mat
-		ring.scale = Vector3(1, 0.25, 1)
-		ring.position.y = 0.06
-		ring.visible = false
-		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		b.add_child(ring)
-		units[d.id] = {"bump": b, "ring": ring}
-		b.volg(_wereld_pos(d, 0.0), 0.0)
-		b.kijk_naar(Vector3(0, 0, 1), true)
+		_maak_unit(d)
+	w.dorpeling_erbij.connect(_maak_unit)
+	w.volwassen_geworden.connect(func(d: Dorpeling) -> void:   # jongen/meisje-glb wordt man/vrouw
+		var oud: Bumpkin = units[d.id]["bump"]
+		var yaw := oud.rotation.y
+		oud.queue_free()
+		_maak_unit(d)
+		(units[d.id]["bump"] as Node3D).rotation.y = yaw)
 
 	_pad = MeshInstance3D.new()
 	_pad.name = "Looppad"
@@ -79,6 +67,43 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	w.koe_geclaimd.connect(func(k: Vee) -> void:
 		if koeien.has(k.id):
 			Koe.zet_eigen(koeien[k.id], k.eigenaar == 0))
+
+
+func _maak_unit(d: Dorpeling) -> void:
+	var b := Bumpkin.new()
+	b.name = "Dorpeling_%d" % d.id
+	var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd)
+	if g != "":
+		b.glb = g
+	elif d.leeftijd == "kind":
+		b.scale = Vector3.ONE * 0.81         # terugval op de man; lijst.md: kind 0,81x
+	add_child(b)
+	var ring := MeshInstance3D.new()
+	ring.name = "Selectiering"
+	ring.mesh = _ring_mesh
+	ring.material_override = _ring_mat
+	ring.scale = Vector3(1, 0.25, 1)
+	ring.position.y = 0.06
+	ring.visible = false
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.add_child(ring)
+	# de baby op de arm (beasts-src BABY_SHOW): een bundeltje voor de borst, alleen zolang d.baby > 0
+	var bundel := MeshInstance3D.new()
+	bundel.name = "Baby"
+	var cm := CapsuleMesh.new()
+	cm.radius = 0.09
+	cm.height = 0.34
+	bundel.mesh = cm
+	var bm := StandardMaterial3D.new()
+	bm.albedo_color = Color(0.93, 0.9, 0.82)
+	bundel.material_override = bm
+	bundel.rotation.z = PI * 0.5
+	bundel.position = Vector3(0, 0.85, 0.2)
+	bundel.visible = false
+	b.add_child(bundel)
+	units[d.id] = {"bump": b, "ring": ring, "baby": bundel}
+	b.volg(_wereld_pos(d, 0.0), 0.0)
+	b.kijk_naar(Vector3(0, 0, 1), true)
 
 
 func _maak_koe(k: Vee) -> void:
@@ -139,7 +164,9 @@ func _process(dt: float) -> void:
 		b.volg(_wereld_pos(d, a), v)
 		b.werk(d.bouwt and not w.gepauzeerd)
 		b.zet_nacht(donker)
+		b.visible = not d.binnen
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
+		(u["baby"] as MeshInstance3D).visible = d.baby > 0.0
 	_werk_koeien(a, dt)
 	_werk_pad()
 	_werk_markeringen(dt)

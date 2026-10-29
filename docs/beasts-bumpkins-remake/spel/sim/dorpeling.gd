@@ -16,6 +16,11 @@ var anker := Vector2i.ZERO    ## zwerfmiddelpunt: het kampvuur, na een bevel de 
 var wacht := 2.0
 var werk_plan: Plan = null   ## bouwplek waar hij heen loopt en aan werkt
 var doel_koe: Vee = null     ## koe die hij gaat claimen (bevel "claim")
+var wieg: Dictionary = {}     ## gezin dat hij met een partner in een hut sticht (Wereld._gezin), {} = geen
+var binnen := false          ## in de hut (onzichtbaar, staat stil op de deurtegel)
+var rust := 0.0              ## s tot hij weer aan een gezin begint (ouder of net volwassen)
+var baby := 0.0              ## s dat de moeder de baby nog draagt; daarna staat het kind er
+var groeit := 0.0            ## s tot het kind volwassen is
 var bouwt := false           ## in deze tik aan het bouwen (view: hamerlus)
 var snelheid_mps := 0.0       ## werkelijke loopsnelheid in deze tik, m/s incl. looptempo (0 = stil)
 
@@ -24,9 +29,15 @@ func volwassen() -> bool:
 	return leeftijd == "volwassen"
 
 
-## Lopen kan iedereen; vechten, werken en koeien claimen alleen volwassenen.
+## Lopen kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
 	return soort == "loop" or volwassen()
+
+
+## Vrij voor een gezin: volwassen, uitgerust, zonder bevel, bouwklus, koe of wieg, en geen baby op de arm.
+func vrij_voor_gezin() -> bool:
+	return volwassen() and rust <= 0.0 and bevel.is_empty() and route.is_empty() and werk_plan == null \
+		and doel_koe == null and wieg.is_empty() and baby <= 0.0 and not binnen
 
 
 func tegel() -> Vector2i:
@@ -41,6 +52,9 @@ func zet_tegel(t: Vector2i) -> void:
 func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	if not kan_bevel(soort):
 		return false
+	if soort != "huis" and not wieg.is_empty():   # een bevel van de speler breekt het gezin af
+		w.annuleer_wieg(wieg)
+	binnen = false
 	werk_plan = null
 	if doel_koe != null:          # een nieuw bevel laat de koe die hij ging claimen weer vrij
 		doel_koe.vast = false
@@ -51,6 +65,7 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	route = Router.glad(w.raster, pos, r)
 	bevel = {"soort": soort, "doel": doel}
 	if r.is_empty():
+		binnen = soort == "huis"
 		_klaar()
 	return true
 
@@ -65,12 +80,14 @@ func tick(w: Wereld, dt: float) -> void:
 	vorige = pos
 	snelheid_mps = 0.0
 	bouwt = false
+	if binnen:
+		return
 	if route.is_empty():
 		if werk_plan != null and not werk_plan.klaar:
 			bouwt = true
 			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt / werk_plan.bouwtijd_s)
 			return
-		if bevel.is_empty():
+		if bevel.is_empty() and baby <= 0.0:    # met de baby op de arm blijft ze staan
 			_zwerf(w, dt)
 		return
 	var rest := dt
@@ -98,6 +115,8 @@ func tick(w: Wereld, dt: float) -> void:
 	if route.is_empty():
 		if doel_koe != null:
 			w.claim_aangekomen(self)
+		if bevel.get("soort", "") == "huis":
+			binnen = true
 		_klaar()
 
 
