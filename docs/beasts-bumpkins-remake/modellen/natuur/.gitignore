@@ -1,0 +1,4 @@
+*.glb
+textures/
+preview/
+__pycache__/
