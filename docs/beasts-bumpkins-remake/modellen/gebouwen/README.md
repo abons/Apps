@@ -66,7 +66,7 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
 - Maat: begane grond 2,3 x 1,9 m (stijlen), verdieping 3,65 x 2,47 m, muurplaat 3,45 m, nok 4,1 m;
   het aambeeld is 8,9 m lang (hoorn tot x = -3,6 m buiten de gevel, hiel 1,8 m uit de andere).
   Teruggerekend uit `toolshed.png` (162x129).
-- Driehoeken: LOD0 ~75,6k, LOD1 ~0,3k. Atlassen per groep (steen, dak, hout 2048; ijzer, pleister,
+- Driehoeken: LOD0 ~79k, LOD1 ~0,4k. Atlassen per groep (steen, dak, hout 2048; ijzer, pleister,
   rest 1024).
 - Ankers: `deur` (scharnier, open naar buiten met `rotation.z = dicht - hoek` om lokaal Z in Blender,
   lokaal Y in Godot; max. **100°**), `deur_drempel` (looppunt voor de deur), `werkplek` (onder de
@@ -98,5 +98,5 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
 
 | gebouw | LOD0 | LOD1 |
 | --- | --- | --- |
-| gereedschapsloods | ~75,6k | ~0,3k |
+| gereedschapsloods | ~79k | ~0,4k |
 | molen | ~75k | ~0,5k |
