@@ -1,0 +1,40 @@
+{
+  "idle": {
+    "loop": true,
+    "duur_s": 3.0,
+    "snelheid_mps": 0.0,
+    "impact_s": null
+  },
+  "lopen": {
+    "loop": true,
+    "duur_s": 1.0,
+    "snelheid_mps": 0.8491,
+    "impact_s": null
+  },
+  "rennen": {
+    "loop": true,
+    "duur_s": 0.6667,
+    "snelheid_mps": 2.3996,
+    "impact_s": null
+  },
+  "bouwen": {
+    "loop": true,
+    "duur_s": 1.25,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.4583
+  },
+  "aanval_zwaard": {
+    "loop": false,
+    "duur_s": 1.0,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.4167
+  },
+  "aanval_steen": {
+    "loop": false,
+    "duur_s": 1.125,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.6667,
+    "release_s": 0.6667,
+    "pak_s": 0.25
+  }
+}

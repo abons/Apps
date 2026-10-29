@@ -9,7 +9,6 @@ const LOD_WISSEL := 28.0  # m: verder weg toont LOD1 (6k driehoeken) in plaats v
 const HUT_BRON := "../peasant_hut_rt.glb"  # relatief aan de projectmap, runtime-terugval
 const DAG_SECONDEN := 60.0
 const DEUR_OPEN_HOEK := deg_to_rad(-90.0)  # deur_voor draait naar buiten: negatief om lokale Y
-const LOOPSNELHEID := 1.3
 
 # Terugval (Godot-coördinaten): Blender (x,y,z) -> (x, z, -y).
 const HUT_MIDDEN := Vector3(0.65, 0.0, 0.05)
@@ -20,6 +19,12 @@ var uur := 11.0
 var winter := false
 var demo := false
 var demo_t := 0.0
+var toon := false           # --toon [--uur=N]: camera volgt de dorpeling, korte animatieshow (voor frames)
+var toon_uur := 12.0
+var toon_lijst: Array = []
+var toon_wacht := 0.0
+var toon_yaw := 0.0
+var toon_nr := 0
 var _keys: Array = []
 
 var cam: Camera3D
@@ -50,7 +55,12 @@ var kaars_niveau := 0.0
 var gevonden := {}          # voor het rapport in de log
 
 # Dorpeling
-var dorp: Node3D
+var dorp: Bumpkin
+var d_onderweg := false
+var d_aan := false
+var d_rennen := false        # R: rennen in plaats van lopen
+var hek_pos := Vector3.ZERO  # midden van het hek (demo-werkplek)
+var p_werk := Vector3.ZERO
 var d_staat := "erf"
 var d_wacht := 2.0
 var d_doel := Vector3.ZERO
@@ -73,6 +83,9 @@ func _ready() -> void:
 	_bouw_hud()
 	if demo:
 		_maak_demo()
+	toon = "--toon" in OS.get_cmdline_user_args()
+	if toon:
+		_maak_toon()
 	print("[hut3d] gevonden: ", gevonden)
 
 
@@ -415,29 +428,12 @@ func _bouw_dorpeling() -> void:
 	p_buiten = drempel + naar_buiten * 1.15 + weg * 0.35
 	p_binnen = drempel - naar_buiten * 0.9
 	p_erf = drempel + naar_buiten * 4.5 + zij * 2.0
-	dorp = Node3D.new()
+	dorp = Bumpkin.new()
 	dorp.name = "Dorpeling"
-	var lijf := MeshInstance3D.new()
-	var cap := CapsuleMesh.new()
-	cap.radius = 0.22
-	cap.height = 1.55
-	lijf.mesh = cap
-	lijf.position.y = 0.775
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.55, 0.32, 0.18)
-	m.roughness = 0.8
-	lijf.material_override = m
-	dorp.add_child(lijf)
-	var neus := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.1, 0.08, 0.14)
-	neus.mesh = bm
-	neus.position = Vector3(0, 1.38, -0.24)
-	var nm := StandardMaterial3D.new()
-	nm.albedo_color = Color(0.85, 0.65, 0.5)
-	neus.material_override = nm
-	dorp.add_child(neus)
+	dorp.aangekomen.connect(func(): d_aan = true)
+	dorp.impact.connect(func(w): print("[hut3d] impact: ", w, " t=", snappedf(demo_t, 0.1)))
 	add_child(dorp)
+	_bouw_hek(zij)
 	dorp.global_position = p_erf
 	d_staat = "erf"
 	d_wacht = 2.0
@@ -451,27 +447,56 @@ func dorp_herstart(binnen: float) -> void:
 	d_wacht = 0.0
 
 
-func _loop_naar(doel: Vector3, dt: float) -> bool:
-	var p := dorp.global_position
-	var v := doel - p
-	v.y = 0
-	var stap := LOOPSNELHEID * dt
-	if v.length() <= stap:
-		dorp.global_position = doel
+func _loop_naar(doel: Vector3, _dt: float) -> bool:
+	## Geeft true zodra de dorpeling er is; roept Bumpkin.loop_naar eenmalig aan.
+	if not d_onderweg:
+		d_onderweg = true
+		d_aan = false
+		dorp.loop_naar(doel, d_rennen)
+	elif d_aan:
+		d_onderweg = false
 		return true
-	var r := v.normalized()
-	dorp.global_position = p + r * stap
-	dorp.look_at(dorp.global_position + r, Vector3.UP)
 	return false
+
+
+func _bouw_hek(zij: Vector3) -> void:
+	hek_pos = drempel + naar_buiten * 6.0 + zij * 2.5
+	p_werk = hek_pos - naar_buiten * 0.8
+	var hm := StandardMaterial3D.new()
+	hm.albedo_color = Color(0.36, 0.25, 0.15)
+	hm.roughness = 0.9
+	var hek := Node3D.new()
+	hek.name = "Hek"
+	add_child(hek)
+	hek.global_position = hek_pos
+	hek.look_at(hek_pos + naar_buiten, Vector3.UP)   # lokale X langs het hek
+	for i in 4:
+		var paal := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.12, 1.1, 0.12)
+		paal.mesh = bm
+		paal.material_override = hm
+		paal.position = Vector3(-1.5 + i * 1.0, 0.55, 0)
+		hek.add_child(paal)
+	for h in [0.45, 0.85]:
+		var rail := MeshInstance3D.new()
+		var rm := BoxMesh.new()
+		rm.size = Vector3(3.1, 0.09, 0.06)
+		rail.mesh = rm
+		rail.material_override = hm
+		rail.position = Vector3(0, h, -0.08)
+		hek.add_child(rail)
 
 
 func _dorp_stap(dt: float) -> void:
 	match d_staat:
 		"erf":
-			d_wacht -= dt
+			if not dorp.werkt() and not dorp.aanvallend():
+				d_wacht -= dt
 			if d_wacht <= 0: d_staat = "naar_deur"
 		"naar_deur":
 			if _loop_naar(p_buiten, dt):
+				dorp.kijk_naar(-naar_buiten)
 				deur_doel = 1.0; d_staat = "wacht_open_in"
 		"wacht_open_in":
 			if deur_open > 0.95: d_staat = "naar_binnen"
@@ -487,17 +512,36 @@ func _dorp_stap(dt: float) -> void:
 				deur_doel = 1.0; d_staat = "wacht_open_uit"
 		"wacht_open_uit":
 			if deur_open > 0.95:
-				dorp.look_at(dorp.global_position + naar_buiten, Vector3.UP)
+				dorp.kijk_naar(naar_buiten, true)
 				d_staat = "naar_buiten"
 		"naar_buiten":
 			var klaar := _loop_naar(p_buiten, dt)
 			if (dorp.global_position - drempel).dot(naar_buiten) > -0.35:
 				dorp.visible = true
 			if klaar:
-				deur_doel = 0.0; d_staat = "naar_erf"
+				deur_doel = 0.0
+				d_staat = "naar_hek" if demo else "naar_erf"
 		"naar_erf":
 			if _loop_naar(p_erf, dt):
 				d_staat = "erf"; d_wacht = 5.0
+		# Autopiloot: dageraad, naar het hek, bouwen, zwaard, steen.
+		"naar_hek":
+			if _loop_naar(p_werk, dt):
+				dorp.kijk_naar(naar_buiten)
+				dorp.werk(true)
+				d_staat = "bouwen"; d_wacht = 4.5
+		"bouwen":
+			d_wacht -= dt
+			if d_wacht <= 0:
+				dorp.val_aan()
+				d_staat = "zwaai"
+		"zwaai":
+			if not dorp.aanvallend():
+				dorp.gooi_steen(hek_pos + Vector3(0.3, 0.7, 0))
+				d_staat = "gooi"
+		"gooi":
+			if not dorp.aanvallend() and not dorp.gooit():
+				d_staat = "klaar"
 
 
 func dorp_binnen() -> bool:
@@ -543,7 +587,22 @@ func _unhandled_input(e: InputEvent) -> void:
 		match e.keycode:
 			KEY_T: uur = fmod(uur + 3.0, 24.0)
 			KEY_F: winter = not winter
+			KEY_R: d_rennen = not d_rennen
+			KEY_B: dorp.werk(not dorp.werkt())
+			KEY_V: dorp.val_aan()
+			KEY_G: _gooi_naar_muis()
 			KEY_ESCAPE: get_tree().quit()
+
+
+func _gooi_naar_muis() -> void:
+	var m := get_viewport().get_mouse_position()
+	var o := cam.project_ray_origin(m)
+	var r := cam.project_ray_normal(m)
+	if absf(r.y) < 0.001:
+		return
+	var t := -o.y / r.y
+	if t > 0.0:
+		dorp.gooi_steen(o + r * t)
 
 
 # ---------------------------------------------------------------- tijd en licht
@@ -624,6 +683,7 @@ func _werk_licht() -> void:
 
 func _werk_kaars(el: float) -> void:
 	var donker := 1.0 - smoothstep(2.0, 10.0, el)
+	dorp.zet_nacht(donker)
 	var doel := donker if dorp_binnen() else 0.0
 	var dt := get_process_delta_time()
 	kaars_niveau = move_toward(kaars_niveau, doel, dt * 0.8)
@@ -642,7 +702,9 @@ func _werk_kaars(el: float) -> void:
 # ---------------------------------------------------------------- lus
 
 func _process(dt: float) -> void:
-	if demo:
+	if toon:
+		_toon_stap(dt)
+	elif demo:
 		_demo_stap(dt)
 	else:
 		uur = fmod(uur + dt * 24.0 / DAG_SECONDEN, 24.0)
@@ -654,7 +716,7 @@ func _process(dt: float) -> void:
 	_werk_licht()
 	var h := int(fposmod(uur, 24.0))
 	var mi := int(fposmod(uur, 1.0) * 60.0)
-	label.text = "%02d:%02d  ·  %s  ·  %s\n[T] +3 uur   [F] seizoen   wiel: zoom   rechts/midden slepen: draaien\nlinks slepen / WASD / rand: pannen   Q/E draaien   PgUp/PgDn kantelen" % [
+	label.text = "%02d:%02d  ·  %s  ·  %s\n[T] +3 uur  [F] seizoen  [R] rennen  [B] bouwen  [V] zwaard  [G] steen  wiel: zoom   rechts/midden slepen: draaien\nlinks slepen / WASD / rand: pannen   Q/E draaien   PgUp/PgDn kantelen" % [
 		h, mi, "winter" if winter else "zomer", d_staat]
 
 
@@ -679,6 +741,8 @@ func _maak_demo() -> void:
 		[38.0, 26.3, dfocus, yd + 0.3, 16.0, 5.5],
 		[40.0, 28.6, c, yd + 1.2, 30.0, 16.0],
 		[46.0, 30.2, c, yd + 1.5, 28.0, 18.0],
+		[50.0, 30.5, hek_pos, yd + 0.7, 22.0, 9.0],
+		[62.0, 31.2, hek_pos, yd + 0.5, 20.0, 7.0],
 	]
 	dorp.global_position = p_erf
 	d_staat = "erf"
@@ -704,3 +768,48 @@ func _zet_demo(t: float) -> void:
 	uur = lerpf(a[1], b[1], clampf(inverse_lerp(a[0], b[0], t), 0.0, 1.0))
 	cam.zet_direct((a[2] as Vector3).lerp(b[2], f), lerpf(a[3], b[3], f),
 		deg_to_rad(lerpf(a[4], b[4], f)), exp(lerpf(log(a[5]), log(b[5]), f)))
+
+
+# ---------------------------------------------------------------- toonbank (--toon)
+
+func _maak_toon() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--uur="):
+			toon_uur = float(a.substr(6))
+		if a.begins_with("--yaw="):
+			toon_yaw = float(a.substr(6))
+	cam.invoer_aan = false
+	d_staat = "toon"
+	var zij := naar_buiten.cross(Vector3.UP)
+	dorp.global_position = p_erf
+	dorp.kijk_naar(zij, true)
+	toon_lijst = [
+		["lopen", p_erf + zij * 4.0], ["wacht", 0.8], ["rennen", p_erf - zij * 4.0], ["wacht", 0.8],
+		["lopen", p_erf + zij * 0.5], ["wacht", 0.5],
+		["werk", 3.5], ["zwaard"], ["wacht", 0.6], ["steen", p_erf + zij * 4.0 + naar_buiten * 1.5],
+		["wacht", 1.8], ["lopen", p_erf - zij * 3.0],
+	]
+	toon_yaw += _deur_yaw()
+
+
+func _toon_stap(dt: float) -> void:
+	demo_t += dt
+	uur = toon_uur
+	cam.zet_direct(dorp.global_position + Vector3(0, 0.9, 0), toon_yaw, deg_to_rad(14), 5.0)
+	if toon_wacht > 0.0:
+		toon_wacht -= dt
+		return
+	if dorp.onderweg() or dorp.aanvallend() or dorp.gooit():
+		return
+	if toon_nr >= toon_lijst.size():
+		return
+	var c: Array = toon_lijst[toon_nr]
+	toon_nr += 1
+	print("[toon] t=", snappedf(demo_t, 0.1), " ", c)
+	match c[0]:
+		"lopen": dorp.loop_naar(c[1], false)
+		"rennen": dorp.loop_naar(c[1], true)
+		"wacht": toon_wacht = c[1]
+		"werk": dorp.werk(true); toon_wacht = c[1]
+		"zwaard": dorp.werk(false); dorp.val_aan()
+		"steen": dorp.gooi_steen(c[1])
