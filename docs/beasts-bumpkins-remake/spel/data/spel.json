@@ -1,0 +1,16 @@
+{
+  "tegel_m": 2.0,
+  "sim_hz": 10,
+  "loop_mps": 0.849,
+  "looptempo": 2.0,
+  "dag_s": 180,
+  "nacht_s": 90,
+  "seizoen_s": 270,
+  "start_seizoen": 0,
+  "start_klok_s": 60,
+  "kaart": "res://data/origineel/map1.json",
+  "kampvuur_id": 143,
+  "zwerf_straal": 4,
+  "zwerf_wacht": [3.0, 8.0],
+  "bos_dichtheid": 0.35
+}

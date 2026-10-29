@@ -1,0 +1,18 @@
+{
+  "_uitleg": "Sleutel = klasse-id uit de kaart (bb_original/objects_list.txt). model = naam van het placeholder-mesh (view/props.gd), later een glb. voetafdruk = [breed, diep] tegels vanaf (x,y). blokkeert = blokkeert de tegels voor looproutes.",
+  "objecten": {
+    "0":   {"naam": "boom_den",     "origineel": "tree",        "model": "placeholder:boom_den",   "voetafdruk": [1, 1], "blokkeert": true},
+    "5":   {"naam": "boom_rond",    "origineel": "tree",        "model": "placeholder:boom_rond",  "voetafdruk": [1, 1], "blokkeert": true},
+    "6":   {"naam": "boom_spar",    "origineel": "tree",        "model": "placeholder:boom_spar",  "voetafdruk": [1, 1], "blokkeert": true},
+    "83":  {"naam": "paddenstoel",  "origineel": "_mushroom",   "model": "placeholder:paddenstoel","voetafdruk": [1, 1], "blokkeert": false},
+    "98":  {"naam": "vlag",         "origineel": "flagpost",    "model": "placeholder:vlag",       "voetafdruk": [1, 1], "blokkeert": false},
+    "103": {"naam": "dorpeling",    "origineel": "villager",    "model": "bumpkin_man",            "voetafdruk": [1, 1], "blokkeert": false, "spawn": true},
+    "143": {"naam": "kampvuur",     "origineel": "campfire",    "model": "placeholder:kampvuur",   "voetafdruk": [1, 1], "blokkeert": true},
+    "144": {"naam": "bron",         "origineel": "spring",      "model": "placeholder:bron",       "voetafdruk": [1, 1], "blokkeert": true},
+    "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "placeholder:beker",     "voetafdruk": [1, 1], "blokkeert": false},
+    "171": {"naam": "koe_generator","origineel": "generator",   "model": "geen",                   "voetafdruk": [1, 1], "blokkeert": false},
+    "1000":{"naam": "boom_bos",     "origineel": "(gegenereerd op bosgrond)", "model": "placeholder:boom_den", "voetafdruk": [1, 1], "blokkeert": true}
+  },
+  "sex": {"1": {"geslacht": "man", "leeftijd": "volwassen"}, "2": {"geslacht": "vrouw", "leeftijd": "volwassen"},
+          "13": {"geslacht": "onbekend", "leeftijd": "kind"}, "14": {"geslacht": "onbekend", "leeftijd": "kind"}}
+}

@@ -1,0 +1,20 @@
+{
+  "_uitleg": "factor = snelheidsfactor op de tegel (1 = gras); loopbaar=false is water/rots. hoogte in m (alleen weergave). gras = gewicht voor de seizoenstint.",
+  "tegels": {
+    "leeg":     {"kleur": "#10202a", "loopbaar": false, "factor": 0.0,  "hoogte": -2.0, "gras": 0.0},
+    "water":    {"kleur": "#2f5d6e", "loopbaar": false, "factor": 0.0,  "hoogte": -2.0, "gras": 0.0},
+    "gras":     {"kleur": "#4b7a2a", "loopbaar": true,  "factor": 1.0,  "hoogte": 0.25, "gras": 1.0},
+    "pad":      {"kleur": "#8a7350", "loopbaar": true,  "factor": 1.15, "hoogte": 0.25, "gras": 0.0},
+    "aarde":    {"kleur": "#6d5538", "loopbaar": true,  "factor": 1.0,  "hoogte": 0.25, "gras": 0.0},
+    "zand":     {"kleur": "#c9b87e", "loopbaar": true,  "factor": 0.9,  "hoogte": 0.2,  "gras": 0.0},
+    "bosgrond": {"kleur": "#3c5a22", "loopbaar": true,  "factor": 0.9,  "hoogte": 0.25, "gras": 0.8},
+    "overig":   {"kleur": "#6f6a55", "loopbaar": true,  "factor": 0.95, "hoogte": 0.25, "gras": 0.2},
+    "rotsrand": {"kleur": "#6b665c", "loopbaar": false, "factor": 0.0,  "hoogte": 0.7,  "gras": 0.0},
+    "rots":     {"kleur": "#8d8a82", "loopbaar": false, "factor": 0.0,  "hoogte": 1.3,  "gras": 0.0}
+  },
+  "kind_naar_tegel": {
+    "void": "leeg", "water": "water", "grass": "gras", "dirt": "aarde", "sand": "zand",
+    "special": "bosgrond", "other": "overig", "rockrim": "rotsrand", "rock": "rots"
+  },
+  "weg_naar_tegel": {"1": "pad", "2": "pad", "6": "pad"}
+}

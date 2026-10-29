@@ -1,0 +1,6 @@
+.godot/
+*.import
+assets/
+data/origineel/
+out/
+.claude-index
