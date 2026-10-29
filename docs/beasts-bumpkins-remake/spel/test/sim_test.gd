@@ -154,6 +154,8 @@ func _initialize() -> void:
 	_check(w.maak_plan(&"hut", vrij + Vector2i(1, 1), 0) == null, "tweede hut er half overheen kan niet")
 	_check(w.maak_plan(&"hut", w.kampvuur, 0) == null, "hut op het kampvuur kan niet")
 	_check(w.maak_plan(&"molen", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
+	var lm: Vector2i = Wereld.BOUWSOORTEN[&"gereedschapsloods"]
+	_check(Plan.new(&"gereedschapsloods", Vector2i.ZERO, 1, lm.x, lm.y).afdruk().size == Vector2i(2, 5), "loods kwartslag gedraaid is 2x5")
 
 	# bouwen: een volwassene loopt naar het plan, werkt tot het klaar is, de plek wordt blokkerend
 	var bouwer: Dorpeling = null

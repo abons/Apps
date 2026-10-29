@@ -21,7 +21,9 @@ $bron = @(
     '..\modellen\bumpkin\bumpkin_meisje.glb',
     '..\modellen\bumpkin\bumpkin_oudere_man.glb',
     '..\modellen\bumpkin\bumpkin_oudere_vrouw.glb',
-    '..\modellen\bumpkin\bumpkin_anim.json')
+    '..\modellen\bumpkin\bumpkin_anim.json',
+    '..\modellen\gebouwen\gereedschapsloods_rt.glb',
+    '..\modellen\gebouwen\kippenhok_rt.glb')
 foreach ($b in $bron) {
     $src = Join-Path $PSScriptRoot $b
     if (Test-Path $src) {

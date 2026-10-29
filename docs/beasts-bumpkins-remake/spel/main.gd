@@ -157,19 +157,39 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(109, 49)) + Vector3(0, 1.0, 0), -1.1, deg_to_rad(22), 11.0)
 		"bouw":
 			# hut naast het kampvuur, alle volwassenen bouwen; tempo 4x zodat de vier standen in een korte opname passen
+			# plus een loods en een kippenhok verderop, elk door een eigen volwassene
+			var ids := []
+			for d in w.dorpelingen:
+				if d.volwassen():
+					ids.append(d.id)
 			var p := w.maak_plan(&"hut", Vector2i(100, 64), 0)
 			if p != null and w.plan_zet(p):
-				var ids := []
-				for d in w.dorpelingen:
-					ids.append(d.id)
-				w.geef_bouwbevel(ids, p)
+				w.geef_bouwbevel(ids.slice(0, 2), p)
+			var l := _vrij_plan(&"gereedschapsloods", Vector2i(106, 60))
+			if l != null and w.plan_zet(l):
+				w.geef_bouwbevel(ids.slice(2, 3), l)
+			var h := _vrij_plan(&"kippenhok", Vector2i(105, 66))
+			if h != null and w.plan_zet(h):
+				w.geef_bouwbevel(ids.slice(3, 4), h)
 			w.tempo = 4.0
-			cam.zet_direct(view.terrein.tegel_midden(Vector2i(102, 66)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(30), 16.0)
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(105, 64)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
 			w.dorpeling(3).anker = Vector2i(108, 47)
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(113, 52)), 0.3, deg_to_rad(60), 34.0)
+
+
+## Eerste plan van `soort` dat kan, in ringen rond `bij` (voor scenario's).
+func _vrij_plan(soort: StringName, bij: Vector2i) -> Plan:
+	for r in 8:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) == r:
+					var p := w.maak_plan(soort, bij + Vector2i(dx, dy), 0)
+					if p != null:
+						return p
+	return null
 
 
 func _scenario_stap() -> void:

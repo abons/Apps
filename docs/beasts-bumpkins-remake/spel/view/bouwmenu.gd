@@ -1,16 +1,21 @@
 class_name Bouwmenu
 extends Node
-## Bouwmenu (stap 5, gameplay.md §7): knop "Hut" of B, ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
+## Bouwmenu (stap 5, gameplay.md §7): een knop per gebouw in GEBOUWEN (of zijn toets), ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
 ## R draait, linkerklik plaatst een Plan in Wereld, rechterklik of Esc stopt. Shift bij het plaatsen houdt de modus aan.
 ## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
-## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de hut-glb, geschaald op
-## de voordeur (DEUR_M, iets groter dan een volwassene; terugval: bruine kist).
+## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de glb van het gebouw. De glb's
+## zijn op ware grootte (dorpeling 1,37 m); een mensendeur ("voordeur", anders "deur", >= 1 m) schaalt ze op DEUR_M,
+## iets groter dan een volwassene. Ontbreekt de glb: een bruine kist.
 ## Moet NA Bestuur in de boom staan: dan krijgt het de invoer eerst en neemt het de linkerklik van het kiezen over.
 
 const GROND_Y := 0.25
 const KLIK_DREMPEL := 6.0
-const HOOGTE := 2.4
-const HUT_GLB := "res://assets/peasant_hut_rt.glb"
+## Per bouwsoort (voetafdruk in Wereld.BOUWSOORTEN): knoptekst, toets, glb, hoogte van de kist.
+const GEBOUWEN := {
+	&"hut": {"tekst": "Hut", "toets": KEY_B, "glb": "res://assets/peasant_hut_rt.glb", "hoogte": 2.4},
+	&"gereedschapsloods": {"tekst": "Loods", "toets": KEY_L, "glb": "res://assets/gereedschapsloods_rt.glb", "hoogte": 2.4},
+	&"kippenhok": {"tekst": "Kippenhok", "toets": KEY_H, "glb": "res://assets/kippenhok_rt.glb", "hoogte": 1.2},
+}
 const STAPELS := ["houtstapel", "steenhoop"]
 const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
 const VOLWASSENE_M := 1.37     ## de man, langste volwassene (bumpkin_basis.py; vrouw en ouderen 1,31-1,33)
@@ -21,20 +26,20 @@ var bestuur: Bestuur
 var actief := false
 var soort: StringName = &"hut"
 var draai := 0
-var knop: Button
+var knoppen := {}          ## soort -> Button
 var ghost: MeshInstance3D
 var _rechts_start := Vector2.ZERO
 var _rechts := false
 var _kisten := {}          ## Plan -> kist
 var _stapels := {}         ## Plan -> [Node3D]
 var terrein: TerreinView   ## optioneel: grondhoogte voor stapels en hut (anders GROND_Y)
-var _hut_scene: PackedScene
+var _scenes := {}          ## soort -> PackedScene
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	w = wereld
 	bestuur = b
-	ghost = _kist(Color(0.3, 1.0, 0.3, 0.45))
+	ghost = _kist(soort, Color(0.3, 1.0, 0.3, 0.45))
 	ghost.visible = false
 	parent3d.add_child(ghost)
 	w.plan_gezet.connect(_toon_plan)
@@ -42,30 +47,56 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 
 	var laag := CanvasLayer.new()
 	add_child(laag)
-	knop = Button.new()
-	knop.text = "Hut (B)"
-	knop.toggle_mode = true
-	knop.add_theme_font_size_override("font_size", 18)
-	knop.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	knop.position = Vector2(-50, -56)
-	knop.focus_mode = Control.FOCUS_NONE
-	knop.toggled.connect(func(aan: bool) -> void: zet_actief(aan))
-	laag.add_child(knop)
+	var rij := HBoxContainer.new()
+	rij.add_theme_constant_override("separation", 8)
+	rij.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	rij.alignment = BoxContainer.ALIGNMENT_CENTER
+	rij.offset_top = -56
+	rij.offset_bottom = -16
+	laag.add_child(rij)
+	for s: StringName in GEBOUWEN:
+		var g: Dictionary = GEBOUWEN[s]
+		var k := Button.new()
+		k.text = "%s (%s)" % [g["tekst"], OS.get_keycode_string(g["toets"])]
+		k.toggle_mode = true
+		k.add_theme_font_size_override("font_size", 18)
+		k.focus_mode = Control.FOCUS_NONE
+		k.toggled.connect(func(aan: bool) -> void: kies(s, aan))
+		rij.add_child(k)
+		knoppen[s] = k
+
+
+## Zet de bouwmodus aan voor `s`, of uit.
+func kies(s: StringName, aan := true) -> void:
+	if aan and s != soort:
+		soort = s
+		var oud := ghost
+		ghost = _kist(soort, Color(0.3, 1.0, 0.3, 0.45))
+		oud.get_parent().add_child(ghost)
+		oud.queue_free()
+	zet_actief(aan)
 
 
 func zet_actief(aan: bool) -> void:
 	actief = aan
 	ghost.visible = aan
-	if knop.button_pressed != aan:
-		knop.set_pressed_no_signal(aan)
+	for s in knoppen:
+		var k: Button = knoppen[s]
+		var moet: bool = aan and s == soort
+		if k.button_pressed != moet:
+			k.set_pressed_no_signal(moet)
 	if aan:
 		bestuur.wis_selectie()
 
 
-func _kist(kleur: Color) -> MeshInstance3D:
+func _hoogte(s: StringName) -> float:
+	return GEBOUWEN[s]["hoogte"]
+
+
+func _kist(s: StringName, kleur: Color) -> MeshInstance3D:
 	var m := BoxMesh.new()
-	var af: Vector2i = Wereld.BOUWSOORTEN[soort]
-	m.size = Vector3(af.x * w.tegel_m, HOOGTE, af.y * w.tegel_m)
+	var af: Vector2i = Wereld.BOUWSOORTEN[s]
+	m.size = Vector3(af.x * w.tegel_m, _hoogte(s), af.y * w.tegel_m)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = kleur
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -78,7 +109,7 @@ func _kist(kleur: Color) -> MeshInstance3D:
 
 func _midden(p: Plan) -> Vector3:
 	var r := p.afdruk()
-	return Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y + HOOGTE * 0.5, (r.position.y + r.size.y * 0.5) * w.tegel_m)
+	return Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y + _hoogte(p.soort) * 0.5, (r.position.y + r.size.y * 0.5) * w.tegel_m)
 
 
 func _plan_onder(pos: Vector2) -> Plan:
@@ -100,7 +131,7 @@ func _process(_dt: float) -> void:
 			continue
 		var f: float = float(p.stand()) / Plan.STANDEN
 		k.scale.y = f
-		k.position.y = GROND_Y + HOOGTE * 0.5 * k.scale.y
+		k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
 	if not actief:
 		return
@@ -115,7 +146,7 @@ func _process(_dt: float) -> void:
 
 
 func _toon_plan(p: Plan) -> void:
-	var mi := _kist(Color(0.9, 0.8, 0.4, 0.5))
+	var mi := _kist(p.soort, Color(0.9, 0.8, 0.4, 0.5))
 	mi.position = _midden(p)
 	mi.rotation.y = p.draai * PI * 0.5
 	_kisten[p] = mi
@@ -159,7 +190,7 @@ func _stapelplekken(p: Plan, n: int) -> Array[Vector2i]:
 	return uit
 
 
-## Plan af: stapels weg, de kist wordt de hut, geschaald naar de voetafdruk (de glb heeft zijn eigen maat).
+## Plan af: stapels weg, de kist wordt het gebouw (glb op ware grootte, of op de mensendeur geschaald).
 func _plan_klaar(p: Plan) -> void:
 	for s: Node3D in _stapels.get(p, []):
 		s.queue_free()
@@ -167,22 +198,25 @@ func _plan_klaar(p: Plan) -> void:
 	var k: MeshInstance3D = _kisten.get(p)
 	if k == null:
 		return
-	if _hut_scene == null and ResourceLoader.exists(HUT_GLB):
-		_hut_scene = load(HUT_GLB)
-	if _hut_scene == null:
+	var glb: String = GEBOUWEN[p.soort]["glb"]
+	if not _scenes.has(p.soort) and ResourceLoader.exists(glb):
+		_scenes[p.soort] = load(glb)
+	if not _scenes.has(p.soort):
 		k.scale.y = 1.0
-		k.position.y = GROND_Y + HOOGTE * 0.5
+		k.position.y = GROND_Y + _hoogte(p.soort) * 0.5
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.55, 0.4, 0.25, 1.0)
 		return
-	var hut: Node3D = _hut_scene.instantiate()
+	var hut: Node3D = (_scenes[p.soort] as PackedScene).instantiate()
 	var box := _omhulsel(hut, Transform3D.IDENTITY)
 	var r := p.afdruk()
-	# Schaal uit de voordeur (mesh "voordeur"); zonder deur passend op de voetafdruk.
-	var schaal := minf(r.size.x, r.size.y) * w.tegel_m * 0.95 / maxf(box.size.x, box.size.z)
+	# Ware grootte, tenzij er een mensendeur is: dan op DEUR_M (het kippendeurtje van 0,4 m telt niet).
+	var schaal := 1.0
 	var deur := hut.find_child("voordeur", true, false)
+	if deur == null:
+		deur = hut.find_child("deur", true, false)
 	if deur != null:
 		var dh := _omhulsel_van(hut, deur).size.y
-		if dh > 0.1:
+		if dh >= 1.0:
 			schaal = DEUR_M / dh
 	hut.scale = Vector3.ONE * schaal
 	hut.rotation.y = p.draai * PI * 0.5
@@ -225,10 +259,12 @@ static func _omhulsel(n: Node, t: Transform3D) -> AABB:
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
-		if e.keycode == KEY_B:
-			zet_actief(not actief)
-			get_viewport().set_input_as_handled()
-		elif actief and e.keycode == KEY_R:
+		for s: StringName in GEBOUWEN:
+			if e.keycode == GEBOUWEN[s]["toets"]:
+				kies(s, not (actief and soort == s))
+				get_viewport().set_input_as_handled()
+				return
+		if actief and e.keycode == KEY_R:
 			draai = (draai + 1) % 4
 			get_viewport().set_input_as_handled()
 		elif actief and e.keycode == KEY_ESCAPE:
