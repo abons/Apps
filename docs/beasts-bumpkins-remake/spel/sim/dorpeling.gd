@@ -22,9 +22,10 @@ var rust := 0.0              ## s tot hij weer aan een gezin begint (ouder of ne
 var baby := 0.0              ## s dat de moeder de baby nog draagt; daarna staat het kind er
 var groeit := 0.0            ## s tot het kind volwassen is
 var trek := {}               ## waar -> s sinds hij die voor het laatst kocht (beasts-src need); kinderen kopen ook
-var draagt := ""             ## "graan" naar de molen, "melk" naar de melkerij, "" = lege handen
+var draagt := ""             ## "graan" naar de molen, "melk" naar de melkerij, "ei" naar het kippenhok, "" = lege handen
 var koopt := ""              ## waar hij voor naar de winkel loopt
 var melk_koe: Vee = null     ## koe die hij gaat melken
+var raap_kip: Kip = null     ## kip waarvan hij het ei gaat rapen
 var klus: Object = null      ## Plan (molen) of null; bij "oogst" de akker
 var klus_tegel := Vector2i(-1, -1)   ## akkertegel bij "oogst"
 var bezig := 0.0             ## s dat hij nog staat te oogsten of aan de toonbank staat
@@ -49,7 +50,7 @@ func vrij_voor_gezin() -> bool:
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
 func ledig() -> bool:
 	return bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
-		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null
+		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null
 
 
 func tegel() -> Vector2i:
@@ -66,13 +67,16 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 		return false
 	if soort != "huis" and not wieg.is_empty():   # een bevel van de speler breekt het gezin af
 		w.annuleer_wieg(wieg)
-	if not soort in ["lever", "koop", "oogst", "melk"]:
+	if not soort in ["lever", "koop", "oogst", "melk", "raap"]:
 		if klus_tegel.x >= 0:
 			w.laat_akker_los(klus_tegel)
 		if melk_koe != null:
 			melk_koe.vast = false
 			melk_koe.gemolken = false
 			melk_koe = null
+		if raap_kip != null:
+			raap_kip.vast = false
+			raap_kip = null
 		koopt = ""
 		klus = null
 		klus_tegel = Vector2i(-1, -1)
@@ -89,7 +93,7 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	bevel = {"soort": soort, "doel": doel}
 	if r.is_empty():
 		binnen = soort == "huis"
-		if soort in ["lever", "koop", "oogst", "melk"]:
+		if soort in ["lever", "koop", "oogst", "melk", "raap"]:
 			w.klus_aangekomen(self, soort)
 		_klaar()
 	return true
@@ -109,7 +113,7 @@ func tick(w: Wereld, dt: float) -> void:
 		return
 	if bezig > 0.0:
 		bezig = maxf(0.0, bezig - dt)
-		bouwt = klus_tegel.x >= 0 or melk_koe != null      # oogsten en melken: de werkclip
+		bouwt = klus_tegel.x >= 0 or melk_koe != null or raap_kip != null   # oogsten, melken, rapen: de werkclip
 		if bezig <= 0.0:
 			w.klus_af(self)
 		return
@@ -148,7 +152,7 @@ func tick(w: Wereld, dt: float) -> void:
 			w.claim_aangekomen(self)
 		if bevel.get("soort", "") == "huis":
 			binnen = true
-		elif bevel.get("soort", "") in ["lever", "koop", "oogst", "melk"]:
+		elif bevel.get("soort", "") in ["lever", "koop", "oogst", "melk", "raap"]:
 			w.klus_aangekomen(self, bevel["soort"])
 		_klaar()
 

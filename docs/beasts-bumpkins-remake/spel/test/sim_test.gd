@@ -362,6 +362,36 @@ func _initialize() -> void:
 	_check(gemolken and mkoe.leeg > 0.0, "koe gemolken, nog %.0f s leeg" % mkoe.leeg)
 	_check(gebracht, "melk naar de melkerij gebracht")
 
+	# eieren: kippenhok krijgt 3 kippen, een kip legt en blijft zitten, een volwassene raapt, het ei gaat het hok in
+	var kw := Wereld.new()
+	kw.laad()
+	var hok: Plan = null
+	for y in range(44, 90, 3):
+		for x in range(86, 124, 3):
+			if hok == null:
+				var hp := kw.maak_plan(&"kippenhok", Vector2i(x, y), 0)
+				if hp != null and kw.bereik[kw.raster.idx(hp.deur_tegel().x, hp.deur_tegel().y)] == 1 and kw.plan_zet(hp):
+					kw._rond_af(hp)
+					hok = hp
+	_check(hok != null and kw.kippen.size() == 3 and hok.voorraad == 8, "kippenhok: 3 kippen, 8 eieren")
+	var ev := hok.voorraad
+	var gelegd := false
+	var geraapt := false
+	for i in int(120.0 / kw.tik_dt):
+		kw.tik(kw.tik_dt)
+		for kp in kw.kippen:
+			if kp.ei:
+				gelegd = true
+		if hok.voorraad > ev:
+			geraapt = true
+		ev = hok.voorraad
+	_check(gelegd, "een kip heeft een ei gelegd")
+	_check(geraapt, "ei geraapt en naar het kippenhok gebracht")
+	var ver := 0
+	for kp in kw.kippen:
+		ver = maxi(ver, int(Vector2(kp.tegel()).distance_to(Vector2(kp.anker))))
+	_check(ver <= Kip.ZWERF_STRAAL + 1, "kippen blijven bij het hok (max %d tegels)" % ver)
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

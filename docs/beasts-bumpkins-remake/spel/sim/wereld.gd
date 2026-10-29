@@ -17,6 +17,7 @@ signal koe_erbij(koe: Vee)
 signal koe_geclaimd(koe: Vee)
 signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
 signal dorpeling_erbij(d: Dorpeling)      ## een kind is geboren
+signal kip_erbij(k: Kip)
 signal volwassen_geworden(d: Dorpeling)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
@@ -35,6 +36,7 @@ var raster := Raster.new()
 var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, state, sex}
 var dorpelingen: Array[Dorpeling] = []
 var vee: Array[Vee] = []
+var kippen: Array[Kip] = []
 var kas := 0
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
 var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 171), (-1,-1) = geen
@@ -234,6 +236,8 @@ func tik(dt: float) -> void:
 		d.tick(self, dt)
 	for k in vee:
 		k.tick(self, dt)
+	for k in kippen:
+		k.tick(self, dt)
 	for p in plannen:
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
@@ -246,8 +250,9 @@ func tik(dt: float) -> void:
 # ---------------------------------------------------------------- winkels: graan -> molen -> brood, melk -> melkerij (beasts-src-lus)
 
 ## Winkel per waar: wat erheen gedragen wordt en wat er gekocht wordt (beasts-src Kind.SHOP = CROP, DAIRY = MILK).
-const WINKELS := {&"molen": {"brengt": "graan", "waar": "brood"}, &"melkerij": {"brengt": "melk", "waar": "melk"}}
-const WAREN := ["brood", "melk"]
+const WINKELS := {&"molen": {"brengt": "graan", "waar": "brood"}, &"melkerij": {"brengt": "melk", "waar": "melk"},
+	&"kippenhok": {"brengt": "ei", "waar": "ei"}}
+const WAREN := ["brood", "melk", "ei"]
 
 ## Akkers groeien in lente en zomer; bij het begin van de winter sterft wat rijp staat (gameplay.md 3, Grid.wither).
 ## Koeien geven na het melken pas na `koe_leeg_s` weer melk. Elke halve seconde kiest wie niets omhanden heeft een klus:
@@ -302,6 +307,27 @@ func brood() -> int:
 
 func melk() -> int:
 	return voorraad(&"melkerij")
+
+
+func eieren() -> int:
+	return voorraad(&"kippenhok")
+
+
+## Een nieuw kippenhok krijgt zijn kippen bij de deur; elk legt pas na een eigen, verspreide eerste wachttijd.
+func _maak_kippen(hok: Plan) -> void:
+	var e: Dictionary = spel["economie"]
+	var deur := dichtstbij_loopbaar(hok.deur_tegel())
+	var plekken := spreid(deur, int(e["kippen_per_hok"]))
+	for i in plekken.size():
+		var k := Kip.new()
+		k.id = kippen.size() + 1
+		k.hok = hok
+		k.zet_tegel(plekken[i])
+		k.anker = deur
+		k.leeg = float(e["kip_leeg_s"]) * (0.5 + 0.25 * i)
+		k.wacht = rng.randf_range(0.5, 3.0)
+		kippen.append(k)
+		kip_erbij.emit(k)
 
 
 func rijp(t: Vector2i) -> bool:
@@ -376,6 +402,18 @@ func _kies_klus(d: Dorpeling) -> void:
 		if koe_best != null and d.geef_bevel(self, "melk", _naast(koe_best.tegel(), d.tegel())):
 			d.melk_koe = koe_best
 			koe_best.vast = true
+			return
+	var kip_best: Kip = null
+	var kpd := INF
+	for k in kippen:
+		if k.ei and not k.vast:
+			var af := d.pos.distance_squared_to(k.pos)
+			if af < kpd:
+				kpd = af
+				kip_best = k
+	if kip_best != null and d.geef_bevel(self, "raap", _naast(kip_best.tegel(), d.tegel())):
+		d.raap_kip = kip_best
+		kip_best.vast = true
 
 
 func laat_akker_los(t: Vector2i) -> void:
@@ -392,6 +430,7 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 			if d.melk_koe != null:
 				d.melk_koe.gemolken = true
 		"koop": d.bezig = float(e["toonbank_s"])
+		"raap": d.bezig = float(e["raap_s"])
 		_: d.bezig = 0.3
 
 
@@ -411,6 +450,14 @@ func klus_af(d: Dorpeling) -> void:
 			k.leeg = float(e["koe_leeg_s"])
 			d.draagt = "melk"
 		d.melk_koe = null
+	elif d.raap_kip != null:
+		var k := d.raap_kip
+		k.vast = false
+		if k.ei:
+			k.ei = false
+			k.leeg = float(e["kip_leeg_s"])
+			d.draagt = "ei"
+		d.raap_kip = null
 	elif d.klus is Plan:
 		var m: Plan = d.klus
 		if d.draagt != "":
@@ -928,4 +975,6 @@ func _rond_af(p: Plan) -> void:
 			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
 				d.zet_tegel(t)
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))   # nieuwe muren kunnen een doorgang afsluiten
+	if p.soort == &"kippenhok":
+		_maak_kippen(p)
 	plan_klaar.emit(p)

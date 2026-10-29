@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -183,6 +183,15 @@ func _start_scenario() -> void:
 			w.vee[0].anker = w.vee[0].tegel()
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(100, 63)) + Vector3(0, 0.6, 0), 0.6, deg_to_rad(36), 20.0)
+		"kippen":
+			# kippenhok bij het dorp; de eerste kip legt meteen, een volwassene raapt het ei en brengt het het hok in, 2x
+			var kh := _vrij_plan(&"kippenhok", Vector2i(99, 62))
+			if kh != null and w.plan_zet(kh):
+				w._rond_af(kh)
+			if not w.kippen.is_empty():
+				w.kippen[0].leeg = 3.0
+			w.tempo = 2.0
+			cam.zet_direct(view.terrein.tegel_midden(kh.deur_tegel() if kh != null else Vector2i(99, 62)) + Vector3(0, 0.3, 0), 0.6, deg_to_rad(30), 9.0)
 		"claim":
 			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
 			for d in w.dorpelingen:

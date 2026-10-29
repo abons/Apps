@@ -9,6 +9,8 @@ var regen: Regen
 var terrein: TerreinView
 var units := {}            # id -> {"bump": Bumpkin, "ring": MeshInstance3D}
 var koeien := {}           # koe-id -> Node3D
+var kippen := {}           # kip-id -> Node3D
+const DRAAG_KLEUR := {"graan": Color(0.72, 0.6, 0.38), "melk": Color(0.92, 0.92, 0.88), "ei": Color(0.72, 0.42, 0.26)}
 var gekozen: Array = []    # id's, gezet door Bestuur
 var _pad: MeshInstance3D
 var _markeringen: Array = []   # [{node, t}]
@@ -64,6 +66,9 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	for k in w.vee:
 		_maak_koe(k)
 	w.koe_erbij.connect(_maak_koe)
+	for k in w.kippen:
+		_maak_kip(k)
+	w.kip_erbij.connect(_maak_kip)
 	w.koe_geclaimd.connect(func(k: Vee) -> void:
 		if koeien.has(k.id):
 			Koe.zet_eigen(koeien[k.id], k.eigenaar == 0))
@@ -132,6 +137,38 @@ func _maak_koe(k: Vee) -> void:
 	Koe.zet_eigen(n, k.eigenaar == 0)
 
 
+func _maak_kip(k: Kip) -> void:
+	var n := KipModel.maak(float(k.id % 4) * 0.4)
+	n.name = "Kip_%d" % k.id
+	add_child(n)
+	kippen[k.id] = n
+	var p := k.pos * w.tegel_m
+	n.position = Vector3(p.x, terrein.hoogte_op(p.x, p.y), p.y)
+	n.rotation.y = float(k.id) * 1.9
+
+
+func _werk_kippen(a: float, dt: float) -> void:
+	for k in w.kippen:
+		if not kippen.has(k.id):
+			continue
+		var n: Node3D = kippen[k.id]
+		var p := k.vorige.lerp(k.pos, a) * w.tegel_m
+		var nieuw := Vector3(p.x, terrein.hoogte_op(p.x, p.y), p.y)
+		var d := nieuw - n.position
+		if Vector2(d.x, d.z).length() > 0.001:
+			n.rotation.y = lerp_angle(n.rotation.y, atan2(d.x, d.z), minf(1.0, dt * 10.0))
+		n.position = nieuw
+		var t := 0.0 if w.gepauzeerd else w.tempo
+		if k.ei:
+			KipModel.speel(n, "zitten", t)
+		elif k.snelheid_mps > 0.0:
+			KipModel.speel(n, "lopen", t)
+		elif k.pikt:
+			KipModel.speel(n, "pikken", t)
+		else:
+			KipModel.speel(n, "idle", t)
+
+
 ## Wereldpositie van een koe (voor Bestuur: klikken op een koe).
 func koe_pos(id: int) -> Vector3:
 	return (koeien[id] as Node3D).global_position if koeien.has(id) else Vector3.INF
@@ -182,8 +219,13 @@ func _process(dt: float) -> void:
 		b.visible = not d.binnen
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
 		(u["baby"] as MeshInstance3D).visible = d.baby > 0.0
-		(u["zak"] as MeshInstance3D).visible = d.draagt != ""
+		var zak: MeshInstance3D = u["zak"]
+		zak.visible = d.draagt != ""
+		if zak.visible:
+			(zak.material_override as StandardMaterial3D).albedo_color = DRAAG_KLEUR.get(d.draagt, Color.WHITE)
+			zak.scale = Vector3.ONE * (0.45 if d.draagt == "ei" else 1.0)
 	_werk_koeien(a, dt)
+	_werk_kippen(a, dt)
 	_werk_pad()
 	_werk_markeringen(dt)
 	werk_seizoen()
