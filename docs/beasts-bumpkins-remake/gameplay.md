@@ -299,3 +299,23 @@ Kosten: stap 1–6 zijn het eigenlijke "spel"; 7–8 geven het dorp; 9–11 geve
 11. **Veertig rigs?** Concept noemt ~40 rigs (onderzoek). Welke eenheden moeten de slice halen, en wil je **quadruped-rig** (koe/wolf) via Tripo (onderzoek, 25 credits) of handwerk in Blender? Belangrijk voor stap 9 en 11.
 12. **Seizoen en weer.** beasts-src: seizoen per dag-nacht (270 s); jaar = 18 min, winter doodt gewas. Houden we dat (kort) of rekken we naar langere seizoenen? Weer (regen/onweer) in de slice of later?
 13. **Geluid.** De 56 stemfragmenten van beasts-src zijn gegenereerd (ElevenLabs, 4 stemmen). Herbruikbaar in de remake (licentie van het plan ten tijde van maken) of opnieuw?
+
+## 7. Besluiten van de gebruiker (2026-10-29)
+
+Vervangt de voorstellen in sectie 6 waar ze botsen.
+
+| Onderwerp | Besluit |
+| --- | --- |
+| Economie | beasts-src-lus (kopen vult de kas) eerst, daarna eten en geluk |
+| Celmaat en tempo | 2 m per tegel. **Geen rennen in missie 1** (origineel heeft het niet; later leuk). Lopen over een **pad is iets sneller** dan over gras, zoals in het origineel |
+| Koe en eigendom | Eigen koe krijgt een bel. **Ook wilde koeien geven melk**; dorpelingen gaan alleen melken als de koe **dicht bij het dorp** staat |
+| Werk naar leeftijd | **Alleen volwassenen werken.** Kinderen en ouderen werken niet, maar **kopen wel** |
+| Wie bouwt | Elke volwassen man bouwt, de bouwer bouwt sneller |
+| Besturing (PC) | Selecteren met **selectiekader of klik op een unit**. **Linkerklik = bevel**, **rechterklik = selectie weg**. Lopen kan iedereen; **vechten en werken alleen volwassenen** |
+| Plaatsen | Rooster, 4 deurrichtingen (R draait) |
+| Steen gooien | **Nieuwe animatie** (de huidige `aanval_steen` met oprapen voldoet niet). **Stenen zijn munitie**: gooien kost stenen |
+| Wolf | Eet koeien; baby's als moeilijkheid later |
+| Seizoenen en weer | **Ook in missie 1** |
+| Missieladder | Origineel volgen, beginnend bij Aorta |
+| Rigs voor dieren | Zelf in Blender, Tripo alleen als dat vastloopt |
+| Stemmen | beasts-src-fragmenten hergebruiken waar ze passen |
