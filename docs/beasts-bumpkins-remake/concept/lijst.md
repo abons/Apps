@@ -180,3 +180,9 @@ Totaal **88 beelden in 7 batches**. Batch 1 is het speelbare dorp (vrouw, kinder
 5. Kuiken heeft geen sprite (ei `chickegg` wel); `bushk_fl/ml/pr/rp` zijn vier kleine figuurtjes (vrouw, man, priester, bouwer; 4 frames) van onbekend gebruik, waarschijnlijk liggend/schuilend; `soldier` is een paarse gebogen figuur (48 frames) van onbekend gebruik.
 6. Portret-toewijzing (hierboven) klopt op het oog; controleren in het spel (`mn_*`/portretvenster).
 7. Spreukeffecten: slechts 9 `s_*`-sprites tegen 14 spreuken (7 + 7); de rest is zelf te ontwerpen.
+
+## Correcties van de gebruiker (ronde 3, 2026-10-29)
+- Het portret dat voor de voetsoldaat is gegokt, hoort bij de **ruiter (cavalier)**.
+- `footdie` hoort niet bij de voetsoldaat maar bij een andere eenheid.
+- `wizadie` lijkt de dode **minstreel**, niet de tovenaar.
+- `vampbat` hoort bij de **vampier**, niet bij de vleermuis.
