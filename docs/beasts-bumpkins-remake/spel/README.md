@@ -35,6 +35,13 @@ wie een bed heeft (2 per hut) gaat de hut in, de rest gaat in een slaapzak (orig
 's ochtends staat iedereen op. Zonder opdracht zwerft iedereen rond het kampvuur (anker); alleen na een loop-, vecht-,
 claim- of gildebevel van de speler blijft hij in de buurt van waar hij stond. Een bevel van de speler gaat altijd voor.
 
+## Weide
+
+Een stuk grond dat hek en poort helemaal omsluiten (rechte buren, hoogstens 150 tegels, niet het kampvuur) is een weide
+(`Wereld.weides`, opnieuw na elk afgebouwd hek of poort). Eigen koeien krijgen de weide met de meeste ruimte per koe
+en zwerven alleen nog daarin; een dichte poort laat ze er niet in en niet uit (`poort_dicht`; koeien volgen tegelmiddens,
+zodat ze niet langs de poort snijden). Origineel: "Don't forget a fenced-in enclosure in which to keep your cattle".
+
 ## Wegen
 
 Padtegels (uit de kaart: `road` 1/2/6, plus wat er later bijkomt) worden een keienstrook van 1,3 m (`view/wegen.gd`,
@@ -63,7 +70,7 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | wiel | zoomen (2 m tot eilandoverzicht) |
 | Spatie, 1 / 2 / 4 | pauze, tempo 1x/2x/4x |
 | B / L / H / M / J / G / F / P, R, Esc | bouwen: hut / loods / kippenhok / molen / melkerij / akker / hek (slepen = rij) / poort, draaien, stoppen. Het menu groeit: eerst hut, kippenhok, loods; na een loods molen en akker; na een molen melkerij, hek en poort |
-| links klikken op een poort | open of dicht (dicht blokkeert) |
+| links klikken op een poort | open of dicht: dicht houdt koeien tegen, dorpelingen lopen er altijd door |
 | K, N | regen automatisch/aan/uit, volgend seizoen (debug) |
 
 Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`, nog zonder invoer en zonder gedrag).

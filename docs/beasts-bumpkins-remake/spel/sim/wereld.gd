@@ -834,6 +834,7 @@ func claim_aangekomen(d: Dorpeling) -> void:
 	else:
 		k.eigenaar = 0
 		k.anker = kampvuur
+	_wijs_weides_toe()       # een eigen koe hoort in een weide als die er is
 	k.wacht = 1.0
 	koe_geclaimd.emit(k)
 
@@ -1026,9 +1027,82 @@ func wissel_poort(p: Plan) -> void:
 	if p == null or not p.klaar or p.soort != &"poort":
 		return
 	p.open = not p.open
-	raster.blok[raster.idx(p.tegel.x, p.tegel.y)] = 0 if p.open else 1
-	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))
 	poort_gewisseld.emit(p)
+
+
+## Dicht poort op tegel `t`: houdt koeien tegen (Vee), dorpelingen lopen er wel door (zij doen hem open en dicht).
+func poort_dicht(t: Vector2i) -> bool:
+	for p in plannen:
+		if p.klaar and p.soort == &"poort" and not p.open and p.tegel == t:
+			return true
+	return false
+
+
+## Weides: ingesloten stukken grond achter een poort. Vanaf elke loopbare buurtegel van een poort vullen over loopbare
+## tegels zonder door een poort te gaan; blijft dat binnen `WEIDE_MAX` tegels en zit het kampvuur er niet in, dan is het
+## een weide. Bij elk afgebouwd hek of poort opnieuw; eigen koeien krijgen de weide met de meeste ruimte per koe.
+const WEIDE_MAX := 150
+var weides: Array[Dictionary] = []
+
+
+func _bepaal_weides() -> void:
+	weides.clear()
+	var gezien := {}
+	for p in plannen:
+		if not p.klaar or p.soort != &"poort":
+			continue
+		for i in 8:
+			var s := p.tegel + Vector2i(Raster.DC[i], Raster.DR[i])
+			if gezien.has(s) or not raster.loopbaar_v(s) or _is_poort(s):
+				continue
+			var vak := {s: true}
+			var rij: Array[Vector2i] = [s]
+			var j := 0
+			var open := false
+			while j < rij.size():
+				var t := rij[j]
+				j += 1
+				if vak.size() > WEIDE_MAX or t == kampvuur:
+					open = true
+					break
+				for k in 4:          # recht: een hek met een schuine naad laat niets door
+					var n: Vector2i = t + [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][k]
+					if vak.has(n) or not raster.loopbaar_v(n) or _is_poort(n):
+						continue
+					vak[n] = true
+					rij.append(n)
+			for t in vak:
+				gezien[t] = true
+			if not open and vak.size() >= 4:
+				weides.append(vak)
+	_wijs_weides_toe()
+
+
+func _is_poort(t: Vector2i) -> bool:
+	for p in plannen:
+		if p.klaar and p.soort == &"poort" and p.tegel == t:
+			return true
+	return false
+
+
+func _wijs_weides_toe() -> void:
+	for k in vee:
+		k.weide = {}
+	if weides.is_empty():
+		return
+	var aantal: Array[int] = []
+	for wd in weides:
+		aantal.append(0)
+	for k in vee:
+		if k.eigenaar != 0:
+			continue
+		var beste := 0
+		for i in weides.size():
+			if float(weides[i].size()) / (aantal[i] + 1) > float(weides[beste].size()) / (aantal[beste] + 1):
+				beste = i
+		aantal[beste] += 1
+		k.weide = weides[beste]
+		k.wacht = minf(k.wacht, 1.0)
 
 
 func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
@@ -1234,4 +1308,9 @@ func _rond_af(p: Plan) -> void:
 		leg_weg(p.deur_tegel())
 	if p.soort == &"kippenhok":
 		_maak_kippen(p)
+	if p.soort == &"poort":
+		raster.blok[raster.idx(p.tegel.x, p.tegel.y)] = 0     # dorpelingen lopen erdoor; koeien kijken naar poort_dicht
+		bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))
+	if p.soort == &"poort" or p.soort == &"hek":
+		_bepaal_weides()
 	plan_klaar.emit(p)

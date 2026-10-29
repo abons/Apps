@@ -17,6 +17,7 @@ var eigenaar := -1            ## -1 wild, 0 speler
 var van_generator := false    ## telt mee voor het maximum van de generator zolang ze wild is
 var vast := false             ## er loopt iemand naartoe om haar te claimen: blijft staan
 var snelheid_mps := 0.0
+var weide := {}               ## tegels van de weide waar ze in hoort (eigen koe, Wereld.weides), {} = vrij rond het anker
 var leeg := 0.0               ## s tot ze weer melk geeft (beasts-src Herd.again: koe 90 s)
 var gemolken := false         ## er zit iemand naast te melken (view: gemolken_worden)
 
@@ -44,6 +45,9 @@ func tick(w: Wereld, dt: float) -> void:
 	if route.is_empty():
 		_zwerf(w, dt)
 		return
+	if w.poort_dicht(Vector2i(int(floor(route[0].x)), int(floor(route[0].y)))):
+		route.clear()            # de poort ging dicht terwijl ze onderweg was
+		return
 	var v := LOOP_MPS / w.tegel_m
 	var rest := dt
 	while rest > 1e-6 and not route.is_empty():
@@ -65,11 +69,26 @@ func _zwerf(w: Wereld, dt: float) -> void:
 	if wacht > 0.0:
 		return
 	wacht = w.rng.randf_range(5.0, 14.0)    # grazen duurt langer dan een dorpeling stilstaat
+	var tegels: Array = weide.keys()
 	for _i in 8:
-		var t := anker + Vector2i(w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL), w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL))
+		var t: Vector2i
+		if not tegels.is_empty():
+			t = tegels[w.rng.randi() % tegels.size()]      # in de weide (of erheen, als ze er nog buiten staat)
+		else:
+			t = anker + Vector2i(w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL), w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL))
 		if t == tegel() or not w.raster.loopbaar_v(t) or w.bereik[w.raster.idx(t.x, t.y)] == 0:
 			continue
 		var r := Router.route(w.raster, tegel(), t)
-		if not r.is_empty():
-			route = Router.glad(w.raster, pos, r)
-			return
+		if r.is_empty():
+			continue
+		var door_dicht := false
+		for rt in r:
+			if w.poort_dicht(rt):
+				door_dicht = true
+				break
+		if door_dicht:
+			continue                       # een dichte poort houdt koeien tegen (dorpelingen lopen erdoor)
+		route.clear()
+		for rt in r:                       # tegelmiddens, niet recht getrokken: dat zou langs een dichte poort kunnen snijden
+			route.append(Vector2(rt) + Vector2(0.5, 0.5))
+		return

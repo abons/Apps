@@ -473,11 +473,11 @@ func _initialize() -> void:
 	# poort: dicht blokkeert, klik = open = loopbaar
 	var pt: Plan = _plek.call(&"poort")
 	om._rond_af(pt)
-	_check(not om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort dicht blokkeert")
+	_check(om.poort_dicht(pt.tegel) and om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort dicht: dicht voor koeien, dorpelingen lopen erdoor")
 	om.wissel_poort(pt)
-	_check(pt.open and om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort open is loopbaar")
+	_check(pt.open and not om.poort_dicht(pt.tegel), "poort open")
 	om.wissel_poort(pt)
-	_check(not pt.open and not om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort weer dicht")
+	_check(not pt.open and om.poort_dicht(pt.tegel), "poort weer dicht")
 	var hk: Plan = _plek.call(&"hek")
 	_check(hk != null and hk.bouwtijd_s == 3.0 and om.prijs(&"hek") == 2, "hek: 2 kas, 3 s werk")
 
@@ -547,6 +547,59 @@ func _initialize() -> void:
 	for dl in zw.dorpelingen:
 		zmax = maxf(zmax, Vector2(dl.tegel()).distance_to(Vector2(zw.kampvuur)))
 	_check(zmax <= 7.0, "zonder opdracht blijft iedereen bij het dorp: max %.1f tegels van het kampvuur" % zmax)
+
+	# weide: hek rondom met een poort; een eigen koe komt er alleen in als de poort open is, en blijft erin als hij dicht is
+	var ww := Wereld.new()
+	ww.laad()
+	ww.alles_open = true
+	var wo := Vector2i(-1, -1)
+	for y in range(50, 80):
+		for x in range(100, 118):
+			if wo.x >= 0:
+				continue
+			var vrij2 := true
+			for dx in range(6):
+				for dy in range(5):
+					var t := Vector2i(x + dx, y + dy)
+					if not ww.raster.loopbaar_v(t) or ww.raster.soort_naam(t.x, t.y) == "pad" or ww.bereik[ww.raster.idx(t.x, t.y)] == 0:
+						vrij2 = false
+			if vrij2:
+				wo = Vector2i(x, y)
+	var wpoort: Plan = null
+	for dx in range(6):
+		for dy in range(5):
+			if dx != 0 and dx != 5 and dy != 0 and dy != 4:
+				continue
+			var srt := &"poort" if (dx == 2 and dy == 4) else &"hek"
+			var hp := Plan.new(srt, wo + Vector2i(dx, dy), 0, 1, 1)
+			if ww.plan_zet(hp):
+				ww._rond_af(hp)
+				if srt == &"poort":
+					wpoort = hp
+	_check(wo.x >= 0 and ww.weides.size() == 1 and ww.weides[0].size() == 12, "weide van 4x3 binnen het hek gevonden (%d)" % (ww.weides[0].size() if not ww.weides.is_empty() else -1))
+	var wkoe: Vee = ww.vee[0]
+	wkoe.zet_tegel(ww.dichtstbij_loopbaar(wo + Vector2i(2, 7)))
+	wkoe.eigenaar = 0
+	ww._wijs_weides_toe()
+	_check(not wkoe.weide.is_empty(), "eigen koe hoort in de weide")
+	for i in int(40.0 / ww.tik_dt):
+		ww.tik(ww.tik_dt)
+	_check(not wkoe.weide.has(wkoe.tegel()), "poort dicht: koe komt er niet in")
+	ww.wissel_poort(wpoort)
+	var erin := false
+	for i in int(120.0 / ww.tik_dt):
+		ww.tik(ww.tik_dt)
+		if wkoe.weide.has(wkoe.tegel()):
+			erin = true
+			break
+	_check(erin, "poort open: koe loopt de weide in")
+	ww.wissel_poort(wpoort)
+	var bleef := true
+	for i in int(120.0 / ww.tik_dt):
+		ww.tik(ww.tik_dt)
+		if not wkoe.weide.has(wkoe.tegel()) and wkoe.tegel() != wpoort.tegel:
+			bleef = false
+	_check(bleef, "poort dicht: koe blijft in de weide")
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)

@@ -211,6 +211,7 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
 		"hek":
 			# een weide van 6x5 tegels met een poort in de onderkant, meteen af; de poort gaat na 2 s open (via _scenario_stap)
+			# en na 12 s weer dicht
 			w.alles_open = true
 			var o := Vector2i(106, 62)
 			for x in range(6):
@@ -221,6 +222,13 @@ func _start_scenario() -> void:
 					var hp := Plan.new(srt, o + Vector2i(x, y), 0, 1, 1)
 					if w.plan_zet(hp):
 						w._rond_af(hp)
+			# een eigen koe buiten de poort: zodra die opengaat loopt ze de weide in (4x)
+			var hk := w.vee[0]
+			hk.zet_tegel(w.dichtstbij_loopbaar(o + Vector2i(2, 6)))
+			hk.eigenaar = 0
+			w._wijs_weides_toe()
+			hk.wacht = 0.5
+			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(o + Vector2i(3, 3)) + Vector3(0, 0.4, 0), 0.5, deg_to_rad(38), 13.0)
 		"nacht":
 			# een hut staat; bij het invallen van de nacht gaan er twee naar binnen en gaan de anderen bij het vuur liggen
@@ -289,6 +297,11 @@ func _scenario_stap() -> void:
 					if p.soort == &"poort":
 						w.wissel_poort(p)
 				_stap = 1
+			elif _stap == 1 and szt >= 12.0:
+				for p in w.plannen:
+					if p.soort == &"poort":
+						w.wissel_poort(p)
+				_stap = 2
 		"selectie":
 			_selectie_stap()
 		"pad":
