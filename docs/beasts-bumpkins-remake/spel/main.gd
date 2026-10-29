@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -163,6 +163,7 @@ func _start_scenario() -> void:
 			cam.zet_direct(mid + Vector3(0, 0.6, 0), 0.6, deg_to_rad(32), 13.0)
 		"molen":
 			# molen + twee akkers bij het dorp; de akkers staan al bijna rijp, de dorpelingen oogsten, brengen en kopen, 4x
+			w.alles_open = true
 			var m := _vrij_plan(&"molen", Vector2i(96, 60))
 			if m != null and w.plan_zet(m):
 				w._rond_af(m)
@@ -176,6 +177,7 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(102, 62)) + Vector3(0, 0.6, 0), 0.6, deg_to_rad(36), 24.0)
 		"melk":
 			# melkerij bij het kampvuur, de wilde koe bij het dorp gezet: een volwassene melkt haar en brengt de melk weg, 4x
+			w.alles_open = true
 			var mk := _vrij_plan(&"melkerij", Vector2i(95, 62))
 			if mk != null and w.plan_zet(mk):
 				w._rond_af(mk)
@@ -207,6 +209,19 @@ func _start_scenario() -> void:
 			w.tempo = 2.0
 			var dt_ := ld.deur_tegel() if ld != null else Vector2i(101, 63)
 			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
+		"hek":
+			# een weide van 6x5 tegels met een poort in de onderkant, meteen af; de poort gaat na 2 s open (via _scenario_stap)
+			w.alles_open = true
+			var o := Vector2i(106, 62)
+			for x in range(6):
+				for y in range(5):
+					if x != 0 and x != 5 and y != 0 and y != 4:
+						continue
+					var srt := &"poort" if (x == 2 and y == 4) else &"hek"
+					var hp := Plan.new(srt, o + Vector2i(x, y), 0, 1, 1)
+					if w.plan_zet(hp):
+						w._rond_af(hp)
+			cam.zet_direct(view.terrein.tegel_midden(o + Vector2i(3, 3)) + Vector3(0, 0.4, 0), 0.5, deg_to_rad(38), 13.0)
 		"claim":
 			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
 			for d in w.dorpelingen:
@@ -261,6 +276,12 @@ func _vrij_plan(soort: StringName, bij: Vector2i) -> Plan:
 
 func _scenario_stap() -> void:
 	match scenario:
+		"hek":
+			if _stap == 0 and szt >= 2.0:
+				for p in w.plannen:
+					if p.soort == &"poort":
+						w.wissel_poort(p)
+				_stap = 1
 		"selectie":
 			_selectie_stap()
 		"pad":

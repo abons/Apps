@@ -1,6 +1,7 @@
 class_name Bouwmenu
 extends Node
-## Bouwmenu (stap 5, gameplay.md §7): een knop per gebouw in GEBOUWEN (of zijn toets), ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
+## Bouwmenu (stap 5, gameplay.md §7): een knop per gebouw in GEBOUWEN (of zijn toets), alleen voor wat Wereld.ontgrendeld
+## al toelaat (hut/kippenhok/loods; loods -> molen, akker; molen -> melkerij, hek, poort). Hek: slepen = een rij. Ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
 ## R draait, linkerklik plaatst een Plan in Wereld, rechterklik of Esc stopt. Shift bij het plaatsen houdt de modus aan.
 ## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
 ## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de glb van het gebouw. De glb's
@@ -18,7 +19,10 @@ const GEBOUWEN := {
 	&"molen": {"tekst": "Molen", "toets": KEY_M, "glb": "res://assets/molen_rt.glb", "hoogte": 3.0},
 	&"melkerij": {"tekst": "Melkerij", "toets": KEY_J, "glb": "res://assets/melkerij_boerderij_rt.glb", "hoogte": 2.6},
 	&"akker": {"tekst": "Akker", "toets": KEY_G, "glb": "", "hoogte": 0.3},   # geen glb: per tegel akker_kaal + akker_rijp
+	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
+	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 2.0},   # poort.glb, deur draait open (klik)
 }
+const POORT_OPEN_RAD := deg_to_rad(100.0)
 const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
 
 const STAPELS := ["houtstapel", "steenhoop"]
@@ -41,6 +45,9 @@ var terrein: TerreinView   ## optioneel: grondhoogte voor stapels en hut (anders
 var _scenes := {}          ## soort -> PackedScene
 var _wieken: Array[Node3D] = []
 var _gewas := {}           ## akkertegel -> Node3D (akker_rijp, groeit mee met Wereld.akkers)
+var _hekken: Node3D        ## alle hekpalen en -segmenten, opnieuw opgebouwd bij elk afgebouwd hek of poort
+var _poorten := {}         ## Plan -> Node3D (poort_deur)
+var _sleep_start := Vector2i(-1, -1)   ## hek: tegel waar het slepen begon
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -51,15 +58,18 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	parent3d.add_child(ghost)
 	w.plan_gezet.connect(_toon_plan)
 	w.plan_klaar.connect(_plan_klaar)
+	_hekken = Node3D.new()
+	_hekken.name = "Hekken"
+	parent3d.add_child(_hekken)
 
 	var laag := CanvasLayer.new()
 	add_child(laag)
 	var rij := HBoxContainer.new()
 	rij.add_theme_constant_override("separation", 8)
-	rij.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	rij.alignment = BoxContainer.ALIGNMENT_END      # rechtsonder: links staat de hulptekst
-	rij.offset_top = -56
-	rij.offset_bottom = -16
+	rij.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	rij.alignment = BoxContainer.ALIGNMENT_END      # rechtsboven: onder staat de hulptekst, linksboven de stand
+	rij.offset_top = 12
+	rij.offset_bottom = 52
 	rij.offset_right = -16
 	laag.add_child(rij)
 	for s: StringName in GEBOUWEN:
@@ -72,10 +82,16 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 		k.toggled.connect(func(aan: bool) -> void: kies(s, aan))
 		rij.add_child(k)
 		knoppen[s] = k
+		k.visible = w.ontgrendeld(s)
+	w.plan_klaar.connect(func(_p: Plan) -> void:       # nieuwe knoppen na een loods of molen
+		for s2 in knoppen:
+			(knoppen[s2] as Button).visible = w.ontgrendeld(s2))
 
 
 ## Zet de bouwmodus aan voor `s`, of uit.
 func kies(s: StringName, aan := true) -> void:
+	if aan and not w.ontgrendeld(s):
+		return
 	if aan and s != soort:
 		soort = s
 		var oud := ghost
@@ -150,6 +166,9 @@ func _process(_dt: float) -> void:
 		k.scale.y = f
 		k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
+	for pt in _poorten:
+		var dr: Node3D = _poorten[pt]
+		dr.rotation.y = lerp_angle(dr.rotation.y, POORT_OPEN_RAD if pt.open else 0.0, minf(1.0, _dt * 5.0))
 	if not actief:
 		return
 	var p := _plan_onder(get_viewport().get_mouse_position())
@@ -169,7 +188,7 @@ func _toon_plan(p: Plan) -> void:
 	_kisten[p] = mi
 	ghost.get_parent().add_child(mi)
 	var lijst: Array[Node3D] = []
-	var plekken := _stapelplekken(p, STAPELS.size() if p.soort != &"akker" else 0)
+	var plekken := _stapelplekken(p, STAPELS.size() if not p.soort in [&"akker", &"hek", &"poort"] else 0)
 	for i in plekken.size():
 		var n := Natuur.instantie(STAPELS[i])
 		if n == null:
@@ -220,6 +239,11 @@ func _plan_klaar(p: Plan) -> void:
 		k.queue_free()
 		_kisten.erase(p)
 		return
+	if p.soort == &"hek" or p.soort == &"poort":
+		k.queue_free()
+		_kisten.erase(p)
+		_bouw_hekken()
+		return
 	var glb: String = GEBOUWEN[p.soort]["glb"]
 	if not _scenes.has(p.soort) and ResourceLoader.exists(glb):
 		_scenes[p.soort] = load(glb)
@@ -253,6 +277,67 @@ func _plan_klaar(p: Plan) -> void:
 		_wieken.append(wk)
 	k.queue_free()
 	_kisten.erase(p)
+
+
+## Hekken opnieuw: een paal op elk hektegelmidden, een segment (2 m, palen op x = +-1) naar elk hek- of poortbuur
+## (recht; schuin alleen zonder rechte tussenburen, dan 1,41x lang). Een poort draait zijn doorgang langs de hekken.
+func _bouw_hekken() -> void:
+	for c in _hekken.get_children():
+		c.queue_free()
+	_poorten.clear()
+	var hek := {}
+	var poort := {}
+	for p in w.plannen:
+		if p.klaar and p.soort == &"hek":
+			hek[p.tegel] = p
+		elif p.klaar and p.soort == &"poort":
+			poort[p.tegel] = p
+	var tm := w.tegel_m
+	for t: Vector2i in hek:
+		var paal := Natuur.instantie("hek_paal")
+		if paal:
+			paal.position = _grond(t)
+			_hekken.add_child(paal)
+		for d in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(0, -1)]:
+			var n: Vector2i = t + d
+			var naar_hek := hek.has(n)
+			if not naar_hek and not poort.has(n):
+				continue
+			if naar_hek and (d.x < 0 or d.y < 0):
+				continue        # hek-hek een keer (alleen naar + richtingen); naar een poort altijd vanaf het hek
+			if d.x != 0 and d.y != 0 and (hek.has(t + Vector2i(d.x, 0)) or hek.has(t + Vector2i(0, d.y))):
+				continue
+			var seg := Natuur.instantie("hek_segment")
+			if seg == null:
+				continue
+			var a := _grond(t)
+			var b := _grond(n)
+			if poort.has(n):    # tot aan de pijler, niet erdoor
+				b = a.lerp(b, 0.45)
+			seg.position = (a + b) * 0.5
+			seg.rotation.y = atan2(-(b.z - a.z), b.x - a.x)
+			seg.scale.x = Vector2(b.x - a.x, b.z - a.z).length() / tm
+			_hekken.add_child(seg)
+	for t: Vector2i in poort:
+		var p: Plan = poort[t]
+		var n := Natuur.instantie("poort")
+		if n == null:
+			continue
+		n.position = _grond(t)
+		# doorgang langs x; staan de hekken boven en onder (z), dan een kwartslag
+		var langs_z := hek.has(t + Vector2i(0, 1)) or hek.has(t + Vector2i(0, -1))
+		var langs_x := hek.has(t + Vector2i(1, 0)) or hek.has(t + Vector2i(-1, 0))
+		var rot := (p.draai % 2) * PI * 0.5        # zonder hekken ernaast: zoals de speler hem draaide
+		if langs_z and not langs_x:
+			rot = PI * 0.5
+		elif langs_x:
+			rot = 0.0
+		n.rotation.y = rot
+		n.scale = Vector3.ONE * (tm / 2.5)      # pijlers op +-1,25: de poort past op een tegel
+		_hekken.add_child(n)
+		var deur := n.find_child("poort_deur", true, false) as Node3D
+		if deur:
+			_poorten[p] = deur
 
 
 ## Akker af: per tegel de kale grond en het gewas erop, dat in _process meegroeit met Wereld.akkers.
@@ -302,6 +387,27 @@ static func _omhulsel(n: Node, t: Transform3D) -> AABB:
 	return uit
 
 
+## Tegels van a naar b in een rechte (of schuine) lijn (Bresenham).
+static func _lijn(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var uit: Array[Vector2i] = []
+	var d := (b - a).abs()
+	var s := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
+	var fout := d.x - d.y
+	var t := a
+	for _i in d.x + d.y + 2:
+		uit.append(t)
+		if t == b:
+			break
+		var e2 := 2 * fout
+		if e2 > -d.y:
+			fout -= d.y
+			t.x += s.x
+		if e2 < d.x:
+			fout += d.x
+			t.y += s.y
+	return uit
+
+
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
 		for s: StringName in GEBOUWEN:
@@ -316,7 +422,22 @@ func _unhandled_input(e: InputEvent) -> void:
 			zet_actief(false)
 			get_viewport().set_input_as_handled()
 	elif actief and e is InputEventMouseButton:
-		if e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
+		if e.button_index == MOUSE_BUTTON_LEFT and soort == &"hek":
+			# hek: indrukken = begin, loslaten = een rechte rij plannen tot daar (elk betaalt zijn eigen prijs)
+			var t := bestuur.tegel_onder(e.position)
+			if e.pressed:
+				_sleep_start = t
+			elif _sleep_start.x >= 0 and t.x >= 0:
+				var n := 0
+				for tt in _lijn(_sleep_start, t):
+					var hp := Plan.new(&"hek", tt, 0, 1, 1)
+					if w.plan_zet(hp):
+						n += 1
+				_sleep_start = Vector2i(-1, -1)
+				if n > 0 and not Input.is_key_pressed(KEY_SHIFT):
+					zet_actief(false)
+			get_viewport().set_input_as_handled()
+		elif e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
 			var p := _plan_onder(e.position)
 			if p != null and w.plan_zet(p) and not Input.is_key_pressed(KEY_SHIFT):
 				zet_actief(false)

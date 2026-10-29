@@ -13,6 +13,7 @@ var bouwtijd_s := 60.0     ## werker-seconden tot klaar (origineel: hut 60 s); w
 var voortgang := 0.0       ## 0..1
 var klaar := false
 var voorraad := 0          ## molen: brood op het schap (beasts-src Building.stock)
+var open := false          ## poort: open = loopbaar
 
 ## Voordeur per soort bij draai 0, in meters vanaf het midden van de voetafdruk (x, z), uit de glb-ankers
 ## (`deur_voor_drempel`, `deur_drempel`) min het midden van het omhulsel; de deur kijkt langs `richting`.

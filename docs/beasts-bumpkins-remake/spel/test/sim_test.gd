@@ -314,6 +314,7 @@ func _initialize() -> void:
 	# graan en brood: molen (start 8 brood), akker rijpt in 60 s, oogsten -> naar de molen, trek -> kopen = kas +3
 	var ec := Wereld.new()
 	ec.laad()
+	ec.alles_open = true
 	var molen: Plan = null
 	var akker: Plan = null
 	for y in range(44, 90, 3):
@@ -349,6 +350,7 @@ func _initialize() -> void:
 	# melk: melkerij, de (wilde) koe dicht bij het dorp wordt gemolken, de melk gaat naar de melkerij, 90 s leeg
 	var mw := Wereld.new()
 	mw.laad()
+	mw.alles_open = true
 	var mkr: Plan = null
 	for y in range(44, 90, 3):
 		for x in range(86, 124, 3):
@@ -447,6 +449,37 @@ func _initialize() -> void:
 	for i in int(10.0 / bw.tik_dt):
 		bw.tik(bw.tik_dt)
 	_check(absf(bh.voortgang - 20.0 / 60.0) < 0.02, "bouwer: 10 s werk = 20 werker-seconden (%.2f)" % (bh.voortgang * 60.0))
+
+	# bouwmenu-volgorde: hut/kippenhok/loods -> (loods) molen + akker -> (molen) melkerij + hek + poort
+	var om := Wereld.new()
+	om.laad()
+	_check(om.ontgrendeld(&"hut") and om.ontgrendeld(&"kippenhok") and om.ontgrendeld(&"gereedschapsloods"), "start: hut, kippenhok, loods")
+	_check(not om.ontgrendeld(&"molen") and not om.ontgrendeld(&"akker") and not om.ontgrendeld(&"melkerij"), "start: geen molen, akker, melkerij")
+	var _plek := func(soort: StringName) -> Plan:
+		for y in range(44, 90, 2):
+			for x in range(86, 124, 2):
+				var q := om.maak_plan(soort, Vector2i(x, y), 0)
+				if q != null and om.plan_zet(q):
+					return q
+		return null
+	_check(_plek.call(&"molen") == null, "molen plaatsen kan nog niet")
+	var lo: Plan = _plek.call(&"gereedschapsloods")
+	_check(not om.ontgrendeld(&"molen"), "loods als plan opent nog niets")
+	om._rond_af(lo)
+	_check(om.ontgrendeld(&"molen") and om.ontgrendeld(&"akker") and not om.ontgrendeld(&"melkerij"), "loods af: molen en akker erbij")
+	var mo: Plan = _plek.call(&"molen")
+	om._rond_af(mo)
+	_check(om.ontgrendeld(&"melkerij") and om.ontgrendeld(&"hek") and om.ontgrendeld(&"poort"), "molen af: melkerij, hek, poort erbij")
+	# poort: dicht blokkeert, klik = open = loopbaar
+	var pt: Plan = _plek.call(&"poort")
+	om._rond_af(pt)
+	_check(not om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort dicht blokkeert")
+	om.wissel_poort(pt)
+	_check(pt.open and om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort open is loopbaar")
+	om.wissel_poort(pt)
+	_check(not pt.open and not om.raster.loopbaar(pt.tegel.x, pt.tegel.y), "poort weer dicht")
+	var hk: Plan = _plek.call(&"hek")
+	_check(hk != null and hk.bouwtijd_s == 3.0 and om.prijs(&"hek") == 2, "hek: 2 kas, 3 s werk")
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)

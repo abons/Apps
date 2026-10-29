@@ -957,33 +957,36 @@ def poort():
         kap = L.blok((0.58, 0.58, 0.2), afkant=0.05, seg=2)
         L.bm_naar_bouwer(kap, b, mat=0, uvschaal=1 / 1.2, M=Matrix.Translation(Vector((x, 0, 1.9))))
         kap.free()
-    # deur: verticale planken met ijzeren banden
+    # deur: verticale planken met ijzeren banden, een eigen object `poort_deur` met het scharnier op x = -0.95
+    # (lokale oorsprong), zodat het spel hem open kan draaien (om lokaal Z in Blender = lokaal Y in Godot)
+    d = L.Bouwer()          # 0 planken, 1 ijzer, 2 blauwe steen
+    H = 0.95
     for k in range(10):
         x = -0.95 + 0.19 * k + 0.095
         h = 1.45 + 0.08 * math.sin(k * 0.9)
         bm = L.blok((0.185, 0.07, h), afkant=0.01)
-        L.bm_naar_bouwer(bm, b, mat=1, uvschaal=1.0, M=Matrix.Translation(Vector((x, 0, 0.12 + h / 2))))
+        L.bm_naar_bouwer(bm, d, mat=0, uvschaal=1.0, M=Matrix.Translation(Vector((x + H, 0, 0.12 + h / 2))))
         bm.free()
     for z in (0.35, 1.2):
         bm = L.blok((1.9, 0.02, 0.08), afkant=0.005)
-        L.bm_naar_bouwer(bm, b, mat=2, M=Matrix.Translation(Vector((0, -0.045, z))))
+        L.bm_naar_bouwer(bm, d, mat=1, M=Matrix.Translation(Vector((H, -0.045, z))))
         bm.free()
     # beslag met blauwe steen in het midden (beide kanten)
     for kant in (-1, 1):
-        ring = []
-        for i in range(17):
-            a = 2 * math.pi * i / 16
-            ring.append(Vector((0.17 * math.cos(a), kant * 0.05, 0.8 + 0.17 * math.sin(a))))
-        P = [Vector((0, kant * 0.04, 0.8)), Vector((0, kant * 0.07, 0.8))]
-        rr = L.buis(b, P, [0.16, 0.13], zijden=4, mat=2)
-        schijf_uv(b, rr[-1], P[-1], 2, omgekeerd=kant < 0)
+        P = [Vector((H, kant * 0.04, 0.8)), Vector((H, kant * 0.07, 0.8))]
+        rr = L.buis(d, P, [0.16, 0.13], zijden=4, mat=1)
+        schijf_uv(d, rr[-1], P[-1], 1, omgekeerd=kant < 0)
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=0.075)
-        L.bm_naar_bouwer(bm, b, mat=3, M=Matrix.Translation(Vector((0, kant * 0.085, 0.8))) @ Matrix.Diagonal((1, 0.6, 1, 1)))
+        L.bm_naar_bouwer(bm, d, mat=2, M=Matrix.Translation(Vector((H, kant * 0.085, 0.8))) @ Matrix.Diagonal((1, 0.6, 1, 1)))
         bm.free()
     blauw = L.pbr("blauwe_steen", (0.05, 0.18, 0.75), ruw=0.08, emissie=(0.02, 0.08, 0.4), emissie_kracht=0.8)
     o = L.obj("poort", b.mesh("poort", [steen_licht_mat("poortsteen"), m("planken"), m("ijzer"), blauw]))
     o.data.set_sharp_from_angle(angle=math.radians(40))
+    do = L.obj("poort_deur", d.mesh("poort_deur", [m("planken"), m("ijzer"), blauw]))
+    do.data.set_sharp_from_angle(angle=math.radians(40))
+    do.parent = o
+    do.location = (-H, 0, 0)
     # een paar keien met mos aan de voet van de pijlers (gebakken)
     keien = []
     for x in (-1.25, 1.25):

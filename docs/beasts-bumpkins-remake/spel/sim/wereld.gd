@@ -20,6 +20,7 @@ signal dorpeling_erbij(d: Dorpeling)      ## een kind is geboren
 signal kip_erbij(k: Kip)
 signal rol_veranderd(d: Dorpeling)
 signal wegen_veranderd
+signal poort_gewisseld(p: Plan)
 signal volwassen_geworden(d: Dorpeling)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
@@ -29,7 +30,14 @@ signal volwassen_geworden(d: Dorpeling)
 ## Molen (= bakkerij, beasts-src SHOP) 8,2 x 5,8 m incl. wieken; akker 2x2 tegels, elk een akker-glb van 2 x 2 m;
 ## melkerij 7,7 x 6,6 m incl. varkenshok, op deurmaat (deur 1,84 m -> 0,86x) 6,6 x 5,6 m.
 const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2),
-	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2), &"melkerij": Vector2i(4, 4)}
+	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2), &"melkerij": Vector2i(4, 4), &"hek": Vector2i(1, 1),
+	&"poort": Vector2i(1, 1)}
+## Bouwmenu-volgorde (besluit gebruiker 2026-10-29): eerst hut, kippenhok en loods; een afgebouwde loods opent molen
+## en akker; een afgebouwde molen opent melkerij, hek en poort.
+const START_SOORTEN := [&"hut", &"kippenhok", &"gereedschapsloods"]
+var alles_open := false                  ## tests en scenario's: het hele bouwmenu meteen
+const ONTGRENDEL := {&"molen": &"gereedschapsloods", &"akker": &"gereedschapsloods", &"melkerij": &"molen",
+	&"hek": &"molen", &"poort": &"molen"}
 const NIET_BLOKKEREND := [&"akker"]       ## loopbaar na de bouw (beasts-src Ground.FIELD is begaanbaar)
 var plannen: Array[Plan] = []
 
@@ -894,6 +902,28 @@ func geef_bevel(ids: Array, soort: String, doel: Vector2i) -> int:
 
 
 ## Maak een Plan van `soort` op `tegel` (linksboven), `draai` kwartslagen; null als de plek niet kan.
+## Staat `soort` al in het bouwmenu: een startsoort, of het gebouw dat hem opent is ergens afgebouwd.
+func ontgrendeld(soort: StringName) -> bool:
+	if alles_open or soort in START_SOORTEN:
+		return true
+	if not ONTGRENDEL.has(soort):
+		return false
+	for p in plannen:
+		if p.klaar and p.soort == ONTGRENDEL[soort]:
+			return true
+	return false
+
+
+## Poort open of dicht (origineel: "click on the gate to open and shut it"). Dicht blokkeert hij de tegel.
+func wissel_poort(p: Plan) -> void:
+	if p == null or not p.klaar or p.soort != &"poort":
+		return
+	p.open = not p.open
+	raster.blok[raster.idx(p.tegel.x, p.tegel.y)] = 0 if p.open else 1
+	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))
+	poort_gewisseld.emit(p)
+
+
 func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
 	if not BOUWSOORTEN.has(soort):
 		return null
@@ -909,7 +939,9 @@ func kan_bouwen(p: Plan) -> bool:
 	var r := p.afdruk()
 	for c in range(r.position.x, r.end.x):
 		for rij in range(r.position.y, r.end.y):
-			if not raster.loopbaar(c, rij) or raster.soort_naam(c, rij) == "pad":   # origineel: niet op een weg bouwen
+			if not raster.loopbaar(c, rij):
+				return false
+			if raster.soort_naam(c, rij) == "pad" and p.soort != &"poort":   # origineel: niet op een weg bouwen
 				return false
 	for q in plannen:
 		if q.afdruk().intersects(r):
@@ -928,8 +960,9 @@ func kan_bouwen(p: Plan) -> bool:
 
 ## Zet het plan neer en betaal de prijs uit de kas (origineel: bij het bestellen). False als het niet kan of te duur is.
 func plan_zet(p: Plan) -> bool:
-	if not kan_bouwen(p) or not kan_betalen(p.soort):
+	if not ontgrendeld(p.soort) or not kan_bouwen(p) or not kan_betalen(p.soort):
 		return false
+	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(p.soort), p.bouwtijd_s))
 	kas -= prijs(p.soort)
 	plannen.append(p)
 	plan_gezet.emit(p)
@@ -1040,6 +1073,20 @@ func geef_bouwbevel(ids: Array, p: Plan) -> int:
 	return n
 
 
+## Het dichtste onafgebouwde plan van dezelfde soort binnen 8 tegels (een rij hek bouwt zo door), of null.
+func _volgend_plan(p: Plan) -> Plan:
+	var beste: Plan = null
+	var bd := 64.0
+	for q in plannen:
+		if q == p or q.klaar or q.soort != p.soort:
+			continue
+		var af := Vector2(q.tegel).distance_squared_to(Vector2(p.tegel))
+		if af <= bd:
+			bd = af
+			beste = q
+	return beste
+
+
 ## Plan af: de voetafdruk wordt blokkerend en de werkers lopen weg van de nieuwe muren.
 func _rond_af(p: Plan) -> void:
 	p.klaar = true
@@ -1059,10 +1106,14 @@ func _rond_af(p: Plan) -> void:
 	for c in range(r.position.x, r.end.x):
 		for rij in range(r.position.y, r.end.y):
 			raster.blok[raster.idx(c, rij)] = 1
+	var volgende := _volgend_plan(p)
 	for d in dorpelingen:
 		if d.werk_plan == p:
 			d.werk_plan = null
 			d.bouwt = false
+			if volgende != null:
+				geef_bouwbevel([d.id], volgende)
+				continue
 		if r.has_point(d.tegel()):    # ook zwervers die op de voetafdruk staan
 			var t := dichtstbij_loopbaar(d.tegel())
 			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
