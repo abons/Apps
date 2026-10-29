@@ -3,6 +3,15 @@
 Wat hier nog niet automatisch kon. Het meeste gaat over echte gameplay-video's van de Android-games,
 want die kunnen alleen op een telefoon of emulator opgenomen worden.
 
+## Hier begint de volgende sessie
+
+Beasts & Bumpkins-remake (`docs/beasts-bumpkins-remake/`, stand in de README daar; originele data lokaal in `lokaal/`, niet in git):
+
+1. **Spellogica missie 1** in `spel/sim/`: economie, werk, bouwen, koe-generator (object 171), winnen bij 6 dorpelingen + 4 koeien, verliezen onder 2 — naar `missies.md` en `gameplay.md` §7.
+2. **Modellen in het spel**: vrouw/jongen/meisje/ouderen (`modellen/bumpkin/`), loods/molen/melkerij/kippenhok (`modellen/gebouwen/`), koe met `koe_vacht.gdshader`. Eerst het rieten dak van melkerij en kippenhok opnieuw bakken (dakschil niet als bakbron; nu bruin met strepen).
+3. **Conceptronde 3 afmaken** (Chrome eerst herstarten): voetsoldatengilde downloaden (gemini.google.com/app/47d87ca270c534fc), dan boogschuttersgilde, stadhuis, brouwerij, draagprops. Bakkerij = molen, bouwersgilde = gereedschapsloods.
+4. **Review-bevindingen `spel/`**: `test/sim_test.gd:122` slaagt ook als het doel niet loopbaar is (test bereikbaarheid niet echt); `sim/wereld.gd:79` onbekende tegelnaam → soort 255, later index buiten bereik; `sim/wereld.gd:316` dorpelingen boven het aantal `spreid`-plekken krijgen stil geen bevel; `modellen/peasant_hut_rt.glb` staat niet in git, dus een verse clone mist de hut (opnieuw bakken met `peasant_hut_realtime.py`).
+
 ## 1. Gameplay-video's van de Android-games
 
 Deze kaartjes tonen nu een slideshow van screenshots uit de repo's. Een korte video maakt ze levendiger.
