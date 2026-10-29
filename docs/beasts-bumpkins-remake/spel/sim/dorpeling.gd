@@ -114,6 +114,11 @@ func _klaar() -> void:
 
 
 func tick(w: Wereld, dt: float) -> void:
+	if not binnen and not w.raster.loopbaar_v(tegel()):   # vangnet: nooit vast in een muur of een dichte poort
+		var t := w.dichtstbij_loopbaar(tegel())
+		if t.x >= 0:
+			zet_tegel(t)
+			route.clear()
 	vorige = pos
 	snelheid_mps = 0.0
 	bouwt = false

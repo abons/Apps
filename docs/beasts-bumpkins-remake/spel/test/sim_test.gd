@@ -481,6 +481,32 @@ func _initialize() -> void:
 	var hk: Plan = _plek.call(&"hek")
 	_check(hk != null and hk.bouwtijd_s == 3.0 and om.prijs(&"hek") == 2, "hek: 2 kas, 3 s werk")
 
+	# regressie 2026-10-29: na een afgebouwd kippenhok bleven de bouwers in de muren staan (doorbouwen naar het tweede
+	# plan sloeg het eruit zetten over); nu staan ze buiten en wordt het tweede hok ook gebouwd
+	var vw := Wereld.new()
+	vw.laad()
+	var hokken: Array[Plan] = []
+	for r in 10:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if hokken.size() < 2:
+					var q := vw.maak_plan(&"kippenhok", Vector2i(104 + dx, 64 + dy), 0)
+					if q != null and vw.plan_zet(q):
+						hokken.append(q)
+	var vids := []
+	for dl in vw.dorpelingen:
+		if dl.volwassen():
+			vids.append(dl.id)
+	vw.geef_bouwbevel(vids, hokken[0])
+	for i in int(120.0 / vw.tik_dt):
+		vw.tik(vw.tik_dt)
+	var in_muur := 0
+	for dl in vw.dorpelingen:
+		if not dl.binnen and not vw.raster.loopbaar_v(dl.tegel()):
+			in_muur += 1
+	_check(in_muur == 0, "na het kippenhok staat niemand in een muur (%d)" % in_muur)
+	_check(hokken[0].klaar and hokken[1].klaar, "bouwers lopen door naar het tweede kippenhok")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

@@ -1108,16 +1108,20 @@ func _rond_af(p: Plan) -> void:
 			raster.blok[raster.idx(c, rij)] = 1
 	var volgende := _volgend_plan(p)
 	for d in dorpelingen:
-		if d.werk_plan == p:
+		var bouwde := d.werk_plan == p
+		if bouwde:
 			d.werk_plan = null
 			d.bouwt = false
-			if volgende != null:
-				geef_bouwbevel([d.id], volgende)
-				continue
-		if r.has_point(d.tegel()):    # ook zwervers die op de voetafdruk staan
+		# eerst de nieuwe muren uit (ook zwervers op de voetafdruk): vanaf een geblokkeerde tegel vindt Router niets,
+		# en wie daar bleef staan kreeg nooit meer een route (2026-10-29: bouwers vast in het kippenhok)
+		if r.has_point(d.tegel()):
 			var t := dichtstbij_loopbaar(d.tegel())
-			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
+			if t.x >= 0:
 				d.zet_tegel(t)
+				d.route.clear()
+				d.bevel = {}
+		if bouwde and volgende != null:
+			geef_bouwbevel([d.id], volgende)
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))   # nieuwe muren kunnen een doorgang afsluiten
 	if Plan.DEUREN.has(p.soort):
 		leg_weg(p.deur_tegel())

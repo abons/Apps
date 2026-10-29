@@ -31,6 +31,11 @@ func zet_tegel(t: Vector2i) -> void:
 
 
 func tick(w: Wereld, dt: float) -> void:
+	if not w.raster.loopbaar_v(tegel()):   # vangnet: nooit vast in een nieuw gebouw, hek of dichte poort
+		var t := w.dichtstbij_loopbaar(tegel())
+		if t.x >= 0:
+			zet_tegel(t)
+			route.clear()
 	vorige = pos
 	snelheid_mps = 0.0
 	if vast:
