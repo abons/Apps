@@ -15,6 +15,10 @@ try {
     Write-Host "== sync" -ForegroundColor Cyan
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sync.ps1")
 
+    if (-not (Test-Path (Join-Path $PSScriptRoot "data\origineel\map1.json"))) {
+        throw "data/origineel/map1.json ontbreekt; maak hem met tools/origineel/ (bron: docs/beasts-bumpkins-remake/lokaal/)"
+    }
+
     Write-Host "== import" -ForegroundColor Cyan
     & $G --headless --path . --import | Out-Null
 

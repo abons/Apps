@@ -179,6 +179,8 @@ func vooruit(dt: float) -> void:
 		_acc -= tik_dt
 		n += 1
 		tik(tik_dt)
+	if n >= 200:
+		_acc = 0.0  # na een lange hapering niet frames lang blijven inhalen
 
 
 func tik(dt: float) -> void:

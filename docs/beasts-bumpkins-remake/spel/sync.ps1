@@ -1,6 +1,6 @@
 # Kopieert de kaartdata en de glb's het project in (assets/ en data/origineel/ staan in .gitignore).
 # map1.json komt uit de gedecodeerde originele spelbestanden (auteursrecht) en blijft dus lokaal.
-param([string]$Map = 'C:\Users\Axel\AppData\Local\Temp\claude\E--werk-androidApps-Apps\16e99493-ac86-47c7-921f-1d215c266f51\scratchpad\map1\map1.json')
+param([string]$Map = (Join-Path $PSScriptRoot '..\lokaal\map1\map1.json'))  # lokaal/ staat in .gitignore
 
 $ErrorActionPreference = 'Stop'
 $orig = Join-Path $PSScriptRoot 'data\origineel'

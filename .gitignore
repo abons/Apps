@@ -19,3 +19,4 @@ __pycache__/
 .env
 .env.*
 !.env.example
+docs/beasts-bumpkins-remake/lokaal/
