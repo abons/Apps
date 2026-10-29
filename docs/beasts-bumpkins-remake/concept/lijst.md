@@ -186,3 +186,4 @@ Totaal **88 beelden in 7 batches**. Batch 1 is het speelbare dorp (vrouw, kinder
 - `footdie` hoort niet bij de voetsoldaat maar bij een andere eenheid.
 - `wizadie` lijkt de dode **minstreel**, niet de tovenaar.
 - `vampbat` hoort bij de **vampier**, niet bij de vleermuis.
+- **Bakkerij = molen**: het gebouw dat als bakkerij in ronde 3 staat, is hetzelfde als de molen uit ronde 1 (al gemodelleerd in `modellen/gebouwen/molen.py`). Geen apart concept nodig.
