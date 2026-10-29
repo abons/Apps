@@ -32,6 +32,33 @@ static func maak(anim := STANDAARD, start := 0.0) -> Node3D:
 	return n
 
 
+## Eigen koe: halsband (paars, zoals de "purple collars" van het origineel) en bel zichtbaar; wild: beide weg.
+static func zet_eigen(n: Node3D, eigen: bool) -> void:
+	var hb := n.find_child("halsband", true, false) as MeshInstance3D
+	var bel := n.find_child("bel", true, false) as Node3D
+	if hb:
+		hb.visible = eigen
+		if eigen and hb.material_override == null:
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(0.42, 0.12, 0.55)
+			m.roughness = 0.6
+			hb.material_override = m
+	if bel:
+		bel.visible = eigen
+
+
+## Speel `anim` (lus volgens koe_anim.json) als hij nog niet speelt; `tempo` schaalt het afspelen.
+static func speel(n: Node3D, anim: String, tempo := 1.0) -> void:
+	var ap := _speler(n)
+	if ap == null or not ap.has_animation(StringName(anim)):
+		return
+	if ap.current_animation != anim:
+		if _lus(anim):
+			ap.get_animation(StringName(anim)).loop_mode = Animation.LOOP_LINEAR
+		ap.play(StringName(anim), 0.3)
+	ap.speed_scale = tempo
+
+
 static func _lus(naam: String) -> bool:
 	var d = Gegevens.lees(ANIM)
 	return d is Dictionary and d.has(naam) and d[naam].get("loop", false)

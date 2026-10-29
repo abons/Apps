@@ -50,14 +50,15 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	var rij := HBoxContainer.new()
 	rij.add_theme_constant_override("separation", 8)
 	rij.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	rij.alignment = BoxContainer.ALIGNMENT_CENTER
+	rij.alignment = BoxContainer.ALIGNMENT_END      # rechtsonder: links staat de hulptekst
 	rij.offset_top = -56
 	rij.offset_bottom = -16
+	rij.offset_right = -16
 	laag.add_child(rij)
 	for s: StringName in GEBOUWEN:
 		var g: Dictionary = GEBOUWEN[s]
 		var k := Button.new()
-		k.text = "%s (%s)" % [g["tekst"], OS.get_keycode_string(g["toets"])]
+		k.text = "%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])]
 		k.toggle_mode = true
 		k.add_theme_font_size_override("font_size", 18)
 		k.focus_mode = Control.FOCUS_NONE
@@ -141,7 +142,7 @@ func _process(_dt: float) -> void:
 		return
 	ghost.position = _midden(p)
 	ghost.rotation.y = draai * PI * 0.5
-	var kan := w.kan_bouwen(p)
+	var kan := w.kan_bouwen(p) and w.kan_betalen(p.soort)
 	(ghost.material_override as StandardMaterial3D).albedo_color = Color(0.3, 1.0, 0.3, 0.45) if kan else Color(1.0, 0.25, 0.2, 0.45)
 
 

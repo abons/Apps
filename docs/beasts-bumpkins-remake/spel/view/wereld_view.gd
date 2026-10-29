@@ -8,6 +8,7 @@ var licht: Licht
 var regen: Regen
 var terrein: TerreinView
 var units := {}            # id -> {"bump": Bumpkin, "ring": MeshInstance3D}
+var koeien := {}           # koe-id -> Node3D
 var gekozen: Array = []    # id's, gezet door Bestuur
 var _pad: MeshInstance3D
 var _markeringen: Array = []   # [{node, t}]
@@ -72,6 +73,50 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	regen = Regen.new()
 	add_child(regen)
 
+	for k in w.vee:
+		_maak_koe(k)
+	w.koe_erbij.connect(_maak_koe)
+	w.koe_geclaimd.connect(func(k: Vee) -> void:
+		if koeien.has(k.id):
+			Koe.zet_eigen(koeien[k.id], k.eigenaar == 0))
+
+
+func _maak_koe(k: Vee) -> void:
+	var n := Koe.maak("grazen", float(k.id % 3))
+	if n == null:
+		return
+	n.name = "Koe_%d" % k.id
+	add_child(n)
+	koeien[k.id] = n
+	var p := k.pos * w.tegel_m
+	n.position = Vector3(p.x, terrein.hoogte_op(p.x, p.y), p.y)
+	n.rotation.y = float(k.id) * 2.4
+	Koe.zet_eigen(n, k.eigenaar == 0)
+
+
+## Wereldpositie van een koe (voor Bestuur: klikken op een koe).
+func koe_pos(id: int) -> Vector3:
+	return (koeien[id] as Node3D).global_position if koeien.has(id) else Vector3.INF
+
+
+func _werk_koeien(a: float, dt: float) -> void:
+	for k in w.vee:
+		if not koeien.has(k.id):
+			continue
+		var n: Node3D = koeien[k.id]
+		var p := k.vorige.lerp(k.pos, a) * w.tegel_m
+		var nieuw := Vector3(p.x, terrein.hoogte_op(p.x, p.y), p.y)
+		var d := nieuw - n.position
+		if Vector2(d.x, d.z).length() > 0.002:
+			n.rotation.y = lerp_angle(n.rotation.y, atan2(d.x, d.z), minf(1.0, dt * 6.0))   # gezicht langs +Z, als Bumpkin
+		n.position = nieuw
+		if w.gepauzeerd:
+			Koe.speel(n, "idle", 0.0)
+		elif k.snelheid_mps > 0.0:
+			Koe.speel(n, "lopen", w.tempo)
+		else:
+			Koe.speel(n, "grazen", w.tempo)
+
 
 func _wereld_pos(d: Dorpeling, alpha: float) -> Vector3:
 	var p := d.vorige.lerp(d.pos, alpha) * w.tegel_m
@@ -95,6 +140,7 @@ func _process(dt: float) -> void:
 		b.werk(d.bouwt and not w.gepauzeerd)
 		b.zet_nacht(donker)
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
+	_werk_koeien(a, dt)
 	_werk_pad()
 	_werk_markeringen(dt)
 	werk_seizoen()

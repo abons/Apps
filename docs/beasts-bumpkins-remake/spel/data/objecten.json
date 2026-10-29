@@ -10,7 +10,7 @@
     "143": {"naam": "kampvuur",     "origineel": "campfire",    "model": "natuur:kampvuur",  "schaal": 1.3, "voetafdruk": [1, 1], "blokkeert": true},
     "144": {"naam": "bron",         "origineel": "spring",      "model": "natuur:bronplas",  "schaal": 1.0, "voetafdruk": [1, 1], "blokkeert": true},
     "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "natuur:zilveren_beker", "schaal": 1.6, "voetafdruk": [1, 1], "blokkeert": false},
-    "171": {"naam": "koe_generator","origineel": "generator",   "model": "koe",              "voetafdruk": [1, 1], "blokkeert": false},
+    "171": {"naam": "koe_generator","origineel": "generator",   "model": "geen",              "voetafdruk": [1, 1], "blokkeert": false},
     "1000":{"naam": "boom_bos",     "origineel": "(gegenereerd op bosgrond)", "model": "natuur:den_groot", "varianten": [["den_groot", 0.4], ["spar", 0.3], ["jonge_den", 0.3]], "voetafdruk": [1, 1], "blokkeert": true}
   },
   "decoratie": {

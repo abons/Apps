@@ -15,6 +15,7 @@ var bevel := {}               ## {} (geen) of {"soort": "loop"|"vecht"|"werk", "
 var anker := Vector2i.ZERO    ## zwerfmiddelpunt: het kampvuur, na een bevel de plek waar hij bleef staan
 var wacht := 2.0
 var werk_plan: Plan = null   ## bouwplek waar hij heen loopt en aan werkt
+var doel_koe: Vee = null     ## koe die hij gaat claimen (bevel "claim")
 var bouwt := false           ## in deze tik aan het bouwen (view: hamerlus)
 var snelheid_mps := 0.0       ## werkelijke loopsnelheid in deze tik, m/s incl. looptempo (0 = stil)
 
@@ -23,7 +24,7 @@ func volwassen() -> bool:
 	return leeftijd == "volwassen"
 
 
-## Lopen kan iedereen; vechten en werken alleen volwassenen.
+## Lopen kan iedereen; vechten, werken en koeien claimen alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
 	return soort == "loop" or volwassen()
 
@@ -41,6 +42,9 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	if not kan_bevel(soort):
 		return false
 	werk_plan = null
+	if doel_koe != null:          # een nieuw bevel laat de koe die hij ging claimen weer vrij
+		doel_koe.vast = false
+		doel_koe = null
 	var r := Router.route(w.raster, tegel(), doel)
 	if r.is_empty() and tegel() != doel:
 		return false
@@ -92,6 +96,8 @@ func tick(w: Wereld, dt: float) -> void:
 			pos += d / afstand * stap
 			rest = 0.0
 	if route.is_empty():
+		if doel_koe != null:
+			w.claim_aangekomen(self)
 		_klaar()
 
 

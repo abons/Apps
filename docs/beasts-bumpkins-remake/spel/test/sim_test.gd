@@ -180,6 +180,56 @@ func _initialize() -> void:
 			in_hut += 1
 	_check(in_hut == 0, "niemand staat in de afgebouwde hut (%d)" % in_hut)
 
+	# kas: de hut is betaald; te duur kan niet
+	_check(w.kas == int(w.spel["start_kas"]) - w.prijs(&"hut"), "hut kostte %d (kas %d)" % [w.prijs(&"hut"), w.kas])
+	var arm := Wereld.new()
+	arm.laad()
+	arm.kas = 10
+	var ap := arm.maak_plan(&"hut", vrij, 0)
+	_check(ap != null and not arm.plan_zet(ap) and arm.kas == 10, "plan te duur: niet gezet, kas blijft 10")
+
+	# koeien: generator, claimen, loslaten, missie 1 winnen
+	var k := Wereld.new()
+	k.laad()
+	_check(k.vee.size() == 1 and k.vee[0].eigenaar == -1, "generator begint met 1 wilde koe")
+	for i in int(200.0 / k.tik_dt):
+		k.tik(k.tik_dt)
+	_check(k.vee.size() == 3, "na 200 s 3 wilde koeien, het maximum (%d)" % k.vee.size())
+	var boer: Dorpeling = null
+	var kleuter: Dorpeling = null
+	for dl in k.dorpelingen:
+		if dl.volwassen():
+			boer = dl
+		else:
+			kleuter = dl
+	var koe1: Vee = k.vee[0]
+	_check(k.geef_claimbevel([kleuter.id], koe1.id) == 0, "kind claimt geen koe")
+	_check(k.geef_claimbevel([boer.id], koe1.id) == 1 and koe1.vast, "volwassene loopt naar de koe, die blijft staan")
+	var claimtikken := 0
+	while koe1.eigenaar != 0 and claimtikken < 3000:
+		k.tik(k.tik_dt)
+		claimtikken += 1
+	_check(koe1.eigenaar == 0 and not koe1.vast and koe1.anker == k.kampvuur, "koe geclaimd na %.0f s, zwerft naar het kampvuur" % (claimtikken * k.tik_dt))
+	_check(k.eigen_koeien() == 1 and k.uitslag == "", "1 eigen koe, missie nog bezig")
+	k.geef_claimbevel([boer.id], koe1.id)
+	for i in 3000:
+		if koe1.eigenaar != 0:
+			break
+		k.tik(k.tik_dt)
+	_check(koe1.eigenaar == -1, "nog eens claimen laat haar los")
+	for kk in k.vee:
+		kk.eigenaar = 0
+	while k.vee.size() < 4:
+		k.tik(k.tik_dt)
+	k.vee[3].eigenaar = 0
+	k.tik(k.tik_dt)
+	_check(k.uitslag == "gewonnen", "6 dorpelingen en 4 eigen koeien: gewonnen (%s)" % k.uitslag)
+	var v2 := Wereld.new()
+	v2.laad()
+	v2.dorpelingen.resize(1)
+	v2.tik(v2.tik_dt)
+	_check(v2.uitslag == "verloren", "1 dorpeling: verloren")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

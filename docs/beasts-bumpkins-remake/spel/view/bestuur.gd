@@ -2,6 +2,7 @@ class_name Bestuur
 extends Node
 ## Muisbesturing (besluit gebruiker 2026-10-29): selecteren met een kader of een klik op een unit,
 ## linkerklik op de grond = loopbevel, rechterklik = selectie weg. Rechts slepen draait de camera (rts_camera.gd).
+## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
 ## Fight- en werkbevelen bestaan in Wereld.geef_bevel (alleen volwassenen); er is nog geen invoer voor.
 
 const KLIK_DREMPEL := 6.0       # px: minder slepen telt als klik
@@ -97,6 +98,10 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 		return
 	if gekozen.is_empty():
 		return
+	var kid := _koe_onder(pos)
+	if kid >= 0 and w.geef_claimbevel(gekozen, kid) > 0:
+		view.markeer(w.koe(kid).tegel())
+		return
 	var t := tegel_onder(pos)
 	if t.x >= 0:
 		var p := w.plan_op(t)
@@ -104,6 +109,21 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			view.markeer(p.tegel)
 			return
 		geef_loopbevel(t)
+
+
+## Koe onder een schermpunt (binnen PICK_PX rond haar rug), -1 als er geen is.
+func _koe_onder(pos: Vector2) -> int:
+	var beste := -1
+	var bd := PICK_PX * 1.4
+	for k in w.vee:
+		var p := view.koe_pos(k.id)
+		if p == Vector3.INF or cam.is_position_behind(p):
+			continue
+		var af := cam.unproject_position(p + Vector3(0, 0.8, 0)).distance_to(pos)
+		if af < bd:
+			bd = af
+			beste = k.id
+	return beste
 
 
 func geef_loopbevel(t: Vector2i) -> int:

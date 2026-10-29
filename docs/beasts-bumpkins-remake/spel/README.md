@@ -1,7 +1,8 @@
 # Beasts & Bumpkins remake: fundament (missie 1, Aorta)
 
 Godot 4.7.2 (Forward+, GDScript, pc eerst). Het eiland Aorta uit de originele kaartdata, zes dorpelingen onder
-spelersbesturing, dag/nacht, seizoenen en weer. Nog geen economie, gebouwen, dieren of vijanden.
+spelersbesturing, dag/nacht, seizoenen en weer, bouwen (hut, loods, kippenhok; prijs uit de kas), koeien claimen en het
+missiedoel (6 dorpelingen + 4 eigen koeien, verlies onder 2). Nog geen winkels/inkomsten, gezinnen of vijanden.
 
 ## Draaien
 
@@ -29,6 +30,7 @@ Opties na `--`: `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, 
 | links slepen | selectiekader (Shift = toevoegen) |
 | links klikken op unit | die unit kiezen |
 | links klikken op grond | loopbevel voor de selectie; meerdere units waaieren uit rond de tegel |
+| links klikken op een koe | de eerste volwassene uit de selectie claimt haar (paarse halsband + bel); nog eens = loslaten |
 | rechts klikken | selectie weg |
 | rechts slepen, Q/E | camera draaien (PgUp/PgDn kantelen) |
 | WASD/pijlen, schermrand | pannen (begrensd tot het eiland) |
@@ -42,7 +44,8 @@ Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`, n
 ## Structuur
 
 - `data/` `spel.json` (tegelmaat 2 m, 10 Hz, looptempo, klok), `tegels.json` (kleur, loopbaar, snelheidsfactor: pad 1,15, gras 1, zand 0,9; water en rots niet loopbaar), `objecten.json` (klasse-id naar naam, model, voetafdruk, blokkeert).
-- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Gegevens`.
+- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Vee` (koe: zwerft rond generator of, eigen, rond het kampvuur), `Plan`, `Gegevens`.
+  Missie 1 in `Wereld`: kas (`spel.json` `start_kas`, `prijzen`, betaald bij `plan_zet`), koe-generator (klasse 171, `koe_generator`: start 1, max 3 wilde, elke 45 s; uit `m01.json` p5=1/p6=3, betekenis aangenomen), `geef_claimbevel`, `uitslag` + signaal `missie_einde`.
 - `view/` `WereldView` spiegelt de sim, `TerreinView` (een mesh met vertexkleur en hoogte, water, MultiMesh-bomen en -rotsen), `Props` (placeholders), `Bumpkin` (geanimeerde man, `volg()`-modus voor de sim), `Licht`, `Regen`, `Bestuur`, `Hud`.
 - `shaders/` terrein (vijf texturensets, seizoenstint, sneeuw, nat), natuur_wind (gesynct uit modellen/natuur), natuur_steen (rotsen met sneeuw) en water (diepte, schuim).
 - `main.gd` zet alles in elkaar en bevat de scenario's. `test/` simtest, routetijd en glad_test. `screenshots/` verificatieframes.

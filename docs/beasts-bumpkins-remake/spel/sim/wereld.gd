@@ -13,6 +13,9 @@ const REGENKANS := [0.35, 0.10, 0.40, 0.0]
 signal bevel_gegeven(ids: Array, soort: String, doel: Vector2i)
 signal plan_gezet(plan: Plan)
 signal plan_klaar(plan: Plan)
+signal koe_erbij(koe: Vee)
+signal koe_geclaimd(koe: Vee)
+signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -25,6 +28,12 @@ var spel: Dictionary
 var raster := Raster.new()
 var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, state, sex}
 var dorpelingen: Array[Dorpeling] = []
+var vee: Array[Vee] = []
+var kas := 0
+var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
+var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 171), (-1,-1) = geen
+var _generator_t := 0.0
+var _volgende_koe_id := 1
 var kampvuur := Vector2i.ZERO
 var bereik := PackedByteArray()          # tegels bereikbaar vanaf het kampvuur
 var _onbekend_gemeld := {}               # tegelnamen die al een waarschuwing gaven
@@ -70,6 +79,8 @@ func laad(kaart_pad := "") -> bool:
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))
 	_bepaal_eiland()
 	_maak_dorpelingen()
+	kas = int(spel.get("start_kas", 0))
+	_start_generator()
 	tijd_s = float(spel["start_seizoen"]) * float(spel["seizoen_s"]) + float(spel["start_klok_s"])
 	return true
 
@@ -117,6 +128,8 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 		objecten.append(ob)
 		if int(o["cls"]) == int(spel["kampvuur_id"]):
 			kampvuur = Vector2i(ob["x"], ob["y"])
+		elif int(o["cls"]) == int(spel.get("koe_generator_id", -1)):
+			_generator = Vector2i(ob["x"], ob["y"])
 	# Gegenereerde bomen op bosgrond (kaart heeft maar 42 bomen; de originele dennen zijn onbekend, zie map1.md).
 	var dichtheid: float = spel["bos_dichtheid"]
 	for y in raster.rijen:
@@ -209,9 +222,142 @@ func tik(dt: float) -> void:
 	tik_nr += 1
 	for d in dorpelingen:
 		d.tick(self, dt)
+	for k in vee:
+		k.tick(self, dt)
 	for p in plannen:
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
+	_werk_generator(dt)
+	_check_missie()
+
+
+# ---------------------------------------------------------------- koeien en missie
+
+## Koe-generator (missie 1, klasse 171: spawnt cls 110 = koe). `start` koeien meteen; daarna elke `interval_s` een
+## nieuwe zolang er minder dan `max` wilde van de generator rondlopen. Een geclaimde koe telt niet meer mee.
+func _start_generator() -> void:
+	if _generator.x < 0:
+		return
+	var g: Dictionary = spel.get("koe_generator", {})
+	for _i in int(g.get("start", 1)):
+		_spawn_koe()
+
+
+func _werk_generator(dt: float) -> void:
+	if _generator.x < 0:
+		return
+	var g: Dictionary = spel.get("koe_generator", {})
+	var wild := 0
+	for k in vee:
+		if k.van_generator and k.eigenaar < 0:
+			wild += 1
+	if wild >= int(g.get("max", 3)):
+		_generator_t = 0.0
+		return
+	_generator_t += dt
+	if _generator_t >= float(g.get("interval_s", 45.0)):
+		_generator_t = 0.0
+		_spawn_koe()
+
+
+func _spawn_koe() -> Vee:
+	var t := dichtstbij_loopbaar(_generator)
+	if t.x < 0:
+		return null
+	var k := Vee.new()
+	k.id = _volgende_koe_id
+	_volgende_koe_id += 1
+	k.zet_tegel(t)
+	k.anker = t
+	k.van_generator = true
+	k.wacht = rng.randf_range(0.5, 4.0)
+	vee.append(k)
+	koe_erbij.emit(k)
+	return k
+
+
+func koe(id: int) -> Vee:
+	for k in vee:
+		if k.id == id:
+			return k
+	return null
+
+
+func eigen_koeien() -> int:
+	var n := 0
+	for k in vee:
+		if k.eigenaar == 0:
+			n += 1
+	return n
+
+
+## Stuur de eerste volwassene uit `ids` naar koe `koe_id`; aangekomen claimt hij haar, of laat haar los als ze al van
+## de speler is (origineel: "click on it again ... a moo will confirm"). De koe blijft staan tot hij er is.
+func geef_claimbevel(ids: Array, koe_id: int) -> int:
+	var k := koe(koe_id)
+	if k == null:
+		return 0
+	for id in ids:
+		var d := dorpeling(id)
+		if d != null and d.kan_bevel("werk") and d.geef_bevel(self, "claim", _naast(k.tegel(), d.tegel())):
+			d.doel_koe = k
+			k.vast = true
+			if d.route.is_empty():
+				claim_aangekomen(d)
+			return 1
+	return 0
+
+
+## Loopbare buurtegel van `t` die het dichtst bij `van` ligt (hij gaat naast de koe staan, niet erin); anders `t`.
+func _naast(t: Vector2i, van: Vector2i) -> Vector2i:
+	var beste := t
+	var bd := INF
+	for i in 8:
+		var n := t + Vector2i(Raster.DC[i], Raster.DR[i])
+		if raster.kan_stap(t.x, t.y, n.x, n.y) and Vector2(n).distance_squared_to(Vector2(van)) < bd:
+			bd = Vector2(n).distance_squared_to(Vector2(van))
+			beste = n
+	return beste
+
+
+## Dorpeling is bij zijn koe: claimen of loslaten. Een eigen koe zwerft voortaan rond het kampvuur.
+func claim_aangekomen(d: Dorpeling) -> void:
+	var k := d.doel_koe
+	d.doel_koe = null
+	if k == null:
+		return
+	k.vast = false
+	if k.eigenaar == 0:
+		k.eigenaar = -1
+		k.anker = k.tegel()
+	else:
+		k.eigenaar = 0
+		k.anker = kampvuur
+	k.wacht = 1.0
+	koe_geclaimd.emit(k)
+
+
+## Missie 1: winst bij >= missie.dorpelingen en >= missie.koeien eigen koeien, verlies onder missie.minimum.
+func _check_missie() -> void:
+	if uitslag != "":
+		return
+	var m: Dictionary = spel.get("missie", {})
+	if m.is_empty():
+		return
+	if dorpelingen.size() < int(m["minimum"]):
+		uitslag = "verloren"
+	elif dorpelingen.size() >= int(m["dorpelingen"]) and eigen_koeien() >= int(m["koeien"]):
+		uitslag = "gewonnen"
+	if uitslag != "":
+		missie_einde.emit(uitslag)
+
+
+func prijs(soort: StringName) -> int:
+	return int(spel.get("prijzen", {}).get(String(soort), 0))
+
+
+func kan_betalen(soort: StringName) -> bool:
+	return kas >= prijs(soort)
 
 
 ## 0..1 tussen de vorige en de volgende tik, voor interpolatie in de view.
@@ -383,10 +529,11 @@ func kan_bouwen(p: Plan) -> bool:
 	return true
 
 
-## Zet het plan neer. Bouwplaats, werkers en kas volgen; nu alleen bijgehouden en gemeld.
+## Zet het plan neer en betaal de prijs uit de kas (origineel: bij het bestellen). False als het niet kan of te duur is.
 func plan_zet(p: Plan) -> bool:
-	if not kan_bouwen(p):
+	if not kan_bouwen(p) or not kan_betalen(p.soort):
 		return false
+	kas -= prijs(p.soort)
 	plannen.append(p)
 	plan_gezet.emit(p)
 	return true

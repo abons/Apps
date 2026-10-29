@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -149,6 +149,15 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(114, 50)), 0.8, deg_to_rad(24), 16.0)
 		"koe":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(118, 58)) + Vector3(0, 0.6, 0), -2.2, deg_to_rad(28), 7.0)
+		"claim":
+			# een volwassene loopt naar de wilde koe bij de generator en claimt haar (halsband + bel), 4x
+			for d in w.dorpelingen:
+				if d.volwassen():
+					d.zet_tegel(w.vee[0].tegel() + Vector2i(-3, 1))
+					w.geef_claimbevel([d.id], w.vee[0].id)
+					break
+			w.tempo = 2.0
+			cam.zet_direct(view.terrein.tegel_midden(w.vee[0].tegel()) + Vector3(0, 0.6, 0), -2.2, deg_to_rad(24), 6.0)
 		"rots":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(108, 44)), 0.4, deg_to_rad(30), 20.0)
 		"klif":
