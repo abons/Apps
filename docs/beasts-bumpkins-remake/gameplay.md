@@ -313,7 +313,7 @@ Vervangt de voorstellen in sectie 6 waar ze botsen.
 | Wie bouwt | Elke volwassen man bouwt, de bouwer bouwt sneller |
 | Besturing (PC) | Selecteren met **selectiekader of klik op een unit**. **Linkerklik = bevel**, **rechterklik = selectie weg**. Lopen kan iedereen; **vechten en werken alleen volwassenen** |
 | Plaatsen | Rooster, 4 deurrichtingen (R draait) |
-| Steen gooien | **Nieuwe animatie** (de huidige `aanval_steen` met oprapen voldoet niet). **Stenen zijn munitie**: gooien kost stenen |
+| Steen gooien | **Munitie is oneindig** en komt nergens vandaan, zoals in het origineel. Per worp **hurken en een steen van de grond rapen**, dan opstaan en gooien: de bestaande `aanval_steen` (rapen op `pak_s`, loslaten op `release_s`) volgt dat al |
 | Wolf | Eet koeien; baby's als moeilijkheid later |
 | Seizoenen en weer | **Ook in missie 1** |
 | Missieladder | Origineel volgen, beginnend bij Aorta |
