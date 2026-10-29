@@ -268,9 +268,11 @@ func _plan_klaar(p: Plan) -> void:
 	hut.rotation.y = p.draai * PI * 0.5
 	var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
 	if terrein != null:
-		m.y = terrein.hoogte_op(m.x, m.z)
+		m.y = _laagste_grond(r)
 	var midden := box.get_center() * schaal
-	hut.position = m - Vector3(midden.x, box.position.y * schaal, midden.z).rotated(Vector3.UP, hut.rotation.y)
+	# y = 0 in de glb is de grond (stenen en keien steken er met opzet onder); vroeger zette dit de onderkant van het
+	# omhulsel op de grond, en dan zweefde de hut 16 cm (de funderingsstenen gaan tot -0,16 m)
+	hut.position = m - Vector3(midden.x, 0.0, midden.z).rotated(Vector3.UP, hut.rotation.y)
 	ghost.get_parent().add_child(hut)
 	var wk := hut.find_child("wieken", true, false) as Node3D
 	if wk != null:
@@ -338,6 +340,19 @@ func _bouw_hekken() -> void:
 		var deur := n.find_child("poort_deur", true, false) as Node3D
 		if deur:
 			_poorten[p] = deur
+
+
+## Laagste grond onder de voetafdruk (hoeken en midden): op een helling zakt het gebouw liever iets in dan dat het zweeft.
+func _laagste_grond(r: Rect2i) -> float:
+	var tm := w.tegel_m
+	var x0 := r.position.x * tm + 0.3
+	var x1 := r.end.x * tm - 0.3
+	var z0 := r.position.y * tm + 0.3
+	var z1 := r.end.y * tm - 0.3
+	var h := terrein.hoogte_op((x0 + x1) * 0.5, (z0 + z1) * 0.5)
+	for p in [Vector2(x0, z0), Vector2(x1, z0), Vector2(x0, z1), Vector2(x1, z1)]:
+		h = minf(h, terrein.hoogte_op(p.x, p.y))
+	return h
 
 
 ## Akker af: per tegel de kale grond en het gewas erop, dat in _process meegroeit met Wereld.akkers.
