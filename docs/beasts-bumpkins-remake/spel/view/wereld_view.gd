@@ -150,6 +150,8 @@ func _werk_koeien(a: float, dt: float) -> void:
 		n.position = nieuw
 		if w.gepauzeerd:
 			Koe.speel(n, "idle", 0.0)
+		elif k.gemolken:
+			Koe.speel(n, "gemolken_worden", w.tempo)
 		elif k.snelheid_mps > 0.0:
 			Koe.speel(n, "lopen", w.tempo)
 		else:

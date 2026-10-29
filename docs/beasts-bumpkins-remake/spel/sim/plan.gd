@@ -19,6 +19,7 @@ var voorraad := 0          ## molen: brood op het schap (beasts-src Building.sto
 const DEUREN := {
 	&"hut": {"plek": Vector2(-1.53, 0.07), "richting": Vector2i(-1, 0)},
 	&"molen": {"plek": Vector2(1.1, 2.5), "richting": Vector2i(0, 1)},
+	&"melkerij": {"plek": Vector2(-2.9, 0.16), "richting": Vector2i(-1, 0)},
 }
 
 

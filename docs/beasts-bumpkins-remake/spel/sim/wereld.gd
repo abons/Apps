@@ -23,9 +23,10 @@ signal volwassen_geworden(d: Dorpeling)
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
 ## hut 7,6 x 7,1 m incl. hek (deur 1,58 m, zie Bouwmenu.DEUR_M), gereedschapsloods 8,9 x 3,6 m incl. het ijzer aan de
 ## zijkant, kippenhok 2,4 x 2,4 m (stromat).
-## Molen (= bakkerij, beasts-src SHOP) 8,2 x 5,8 m incl. wieken; akker 2x2 tegels, elk een akker-glb van 2 x 2 m.
+## Molen (= bakkerij, beasts-src SHOP) 8,2 x 5,8 m incl. wieken; akker 2x2 tegels, elk een akker-glb van 2 x 2 m;
+## melkerij 7,7 x 6,6 m incl. varkenshok, op deurmaat (deur 1,84 m -> 0,86x) 6,6 x 5,6 m.
 const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2),
-	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2)}
+	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2), &"melkerij": Vector2i(4, 4)}
 const NIET_BLOKKEREND := [&"akker"]       ## loopbaar na de bouw (beasts-src Ground.FIELD is begaanbaar)
 var plannen: Array[Plan] = []
 
@@ -242,10 +243,15 @@ func tik(dt: float) -> void:
 	_check_missie()
 
 
-# ---------------------------------------------------------------- graan en brood (beasts-src: akker -> winkel -> kopen)
+# ---------------------------------------------------------------- winkels: graan -> molen -> brood, melk -> melkerij (beasts-src-lus)
+
+## Winkel per waar: wat erheen gedragen wordt en wat er gekocht wordt (beasts-src Kind.SHOP = CROP, DAIRY = MILK).
+const WINKELS := {&"molen": {"brengt": "graan", "waar": "brood"}, &"melkerij": {"brengt": "melk", "waar": "melk"}}
+const WAREN := ["brood", "melk"]
 
 ## Akkers groeien in lente en zomer; bij het begin van de winter sterft wat rijp staat (gameplay.md 3, Grid.wither).
-## Elke halve seconde kiest wie niets omhanden heeft een klus: graan wegbrengen, brood kopen, of (volwassen) oogsten.
+## Koeien geven na het melken pas na `koe_leeg_s` weer melk. Elke halve seconde kiest wie niets omhanden heeft een klus:
+## wegbrengen wat hij draagt, kopen waar hij trek in heeft, of (volwassen) oogsten of melken.
 func _economie(dt: float) -> void:
 	var e: Dictionary = spel["economie"]
 	var rijp := float(e["rijp_s"])
@@ -257,8 +263,11 @@ func _economie(dt: float) -> void:
 		for t in akkers:
 			if akkers[t] >= rijp:
 				akkers[t] = 0.0
+	for k in vee:
+		k.leeg = maxf(0.0, k.leeg - dt)
 	for d in dorpelingen:
-		d.trek += dt
+		for waar in WAREN:
+			d.trek[waar] = float(d.trek.get(waar, 0.0)) + dt
 	_klus_t += dt
 	if _klus_t < 0.5:
 		return
@@ -268,30 +277,49 @@ func _economie(dt: float) -> void:
 			_kies_klus(d)
 
 
-func molens() -> Array[Plan]:
+func winkels(soort: StringName) -> Array[Plan]:
 	var uit: Array[Plan] = []
 	for p in plannen:
-		if p.klaar and p.soort == &"molen":
+		if p.klaar and p.soort == soort:
 			uit.append(p)
 	return uit
 
 
-func brood() -> int:
+func molens() -> Array[Plan]:
+	return winkels(&"molen")
+
+
+func voorraad(soort: StringName) -> int:
 	var n := 0
-	for m in molens():
+	for m in winkels(soort):
 		n += m.voorraad
 	return n
+
+
+func brood() -> int:
+	return voorraad(&"molen")
+
+
+func melk() -> int:
+	return voorraad(&"melkerij")
 
 
 func rijp(t: Vector2i) -> bool:
 	return akkers.has(t) and akkers[t] >= float(spel["economie"]["rijp_s"])
 
 
-func _dichtste_molen(d: Dorpeling, met_brood: bool) -> Plan:
+func _winkel_voor(waar: String, brengt: bool) -> StringName:
+	for s in WINKELS:
+		if WINKELS[s]["brengt" if brengt else "waar"] == waar:
+			return s
+	return &""
+
+
+func _dichtste_winkel(d: Dorpeling, soort: StringName, met_voorraad: bool) -> Plan:
 	var beste: Plan = null
 	var bd := INF
-	for m in molens():
-		if met_brood and m.voorraad <= 0:
+	for m in winkels(soort):
+		if met_voorraad and m.voorraad <= 0:
 			continue
 		var af := d.pos.distance_squared_to(Vector2(m.deur_tegel()))
 		if af < bd:
@@ -300,42 +328,69 @@ func _dichtste_molen(d: Dorpeling, met_brood: bool) -> Plan:
 	return beste
 
 
+## Melkbaar: niet leeg, niet al vast (claim of melker onderweg) en binnen `melk_straal` tegels van het kampvuur
+## (besluit gebruiker: ook wilde koeien geven melk, maar alleen als ze dicht bij het dorp staan).
+func melkbaar(k: Vee) -> bool:
+	return k.leeg <= 0.0 and not k.vast and Vector2(k.tegel()).distance_to(Vector2(kampvuur)) <= float(spel["economie"]["melk_straal"])
+
+
 func _kies_klus(d: Dorpeling) -> void:
 	var e: Dictionary = spel["economie"]
 	if d.draagt != "":
-		var m := _dichtste_molen(d, false)
+		var m := _dichtste_winkel(d, _winkel_voor(d.draagt, true), false)
 		if m != null and d.geef_bevel(self, "lever", dichtstbij_loopbaar(m.deur_tegel())):
 			d.klus = m
 		return
-	if d.trek >= float(e["trek_s"]):
-		var m := _dichtste_molen(d, true)
+	for waar in WAREN:
+		if float(d.trek.get(waar, 0.0)) < float(e["trek_s"]):
+			continue
+		var m := _dichtste_winkel(d, _winkel_voor(waar, false), true)
 		if m != null and d.geef_bevel(self, "koop", dichtstbij_loopbaar(m.deur_tegel())):
 			d.klus = m
+			d.koopt = waar
 			return
-	if not d.volwassen() or molens().is_empty():
+	if not d.volwassen():
 		return
-	var beste := Vector2i(-1, -1)
-	var bd := INF
-	for t in akkers:
-		if rijp(t) and not _geoogst.has(t):
-			var af := d.pos.distance_squared_to(Vector2(t))
-			if af < bd:
-				bd = af
-				beste = t
-	if beste.x >= 0 and d.geef_bevel(self, "oogst", beste):
-		d.klus_tegel = beste
-		_geoogst[beste] = d.id
+	if not molens().is_empty():
+		var beste := Vector2i(-1, -1)
+		var bd := INF
+		for t in akkers:
+			if rijp(t) and not _geoogst.has(t):
+				var af := d.pos.distance_squared_to(Vector2(t))
+				if af < bd:
+					bd = af
+					beste = t
+		if beste.x >= 0 and d.geef_bevel(self, "oogst", beste):
+			d.klus_tegel = beste
+			_geoogst[beste] = d.id
+			return
+	if not winkels(&"melkerij").is_empty():
+		var koe_best: Vee = null
+		var kd := INF
+		for k in vee:
+			if melkbaar(k):
+				var af := d.pos.distance_squared_to(k.pos)
+				if af < kd:
+					kd = af
+					koe_best = k
+		if koe_best != null and d.geef_bevel(self, "melk", _naast(koe_best.tegel(), d.tegel())):
+			d.melk_koe = koe_best
+			koe_best.vast = true
 
 
 func laat_akker_los(t: Vector2i) -> void:
 	_geoogst.erase(t)
 
 
-## Aangekomen voor een klus: even staan (oogsten of aan de toonbank), daarna `klus_af`.
+## Aangekomen voor een klus: even staan (oogsten, melken of aan de toonbank), daarna `klus_af`.
 func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 	var e: Dictionary = spel["economie"]
 	match soort:
 		"oogst": d.bezig = float(e["oogst_s"])
+		"melk":
+			d.bezig = float(e["melk_s"])
+			if d.melk_koe != null:
+				d.melk_koe.gemolken = true
 		"koop": d.bezig = float(e["toonbank_s"])
 		_: d.bezig = 0.3
 
@@ -348,15 +403,24 @@ func klus_af(d: Dorpeling) -> void:
 		if rijp(t):
 			akkers[t] = 0.0
 			d.draagt = "graan"
+	elif d.melk_koe != null:
+		var k := d.melk_koe
+		k.vast = false
+		k.gemolken = false
+		if k.leeg <= 0.0:
+			k.leeg = float(e["koe_leeg_s"])
+			d.draagt = "melk"
+		d.melk_koe = null
 	elif d.klus is Plan:
 		var m: Plan = d.klus
 		if d.draagt != "":
 			m.voorraad += 1         # beasts-src restock
 			d.draagt = ""
 		elif m.voorraad > 0:
-			m.voorraad -= 1         # beasts-src visit: de kas krijgt de broodprijs
-			kas += int(e["brood_prijs"])
-			d.trek = 0.0
+			m.voorraad -= 1         # beasts-src visit: de kas krijgt de prijs
+			kas += int(e["prijs_per_stuk"])
+			d.trek[d.koopt] = 0.0
+		d.koopt = ""
 	d.klus = null
 	d.klus_tegel = Vector2i(-1, -1)
 
@@ -840,8 +904,8 @@ func geef_bouwbevel(ids: Array, p: Plan) -> int:
 func _rond_af(p: Plan) -> void:
 	p.klaar = true
 	var r := p.afdruk()
-	if p.soort == &"molen":
-		p.voorraad = int(spel["economie"]["molen_start"])
+	if WINKELS.has(p.soort):
+		p.voorraad = int(spel["economie"]["winkel_start"])
 	if p.soort in NIET_BLOKKEREND:
 		for c in range(r.position.x, r.end.x):
 			for rij in range(r.position.y, r.end.y):

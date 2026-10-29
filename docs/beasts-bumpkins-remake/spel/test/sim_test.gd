@@ -332,6 +332,36 @@ func _initialize() -> void:
 	_check(geleverd, "graan geoogst en naar de molen gebracht")
 	_check(ec.akkers.size() == 4, "akker blijft 4 tegels na het oogsten")
 
+	# melk: melkerij, de (wilde) koe dicht bij het dorp wordt gemolken, de melk gaat naar de melkerij, 90 s leeg
+	var mw := Wereld.new()
+	mw.laad()
+	var mkr: Plan = null
+	for y in range(44, 90, 3):
+		for x in range(86, 124, 3):
+			if mkr == null:
+				var mp := mw.maak_plan(&"melkerij", Vector2i(x, y), 0)
+				if mp != null and mw.bereik[mw.raster.idx(mp.deur_tegel().x, mp.deur_tegel().y)] == 1 and mw.plan_zet(mp):
+					mw._rond_af(mp)
+					mkr = mp
+	_check(mkr != null and mkr.voorraad == 8, "melkerij staat met 8 melk")
+	var mkoe: Vee = mw.vee[0]
+	_check(not mw.melkbaar(mkoe), "koe bij de generator (ver van het dorp) wordt niet gemolken")
+	mkoe.zet_tegel(mw.dichtstbij_loopbaar(mw.kampvuur + Vector2i(4, -4)))
+	mkoe.anker = mkoe.tegel()
+	_check(mw.melkbaar(mkoe), "koe bij het dorp is melkbaar")
+	var mv := mkr.voorraad
+	var gemolken := false
+	var gebracht := false
+	for i in int(60.0 / mw.tik_dt):
+		mw.tik(mw.tik_dt)
+		if mkoe.leeg > 0.0:
+			gemolken = true
+		if mkr.voorraad > mv:
+			gebracht = true
+		mv = mkr.voorraad
+	_check(gemolken and mkoe.leeg > 0.0, "koe gemolken, nog %.0f s leeg" % mkoe.leeg)
+	_check(gebracht, "melk naar de melkerij gebracht")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

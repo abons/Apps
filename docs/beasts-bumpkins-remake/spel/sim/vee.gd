@@ -17,6 +17,8 @@ var eigenaar := -1            ## -1 wild, 0 speler
 var van_generator := false    ## telt mee voor het maximum van de generator zolang ze wild is
 var vast := false             ## er loopt iemand naartoe om haar te claimen: blijft staan
 var snelheid_mps := 0.0
+var leeg := 0.0               ## s tot ze weer melk geeft (beasts-src Herd.again: koe 90 s)
+var gemolken := false         ## er zit iemand naast te melken (view: gemolken_worden)
 
 
 func tegel() -> Vector2i:
