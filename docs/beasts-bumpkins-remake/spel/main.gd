@@ -229,7 +229,7 @@ func _start_scenario() -> void:
 			for d in w.dorpelingen:
 				if d.volwassen():
 					ids.append(d.id)
-			var p := w.maak_plan(&"hut", Vector2i(100, 64), 0)
+			var p := _vrij_plan(&"hut", Vector2i(99, 62))
 			if p != null and w.plan_zet(p):
 				w.geef_bouwbevel(ids.slice(0, 2), p)
 			var l := _vrij_plan(&"gereedschapsloods", Vector2i(106, 60))

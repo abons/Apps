@@ -2,7 +2,7 @@ class_name Wegen
 extends Node3D
 ## De wegen als keienstrook (shaders/weg.gdshader) over het terrein: per padtegel een achthoekje op het tegelmidden en een
 ## strook naar elke padburen (recht altijd, schuin alleen als de twee rechte tussenburen er niet allebei liggen, anders
-## ontstaat er een driehoek). Volgt de grondhoogte. Wordt opnieuw opgebouwd bij Wereld.wegen_veranderd.
+## ontstaat er een driehoek), plus per gebouw een stoep van de deurtegel tot het deuranker. Volgt de grondhoogte. Wordt opnieuw opgebouwd bij Wereld.wegen_veranderd.
 
 const BREED := 1.3          ## m, de keienstrook (origineel: ongeveer een halve tegel)
 const BOVEN := 0.035        ## m boven de grond
@@ -60,6 +60,12 @@ func herbouw() -> void:
 						continue
 				var e := Vector2((n.x + 0.5) * tm, (n.y + 0.5) * tm)
 				_strook(st, c, e, half)
+	# de stoep: van het midden van de deurtegel naar het deuranker, binnen de voetafdruk
+	for p in w.plannen:
+		if p.klaar and Plan.DEUREN.has(p.soort):
+			var dt := p.deur_tegel()
+			if w.raster.soort[w.raster.idx(dt.x, dt.y)] == pad:
+				_strook(st, Vector2((dt.x + 0.5) * tm, (dt.y + 0.5) * tm), p.deur_punt(tm), half * 0.85)
 	st.generate_normals()
 	_mi.mesh = st.commit()
 	_mi.material_override = mat

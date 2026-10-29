@@ -32,7 +32,11 @@ Padtegels (uit de kaart: `road` 1/2/6, plus wat er later bijkomt) worden een kei
 `shaders/weg.gdshader`: procedurele kinderkopjes, rafelrand, sneeuw en nat), van tegelmidden naar tegelmidden; het terrein
 eronder is alleen wat vertrapte grond. Elk afgebouwd gebouw met een deur (`Plan.DEUREN`: hut, molen, melkerij, kippenhok,
 loods) krijgt meteen een weg van zijn deur naar het dichtste pad of het kampvuur (`Wereld.leg_weg`, BFS; beasts-src
-`World.aim` bestelt die weg mee), `weg_per_tegel` (2) kas per nieuwe tegel, zonder bouwtijd.
+`World.aim` bestelt die weg mee), `weg_per_tegel` (2) kas per nieuwe tegel, zonder bouwtijd. De laatste meters, van de
+deurtegel tot de echte deur binnen de voetafdruk, tekent `Wegen` als stoep naar `Plan.deur_punt`.
+Bouwen kan niet op pad (zoals het origineel), niet op andermans deurtegel, en alleen als de eigen deurtegel loopbaar en
+bereikbaar is (een boompje voor de deur liet de weg eerst ernaast uitkomen). `test/deur_check.gd` legt `Plan.DEUREN` naast
+de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebouw-glb opnieuw draaien.
 
 ## Besturing
 

@@ -903,16 +903,26 @@ func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
 	return p if kan_bouwen(p) else null
 
 
-## Alle tegels van de voetafdruk loopbaar (objecten staan al in het raster) en vrij van andere plannen.
+## Alle tegels van de voetafdruk loopbaar (objecten staan al in het raster), geen pad, vrij van andere plannen en hun
+## deuren, en de eigen deurtegel loopbaar en bereikbaar.
 func kan_bouwen(p: Plan) -> bool:
 	var r := p.afdruk()
 	for c in range(r.position.x, r.end.x):
 		for rij in range(r.position.y, r.end.y):
-			if not raster.loopbaar(c, rij):
+			if not raster.loopbaar(c, rij) or raster.soort_naam(c, rij) == "pad":   # origineel: niet op een weg bouwen
 				return false
 	for q in plannen:
 		if q.afdruk().intersects(r):
 			return false
+		if Plan.DEUREN.has(q.soort) and r.has_point(q.deur_tegel()):    # niet voor andermans deur
+			return false
+	if Plan.DEUREN.has(p.soort):        # de eigen deur moet bereikbaar zijn: daar begint de weg en daar gaan ze naar binnen
+		var dt := p.deur_tegel()
+		if not raster.loopbaar_v(dt) or bereik[raster.idx(dt.x, dt.y)] == 0:
+			return false
+		for q in plannen:
+			if q.afdruk().has_point(dt):
+				return false
 	return true
 
 
@@ -964,8 +974,7 @@ func leg_weg(van: Vector2i) -> int:
 			break
 		t = vorige[t]
 	kas = maxi(0, kas - nieuw * int(spel.get("weg_per_tegel", 0)))
-	if nieuw > 0:
-		wegen_veranderd.emit()
+	wegen_veranderd.emit()      # ook zonder nieuwe tegels: de stoep naar de deur (view/wegen.gd)
 	return nieuw
 
 

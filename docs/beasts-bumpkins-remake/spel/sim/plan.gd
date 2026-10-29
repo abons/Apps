@@ -18,7 +18,7 @@ var voorraad := 0          ## molen: brood op het schap (beasts-src Building.sto
 ## (`deur_voor_drempel`, `deur_drempel`) min het midden van het omhulsel; de deur kijkt langs `richting`.
 const DEUREN := {
 	&"hut": {"plek": Vector2(-1.53, 0.07), "richting": Vector2i(-1, 0)},
-	&"molen": {"plek": Vector2(1.1, 2.5), "richting": Vector2i(0, 1)},
+	&"molen": {"plek": Vector2(1.05, 2.38), "richting": Vector2i(0, 1)},
 	&"melkerij": {"plek": Vector2(-2.9, 0.16), "richting": Vector2i(-1, 0)},
 	&"kippenhok": {"plek": Vector2(-0.45, -0.7), "richting": Vector2i(0, -1)},
 	&"gereedschapsloods": {"plek": Vector2(0.6, 1.44), "richting": Vector2i(0, 1)},
@@ -43,6 +43,15 @@ func stand() -> int:
 func deur_richting() -> Vector2i:
 	var r: Vector2i = DEUREN.get(soort, DEUREN[&"hut"])["richting"]
 	return Vector2i(Vector2(r).rotated(-draai * PI * 0.5).round())
+
+
+## Het deuranker in wereldmeters (x, z): waar de weg vanaf de deurtegel naartoe loopt (view/wegen.gd), want de
+## voetafdruk is groter dan het gebouw en de deur ligt er dus binnen.
+func deur_punt(tegel_m: float) -> Vector2:
+	var r := afdruk()
+	var d: Dictionary = DEUREN.get(soort, DEUREN[&"hut"])
+	var m := (Vector2(r.position) + Vector2(r.size) * 0.5) * tegel_m
+	return m + (d["plek"] as Vector2).rotated(-draai * PI * 0.5)
 
 
 ## De tegel voor de deur: het deuranker naar tegels, dan langs de deurrichting tot net buiten de voetafdruk.

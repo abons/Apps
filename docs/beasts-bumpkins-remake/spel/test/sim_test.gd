@@ -147,12 +147,23 @@ func _initialize() -> void:
 	_check(v.tik_nr == 50, "4x = 40 tikken erbij (%d)" % v.tik_nr)
 
 	# bouwplan: hut op gras naast het kampvuur kan, op het kampvuur of dubbel niet
-	var vrij := Vector2i(100, 64)
-	_check(w.raster.loopbaar(100, 64) and w.raster.loopbaar(103, 67), "testplek (100,64) is vrij")
+	var vrij := Vector2i(-1, -1)          # eerste plek bij het kampvuur waar een hut kan (niet op het pad)
+	for r in 8:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if vrij.x < 0 and w.kan_bouwen(Plan.new(&"hut", Vector2i(98 + dx, 62 + dy), 0, 4, 4)):
+					vrij = Vector2i(98 + dx, 62 + dy)
+	_check(vrij.x >= 0, "testplek %s is vrij" % vrij)
 	var bp := w.maak_plan(&"hut", vrij, 0)
 	_check(bp != null and w.plan_zet(bp), "hut kan op een vrije plek")
 	_check(w.maak_plan(&"hut", vrij + Vector2i(1, 1), 0) == null, "tweede hut er half overheen kan niet")
 	_check(w.maak_plan(&"hut", w.kampvuur, 0) == null, "hut op het kampvuur kan niet")
+	var padtegel := Vector2i(-1, -1)
+	for y in range(50, 80):
+		for x in range(90, 115):
+			if padtegel.x < 0 and w.raster.soort_naam(x, y) == "pad":
+				padtegel = Vector2i(x, y)
+	_check(padtegel.x >= 0 and w.maak_plan(&"kippenhok", padtegel, 0) == null, "niet op een pad bouwen (%s)" % padtegel)
 	_check(w.maak_plan(&"kerk", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
 	var lm: Vector2i = Wereld.BOUWSOORTEN[&"gereedschapsloods"]
 	_check(Plan.new(&"gereedschapsloods", Vector2i.ZERO, 1, lm.x, lm.y).afdruk().size == Vector2i(2, 5), "loods kwartslag gedraaid is 2x5")
@@ -172,7 +183,7 @@ func _initialize() -> void:
 		w.tik(w.tik_dt)
 		bouwtikken += 1
 	_check(bp.klaar, "hut klaar na %d bouwtikken (%.0f s)" % [bouwtikken, bouwtikken * w.tik_dt])
-	_check(not w.raster.loopbaar(100, 64), "afgebouwde hut blokkeert zijn tegels")
+	_check(not w.raster.loopbaar(vrij.x, vrij.y), "afgebouwde hut blokkeert zijn tegels")
 	_check(bouwer.werk_plan == null and not bouwer.bouwt, "bouwer is vrij na afloop")
 	var in_hut := 0
 	for dl in w.dorpelingen:
