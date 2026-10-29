@@ -16,6 +16,11 @@ $bron = @(
     '..\modellen\peasant_hut_rt.glb',
     '..\modellen\peasant_hut_rt_lod1.glb',
     '..\modellen\bumpkin\bumpkin_man.glb',
+    '..\modellen\bumpkin\bumpkin_vrouw.glb',
+    '..\modellen\bumpkin\bumpkin_jongen.glb',
+    '..\modellen\bumpkin\bumpkin_meisje.glb',
+    '..\modellen\bumpkin\bumpkin_oudere_man.glb',
+    '..\modellen\bumpkin\bumpkin_oudere_vrouw.glb',
     '..\modellen\bumpkin\bumpkin_anim.json')
 foreach ($b in $bron) {
     $src = Join-Path $PSScriptRoot $b

@@ -14,6 +14,9 @@ signal aangekomen          ## loop_naar() is bij het doel
 signal impact(welke: StringName)  ## bouwen (elke lus) en aanval_zwaard op impact_s; steen bij inslag; voor geluid/treffers
 
 const BUMPKIN_GLB := "res://assets/bumpkin_man.glb"
+## Uiterlijk per (geslacht, leeftijd); kinderen zijn al 1,11 m (0,81x de man) in de glb. Ontbreekt er een: de man.
+const UITERLIJK := {"man": "bumpkin_man", "vrouw": "bumpkin_vrouw", "jongen": "bumpkin_jongen", "meisje": "bumpkin_meisje",
+	"oude_man": "bumpkin_oudere_man", "oude_vrouw": "bumpkin_oudere_vrouw"}
 const BUMPKIN_ANIM := "res://assets/bumpkin_anim.json"
 const MODEL_YAW_OFFSET := 0.0
 const ACCEL := 6.0          # m/s^2
@@ -28,6 +31,7 @@ const GANG_MENGEN := 2
 const SCHREDE := 1.4        # alleen GANG_SCHREDE: zoveel langer is een pas dan de clip bedoelt
 static var gang := GANG_SCHREDE   ## hoe volg() de loop-animatie aan een hogere grondsnelheid koppelt
 
+var glb := BUMPKIN_GLB      ## zet voor add_child (zie glb_voor)
 var tempo := 1.0            ## 1 = de loopsnelheid uit de sidecar; <1 langzamer (afspeeltempo schaalt mee)
 var heeft_model := false
 
@@ -199,9 +203,22 @@ func _lees_meta() -> void:
 						_meta[k][f] = d[k][f]
 
 
+## Het glb-pad voor een dorpeling, of "" als dat model niet in assets/ staat.
+static func glb_voor(geslacht: String, leeftijd: String) -> String:
+	var k := geslacht
+	if leeftijd == "kind":
+		k = "meisje" if geslacht == "vrouw" else "jongen"
+	elif leeftijd == "oud":
+		k = "oude_vrouw" if geslacht == "vrouw" else "oude_man"
+	elif geslacht != "vrouw":
+		k = "man"
+	var p := "res://assets/%s.glb" % UITERLIJK[k]
+	return p if ResourceLoader.exists(p) else ""
+
+
 func _bouw_model() -> void:
-	if ResourceLoader.exists(BUMPKIN_GLB):
-		_model = (load(BUMPKIN_GLB) as PackedScene).instantiate()
+	if ResourceLoader.exists(glb):
+		_model = (load(glb) as PackedScene).instantiate()
 		add_child(_model)
 		_speler = _model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _model == null or _speler == null:

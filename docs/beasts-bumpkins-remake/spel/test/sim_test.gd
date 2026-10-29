@@ -92,6 +92,7 @@ func _initialize() -> void:
 	# 5. pad rond rots: een paar tegels waarvan de rechte lijn door rots/water/boom gaat maar een route bestaat
 	var gevonden := false
 	var naar := Vector2i(100, 66)
+	_check(w.raster.loopbaar_v(naar) and w.bereik[w.raster.idx(naar.x, naar.y)] == 1, "routedoel %s is loopbaar en bereikbaar" % naar)
 	for y in range(40, 60):
 		for x in range(82, 96):
 			var van := Vector2i(x, y)
@@ -107,7 +108,7 @@ func _initialize() -> void:
 			if geraakt:
 				var r := Router.route(w.raster, van, naar)
 				if not r.is_empty():
-					var ok := true
+					var ok := r[-1] == naar
 					for t in r:
 						if not w.raster.loopbaar_v(t):
 							ok = false

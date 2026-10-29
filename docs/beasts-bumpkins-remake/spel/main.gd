@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -71,6 +71,7 @@ func _ready() -> void:
 	bestuur.kader = hud.kader
 	bouwmenu = Bouwmenu.new()
 	bouwmenu.name = "Bouwmenu"
+	bouwmenu.terrein = view.terrein
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
 	if scenario != "":
@@ -154,6 +155,16 @@ func _start_scenario() -> void:
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
 			w.dorpeling(3).anker = Vector2i(108, 47)
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(109, 49)) + Vector3(0, 1.0, 0), -1.1, deg_to_rad(22), 11.0)
+		"bouw":
+			# hut naast het kampvuur, alle volwassenen bouwen; tempo 4x zodat de vier standen in een korte opname passen
+			var p := w.maak_plan(&"hut", Vector2i(100, 64), 0)
+			if p != null and w.plan_zet(p):
+				var ids := []
+				for d in w.dorpelingen:
+					ids.append(d.id)
+				w.geef_bouwbevel(ids, p)
+			w.tempo = 4.0
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(101, 65)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(30), 13.0)
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))

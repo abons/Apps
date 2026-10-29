@@ -71,7 +71,7 @@ Grotendeels wel, maar niet volledig.
 - **Docs:** `gameplay.md` sectie 7 = besluiten gebruiker; `missies.md` (30 missies); `map1.md`; `audio.md` (besluiten onderaan); `concept/lijst.md`.
 - **Volgende:**
   1. Spellogica naar `missies.md`/`gameplay.md` sectie 7: economie, werk, bouwen, koe-generator, winst/verlies missie 1.
-  2. Vijf andere personages, gebouwen en koe in het spel zetten (nu alle zes = man).
+  2. Gebouwen en koe in het spel zetten (de zes personages staan er sinds 2026-10-29 avond in, de hut ook na een bouw).
   3. Gebouwen: rieten dak opnieuw bakken in melkerij/kippenhok (stralen raken de onderlaag).
   4. Personages boven ~6: andere aanpak nodig (gebeeldhouwde of basismodel-mens), geen extra procedurele rondes.
   5. Conceptronde 3 afmaken (Chrome eerst herstarten): voetsoldatengilde (gedownload naar `lokaal/concept/`, beoordeling open), boogschuttersgilde, stadhuis, brouwerij, draagprops.

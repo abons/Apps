@@ -40,9 +40,12 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	for d in w.dorpelingen:
 		var b := Bumpkin.new()
 		b.name = "Dorpeling_%d" % d.id
+		var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd)
+		if g != "":
+			b.glb = g
+		elif d.leeftijd == "kind":
+			b.scale = Vector3.ONE * 0.81         # terugval op de man; lijst.md: kind 0,81x
 		add_child(b)
-		if d.leeftijd == "kind":
-			b.scale = Vector3.ONE * 0.81         # lijst.md: kind 0,81x
 		var ring := MeshInstance3D.new()
 		ring.name = "Selectiering"
 		ring.mesh = _ring_mesh

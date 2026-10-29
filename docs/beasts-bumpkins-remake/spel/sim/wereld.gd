@@ -24,6 +24,7 @@ var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, s
 var dorpelingen: Array[Dorpeling] = []
 var kampvuur := Vector2i.ZERO
 var bereik := PackedByteArray()          # tegels bereikbaar vanaf het kampvuur
+var _onbekend_gemeld := {}               # tegelnamen die al een waarschuwing gaven
 var eiland := Rect2i()                   # omhullende van `bereik`
 var rng := RandomNumberGenerator.new()
 var tegel_m := 2.0
@@ -82,10 +83,21 @@ func _vul_raster(kaart: Dictionary, tegels: Dictionary) -> void:
 		for x in k:
 			var naam: String = map_kind.get(rij_kind[x], "leeg")
 			var i := raster.idx(x, y)
-			raster.soort[i] = raster.namen.find(naam)
+			raster.soort[i] = _soort_index(naam)
 			var weg := str(int(rij_weg[x]))
 			if wegen.has(weg) and naam != "water" and naam != "leeg":
-				raster.soort[i] = raster.namen.find(wegen[weg])
+				raster.soort[i] = _soort_index(wegen[weg])
+
+
+## Index van een tegelnaam; een onbekende naam wordt "leeg" (anders 255 in de bytes en later een index buiten bereik).
+func _soort_index(naam: String) -> int:
+	var i := raster.namen.find(naam)
+	if i < 0:
+		if not _onbekend_gemeld.has(naam):
+			_onbekend_gemeld[naam] = true
+			push_warning("wereld: onbekende tegelsoort '%s', wordt leeg" % naam)
+		i = raster.namen.find("leeg")
+	return i
 
 
 func _plaats_objecten(kaart: Dictionary) -> void:
@@ -328,9 +340,13 @@ func geef_bevel(ids: Array, soort: String, doel: Vector2i) -> int:
 	var plekken := spreid(t, uitvoerders.size())
 	var over: Array[Dorpeling] = uitvoerders.duplicate()
 	var gelukt := 0
-	for plek in plekken:
-		if over.is_empty():
-			break
+	if plekken.is_empty():
+		return 0
+	# Meer uitvoerders dan vrije plekken (smalle doorgang): de rest deelt de plekken, rond en rond.
+	var k := 0
+	while not over.is_empty():
+		var plek := plekken[k % plekken.size()]
+		k += 1
 		var beste: Dorpeling = over[0]
 		for d in over:
 			if d.pos.distance_squared_to(Vector2(plek)) < beste.pos.distance_squared_to(Vector2(plek)):
@@ -411,4 +427,5 @@ func _rond_af(p: Plan) -> void:
 			var t := dichtstbij_loopbaar(d.tegel())
 			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
 				d.zet_tegel(t)
+	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))   # nieuwe muren kunnen een doorgang afsluiten
 	plan_klaar.emit(p)

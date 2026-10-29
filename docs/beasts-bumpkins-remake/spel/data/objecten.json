@@ -20,5 +20,5 @@
     "stronken": {"modellen": [["stronk", 1.0]], "op": {"bosgrond": 0.05}, "afstand": 2, "schaal": [0.9, 1.3]}
   },
   "sex": {"1": {"geslacht": "man", "leeftijd": "volwassen"}, "2": {"geslacht": "vrouw", "leeftijd": "volwassen"},
-          "13": {"geslacht": "onbekend", "leeftijd": "kind"}, "14": {"geslacht": "onbekend", "leeftijd": "kind"}}
+          "13": {"geslacht": "man", "leeftijd": "kind"}, "14": {"geslacht": "vrouw", "leeftijd": "kind"}}
 }

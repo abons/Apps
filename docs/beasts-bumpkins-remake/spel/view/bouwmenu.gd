@@ -2,12 +2,16 @@ class_name Bouwmenu
 extends Node
 ## Bouwmenu (stap 5, gameplay.md §7): knop "Hut" of B, ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
 ## R draait, linkerklik plaatst een Plan in Wereld, rechterklik of Esc stopt. Shift bij het plaatsen houdt de modus aan.
-## Een Plan is nog een doorzichtige kist: bouwplaats, werkers en kas (prijs) staan nog niet in de sim.
+## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
+## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de hut-glb (terugval: bruine kist).
 ## Moet NA Bestuur in de boom staan: dan krijgt het de invoer eerst en neemt het de linkerklik van het kiezen over.
 
 const GROND_Y := 0.25
 const KLIK_DREMPEL := 6.0
 const HOOGTE := 2.4
+const HUT_GLB := "res://assets/peasant_hut_rt.glb"
+const STAPELS := ["houtstapel", "steenhoop"]
+const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
 
 var w: Wereld
 var bestuur: Bestuur
@@ -19,6 +23,9 @@ var ghost: MeshInstance3D
 var _rechts_start := Vector2.ZERO
 var _rechts := false
 var _kisten := {}          ## Plan -> kist
+var _stapels := {}         ## Plan -> [Node3D]
+var terrein: TerreinView   ## optioneel: grondhoogte voor stapels en hut (anders GROND_Y)
+var _hut_scene: PackedScene
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -28,6 +35,7 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	ghost.visible = false
 	parent3d.add_child(ghost)
 	w.plan_gezet.connect(_toon_plan)
+	w.plan_klaar.connect(_plan_klaar)
 
 	var laag := CanvasLayer.new()
 	add_child(laag)
@@ -80,8 +88,13 @@ func _plan_onder(pos: Vector2) -> Plan:
 
 
 func _process(_dt: float) -> void:
+	for p in _stapels:
+		for s: Node3D in _stapels[p]:
+			s.scale = Vector3.ONE * lerpf(1.0, STAPEL_RESTANT, p.voortgang)
 	for p in _kisten:
 		var k: MeshInstance3D = _kisten[p]
+		if p.klaar:
+			continue
 		var f: float = float(p.stand()) / Plan.STANDEN
 		k.scale.y = f
 		k.position.y = GROND_Y + HOOGTE * 0.5 * k.scale.y
@@ -104,6 +117,90 @@ func _toon_plan(p: Plan) -> void:
 	mi.rotation.y = p.draai * PI * 0.5
 	_kisten[p] = mi
 	ghost.get_parent().add_child(mi)
+	var lijst: Array[Node3D] = []
+	var plekken := _stapelplekken(p, STAPELS.size())
+	for i in plekken.size():
+		var n := Natuur.instantie(STAPELS[i])
+		if n == null:
+			continue
+		n.position = _grond(plekken[i])
+		n.rotation.y = p.draai * PI * 0.5 + i * 0.7
+		ghost.get_parent().add_child(n)
+		lijst.append(n)
+	_stapels[p] = lijst
+
+
+func _grond(t: Vector2i) -> Vector3:
+	var v := Vector3((t.x + 0.5) * w.tegel_m, GROND_Y, (t.y + 0.5) * w.tegel_m)
+	if terrein != null:
+		v.y = terrein.hoogte_op(v.x, v.z)
+	return v
+
+
+## Loopbare tegels die aan de voetafdruk grenzen (niet op de hoeken), te beginnen aan de voorkant (+z na draaien).
+func _stapelplekken(p: Plan, n: int) -> Array[Vector2i]:
+	var r := p.afdruk()
+	var rand: Array[Vector2i] = []
+	for c in range(r.position.x, r.end.x):
+		rand.append(Vector2i(c, r.end.y))
+	for rij in range(r.position.y, r.end.y):
+		rand.append(Vector2i(r.end.x, rij))
+	for c in range(r.position.x, r.end.x):
+		rand.append(Vector2i(c, r.position.y - 1))
+	for rij in range(r.position.y, r.end.y):
+		rand.append(Vector2i(r.position.x - 1, rij))
+	var uit: Array[Vector2i] = []
+	for t in rand:
+		if uit.size() < n and w.raster.loopbaar_v(t) and w.plan_op(t) == null:
+			uit.append(t)
+	return uit
+
+
+## Plan af: stapels weg, de kist wordt de hut, geschaald naar de voetafdruk (de glb heeft zijn eigen maat).
+func _plan_klaar(p: Plan) -> void:
+	for s: Node3D in _stapels.get(p, []):
+		s.queue_free()
+	_stapels.erase(p)
+	var k: MeshInstance3D = _kisten.get(p)
+	if k == null:
+		return
+	if _hut_scene == null and ResourceLoader.exists(HUT_GLB):
+		_hut_scene = load(HUT_GLB)
+	if _hut_scene == null:
+		k.scale.y = 1.0
+		k.position.y = GROND_Y + HOOGTE * 0.5
+		(k.material_override as StandardMaterial3D).albedo_color = Color(0.55, 0.4, 0.25, 1.0)
+		return
+	var hut: Node3D = _hut_scene.instantiate()
+	var box := _omhulsel(hut, Transform3D.IDENTITY)
+	var r := p.afdruk()
+	var schaal := minf(r.size.x, r.size.y) * w.tegel_m * 0.95 / maxf(box.size.x, box.size.z)
+	hut.scale = Vector3.ONE * schaal
+	hut.rotation.y = p.draai * PI * 0.5
+	var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
+	if terrein != null:
+		m.y = terrein.hoogte_op(m.x, m.z)
+	var midden := box.get_center() * schaal
+	hut.position = m - Vector3(midden.x, box.position.y * schaal, midden.z).rotated(Vector3.UP, hut.rotation.y)
+	ghost.get_parent().add_child(hut)
+	k.queue_free()
+	_kisten.erase(p)
+
+
+static func _omhulsel(n: Node, t: Transform3D) -> AABB:
+	var uit := AABB()
+	var eerste := true
+	var tt := t * (n as Node3D).transform if n is Node3D else t
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		uit = tt * (n as MeshInstance3D).get_aabb()
+		eerste = false
+	for c in n.get_children():
+		var b := _omhulsel(c, tt)
+		if b.size == Vector3.ZERO:
+			continue
+		uit = b if eerste else uit.merge(b)
+		eerste = false
+	return uit
 
 
 func _unhandled_input(e: InputEvent) -> void:
