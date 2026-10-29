@@ -1,7 +1,9 @@
 class_name TerreinView
 extends Node3D
-## Bouwt het terrein: een mesh met hoogte en kleur per hoekpunt (uit tegelhoogte en tegelkleur), een waterlaag,
-## bomen (MultiMesh), rotsblokken (MultiMesh) en de losse kaartobjecten (placeholders uit Props).
+## Bouwt het terrein: een mesh met hoogte en texturengewichten per hoekpunt (uit tegelhoogte en tegelsoort, shader
+## terrein.gdshader), een waterlaag, bomen en losse kaartobjecten (glb's via Props/Natuur) en de decoratie (rotsen, struiken,
+## stronken; alleen weergave, uit data/objecten.json "decoratie"). Bomen zijn gewone instanties: visibility_range werkt per
+## instantie, niet per MultiMesh-instantie, en een LOD-wissel bij 28 m is meer waard dan het bespaarde draw-call.
 ## Hoogte is alleen weergave; de sim is plat. `hoogte_op()` geeft de grondhoogte voor units.
 
 const MARGE := 14           # tegels water/land rondom het eiland
@@ -17,6 +19,9 @@ var terrein_mat: ShaderMaterial
 var water_mat: ShaderMaterial
 var kampvuur_node: Node3D
 var vlag_doek: Node3D
+var _sneeuwlaag_bomen: Array[Node3D] = []   # instanties met `_sneeuw`-kinderen
+var _sneeuwlaag_aan := false
+var aantallen := {}                          # voor het log: soort -> aantal
 
 
 func bouw(wereld: Wereld) -> void:
@@ -30,7 +35,10 @@ func bouw(wereld: Wereld) -> void:
 	_bouw_terrein()
 	_bouw_water()
 	_bouw_objecten()
-	_bouw_bomen_en_rotsen()
+	_bouw_bomen()
+	_bouw_decoratie()
+	zet_sneeuwlaag(false, true)
+	print("[terrein] ", aantallen)
 
 
 func tegel_midden(t: Vector2i) -> Vector3:
@@ -66,12 +74,10 @@ func hoogte_op(xm: float, zm: float) -> float:
 
 func _bouw_terrein() -> void:
 	_hoek_h.resize((br + 1) * (ho + 1))
-	var kleur_lin: Array[Color] = []
-	for k in w.raster.kleuren:
-		kleur_lin.append(k.srgb_to_linear())
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var kleuren := PackedColorArray()
+	var uvs := PackedVector2Array()
 	var idx := PackedInt32Array()
 	# hoekhoogtes: gemiddelde van de vier tegels rond de hoek
 	for j in ho + 1:
@@ -91,14 +97,14 @@ func _bouw_terrein() -> void:
 			var hd := _hoek(i, mini(j + 1, ho))
 			normals.append(Vector3(hl - hr, 2.0 * tegel_m, hu - hd).normalized())
 			var c := Color(0, 0, 0, 0)
+			var u := Vector2.ZERO
 			for dj in 2:
 				for di in 2:
-					var tc := x0 + i - 1 + di
-					var tr := y0 + j - 1 + dj
-					var si := w.raster.soort[w.raster.idx(tc, tr)] if w.raster.in_kaart(tc, tr) else w.raster.namen.find("leeg")
-					var k := kleur_lin[si]
-					c += Color(k.r, k.g, k.b, w.raster.gras_soort[si])
+					var sw := _splat(w.raster.soort_naam(x0 + i - 1 + di, y0 + j - 1 + dj))
+					c += Color(sw[0], sw[1], sw[2], sw[3])
+					u += Vector2(sw[4], sw[5])
 			kleuren.append(c / 4.0)
+			uvs.append(u / 4.0)
 	for j in ho:
 		for i in br:
 			var a := j * (br + 1) + i
@@ -111,16 +117,51 @@ func _bouw_terrein() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = kleuren
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	terrein_mat = ShaderMaterial.new()
 	terrein_mat.shader = load("res://shaders/terrein.gdshader")
+	for soort in ["kleur", "normaal", "ruw"]:
+		terrein_mat.set_shader_parameter(soort + "_tex", _texturenset(soort))
 	m.surface_set_material(0, terrein_mat)
 	var mi := MeshInstance3D.new()
 	mi.name = "Terrein"
 	mi.mesh = m
 	add_child(mi)
+
+
+## Gewichten per tegelsoort: [gras, bosgrond, rots, zand, pad-tint, aarde-tint]; water/leeg = alles 0 (= water_rand).
+func _splat(soort: String) -> Array:
+	match soort:
+		"gras": return [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+		"bosgrond": return [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+		"rots", "rotsrand": return [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+		"zand": return [0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+		"pad": return [0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+		"aarde": return [0.0, 0.65, 0.0, 0.35, 0.0, 1.0]
+		"overig": return [0.0, 0.5, 0.5, 0.0, 0.0, 0.5]
+	return [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+## Texture2DArray met de vijf terreinsets (volgorde = lagen in de shader): kleur, normaal of ruw.
+func _texturenset(soort: String) -> Texture2DArray:
+	var imgs: Array[Image] = []
+	for naam in ["gras", "bosgrond", "rots", "zand", "water_rand"]:
+		var tx := load("res://assets/terrein_%s_%s.jpg" % [naam, soort]) as Texture2D
+		if tx == null:
+			push_error("terrein: texture ontbreekt: " + naam + "_" + soort)
+			return null
+		var img := tx.get_image()
+		if img.is_compressed():
+			img.decompress()
+		img.convert(Image.FORMAT_RGB8)
+		img.generate_mipmaps(soort == "normaal")
+		imgs.append(img)
+	var t := Texture2DArray.new()
+	t.create_from_images(imgs)
+	return t
 
 
 func _bouw_water() -> void:
@@ -165,68 +206,117 @@ func _bouw_objecten() -> void:
 			continue
 		var n := Props.maak(ob)
 		if n == null:
-			n = Node3D.new()      # gemarkeerd maar zonder model (koe_generator)
+			n = Node3D.new()      # gemarkeerd maar zonder model
 		tellers[naam] = int(tellers.get(naam, 0)) + 1
 		n.name = naam if int(tellers[naam]) == 1 and naam != "paddenstoel" else "%s_%d_%d" % [naam, ob["x"], ob["y"]]
 		n.position = tegel_midden(Vector2i(ob["x"], ob["y"]))
-		n.rotation.y = _hash(ob["x"], ob["y"], 5) * TAU if naam == "paddenstoel" else 0.0
+		if naam == "paddenstoel" or naam == "koe_generator":
+			n.rotation.y = _hash(ob["x"], ob["y"], 5) * TAU
+		elif naam == "vlag":
+			n.rotation.y = deg_to_rad(-90)     # het doek wappert naar het oosten
 		add_child(n)
+		aantallen[naam] = int(aantallen.get(naam, 0)) + 1
 		if naam == "kampvuur":
 			kampvuur_node = n
 		elif naam == "vlag":
-			vlag_doek = n.find_child("Vlagdoek", true, false)
-		elif naam == "zilveren_beker":
-			n.scale = Vector3.ONE * 1.8
+			vlag_doek = n
 
 
-func _bouw_bomen_en_rotsen() -> void:
-	var per_soort := {}      # modelnaam -> Array[Transform3D]
+## Kiest uit [[naam, gewicht], ...] met een vaste (gehashte) waarde 0..1.
+func _kies(lijst: Array, r: float) -> String:
+	var som := 0.0
+	for e in lijst:
+		som += float(e[1])
+	var t := r * som
+	for e in lijst:
+		t -= float(e[1])
+		if t <= 0.0:
+			return e[0]
+	return lijst[-1][0]
+
+
+func _bouw_bomen() -> void:
+	var defs: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["objecten"]
+	var bos := Node3D.new()
+	bos.name = "Bomen"
+	add_child(bos)
 	for ob in w.objecten:
 		if not (ob["naam"] as String).begins_with("boom_"):
 			continue
-		var model: String = (ob["model"] as String).substr(12)
+		var def: Dictionary = defs[str(ob["cls"])]
 		var x: int = ob["x"]
 		var y: int = ob["y"]
+		var glb := _kies(def.get("varianten", [[(def["model"] as String).substr(7), 1.0]]), _hash(x, y, 20))
+		var n := Natuur.instantie(glb)
+		if n == null:
+			continue
 		var p := tegel_midden(Vector2i(x, y)) + Vector3((_hash(x, y, 1) - 0.5) * 0.9, 0, (_hash(x, y, 2) - 0.5) * 0.9)
 		p.y = hoogte_op(p.x, p.z) - 0.05
 		var s := 0.85 + _hash(x, y, 3) * 0.5
-		var b := Basis(Vector3.UP, _hash(x, y, 4) * TAU).scaled(Vector3(s, s * (0.9 + _hash(x, y, 6) * 0.3), s))
-		if not per_soort.has(model):
-			per_soort[model] = []
-		per_soort[model].append(Transform3D(b, p))
-	for model in per_soort:
-		var lijst: Array = per_soort[model]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = Props.boom_mesh(model)
-		mm.instance_count = lijst.size()
-		for i in lijst.size():
-			mm.set_instance_transform(i, lijst[i])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "Bomen_" + model
-		mmi.multimesh = mm
-		add_child(mmi)
-	# rotsblokken op rots- en rotsrandtegels
-	var rots: Array[Transform3D] = []
-	for y in range(y0, y0 + ho):
-		for x in range(x0, x0 + br):
-			var sn := w.raster.soort_naam(x, y)
-			if sn != "rots" and sn != "rotsrand":
-				continue
-			var aantal := 1 if sn == "rots" else (1 if _hash(x, y, 7) < 0.3 else 0)
-			for k in aantal:
-				var p := tegel_midden(Vector2i(x, y)) + Vector3((_hash(x, y, 8 + k) - 0.5) * 1.4, 0, (_hash(x, y, 9 + k) - 0.5) * 1.4)
-				var sc := (0.95 if sn == "rots" else 0.6) * (0.6 + _hash(x, y, 10) * 0.9)
-				p.y = hoogte_op(p.x, p.z) + 0.15 * sc
-				var b := Basis(Vector3.UP, _hash(x, y, 11) * TAU).scaled(Vector3(sc * (0.8 + _hash(x, y, 12) * 0.7), sc * (0.55 + _hash(x, y, 13) * 0.5), sc * (0.8 + _hash(x, y, 14) * 0.6)))
-				rots.append(Transform3D(b, p))
-	var mm2 := MultiMesh.new()
-	mm2.transform_format = MultiMesh.TRANSFORM_3D
-	mm2.mesh = Props.rots_mesh()
-	mm2.instance_count = rots.size()
-	for i in rots.size():
-		mm2.set_instance_transform(i, rots[i])
-	var mmi2 := MultiMeshInstance3D.new()
-	mmi2.name = "Rotsen"
-	mmi2.multimesh = mm2
-	add_child(mmi2)
+		n.transform = Transform3D(Basis(Vector3.UP, _hash(x, y, 4) * TAU).scaled(Vector3(s, s * (0.92 + _hash(x, y, 6) * 0.2), s)), p)
+		bos.add_child(n)
+		_sneeuwlaag_bomen.append(n)
+		aantallen[glb] = int(aantallen.get(glb, 0)) + 1
+
+
+## Winter: de `_sneeuw`-kinderen van de bomen aan (alleen bij verandering).
+func zet_sneeuwlaag(aan: bool, geforceerd := false) -> void:
+	if aan == _sneeuwlaag_aan and not geforceerd:
+		return
+	_sneeuwlaag_aan = aan
+	for n in _sneeuwlaag_bomen:
+		Natuur.zet_sneeuwlaag(n, aan)
+
+
+## Decoratie uit data/objecten.json "decoratie": alleen weergave, geen sim.
+func _bouw_decoratie() -> void:
+	var dec: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["decoratie"]
+	var deco := Node3D.new()
+	deco.name = "Decoratie"
+	add_child(deco)
+	# afstand tot kaartobjecten (alles behalve dorpelingen)
+	var bezet := {}
+	for ob in w.objecten:
+		if not ob["spawn"]:
+			bezet[Vector2i(ob["x"], ob["y"])] = true
+	for soort in ["rotsen", "struiken", "stronken"]:
+		var d: Dictionary = dec[soort]
+		var op: Dictionary = d["op"]
+		var afstand: int = int(d.get("afstand", 0))
+		var dorp_vrij: int = int(d.get("dorp_vrij", 0))
+		var sc: Array = d.get("schaal", [1.0, 1.0])
+		var sd: int = 40 + soort.length()
+		for y in range(y0, y0 + ho):
+			for x in range(x0, x0 + br):
+				var sn := w.raster.soort_naam(x, y)
+				if not op.has(sn) or _hash(x, y, sd) >= float(op[sn]):
+					continue
+				if afstand > 0:
+					if w.raster.blok[w.raster.idx(x, y)] == 1 or _dichtbij(bezet, x, y, afstand):
+						continue
+				if dorp_vrij > 0 and maxi(absi(x - w.kampvuur.x), absi(y - w.kampvuur.y)) <= dorp_vrij:
+					continue
+				var lijst: Array = d["modellen"]
+				var naam: String = lijst[int(_hash(x, y, sd + 1) * lijst.size()) % lijst.size()] if lijst[0] is String else _kies(lijst, _hash(x, y, sd + 1))
+				var n := Natuur.instantie(naam)
+				if n == null:
+					continue
+				var s := lerpf(sc[0], sc[1], _hash(x, y, sd + 2))
+				var p := tegel_midden(Vector2i(x, y))
+				var yaw := _hash(x, y, sd + 3) * TAU
+				if soort == "rotsen":
+					yaw = floorf(_hash(x, y, sd + 3) * 4.0) * PI * 0.5    # 2x2-tegels sluiten alleen in kwartslagen aan
+				else:
+					p += Vector3((_hash(x, y, sd + 4) - 0.5) * 1.2, 0, (_hash(x, y, sd + 5) - 0.5) * 1.2)
+					p.y = hoogte_op(p.x, p.z)
+				n.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s * float(d.get("schaal_y", 1.0)), s)), p)
+				deco.add_child(n)
+				aantallen[naam] = int(aantallen.get(naam, 0)) + 1
+
+
+func _dichtbij(bezet: Dictionary, x: int, y: int, r: int) -> bool:
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			if bezet.has(Vector2i(x + dx, y + dy)):
+				return true
+	return false

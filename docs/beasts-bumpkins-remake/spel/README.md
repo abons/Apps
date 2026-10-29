@@ -40,15 +40,23 @@ Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`, n
 - `data/` `spel.json` (tegelmaat 2 m, 10 Hz, looptempo, klok), `tegels.json` (kleur, loopbaar, snelheidsfactor: pad 1,15, gras 1, zand 0,9; water en rots niet loopbaar), `objecten.json` (klasse-id naar naam, model, voetafdruk, blokkeert).
 - `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Gegevens`.
 - `view/` `WereldView` spiegelt de sim, `TerreinView` (een mesh met vertexkleur en hoogte, water, MultiMesh-bomen en -rotsen), `Props` (placeholders), `Bumpkin` (geanimeerde man, `volg()`-modus voor de sim), `Licht`, `Regen`, `Bestuur`, `Hud`.
-- `shaders/` terrein (seizoenstint, sneeuw, nat) en water (diepte, schuim).
+- `shaders/` terrein (vijf texturensets, seizoenstint, sneeuw, nat), natuur_wind (gesynct uit modellen/natuur), natuur_steen (rotsen met sneeuw) en water (diepte, schuim).
 - `main.gd` zet alles in elkaar en bevat de scenario's. `test/` simtest, routetijd en glad_test. `screenshots/` verificatieframes.
 
 De sim tikt op 10 Hz los van het renderen; de view interpoleert tussen twee tikken. Looptempo = 0,849 m/s (animatie-sidecar) x `looptempo` 2,0 (spel.json) x tegelfactor. Routes worden recht getrokken (`Router.glad`). De loopanimatie volgt de grondsnelheid via `Bumpkin.gang`: 0 clip exact op tempo (cadans 2x, druk), 1 `SCHREDE` 1,4 (standaard: rustiger, lichte voetglijding), 2 blend naar de rennen-clip (ziet eruit als joggen).
 Tijd: een dag-nacht is 270 s (180 dag, 90 nacht), een seizoen is een dag-nacht. Begint in de lente.
 
-## Placeholder
+## Modellen en natuur
 
-Alle modellen behalve de dorpeling: bomen (den, spar, rond; ook gegenereerd op bosgrond), rotsblokken, paddenstoelen, vlag, kampvuur, bron, beker.
-Namen in de scene (`Bomen_boom_den`, `kampvuur`, `vlag`, ...) zijn de koppelpunten voor echte modellen. De koe-generator (klasse 171) is alleen een lege marker.
+Kaartobjecten gebruiken de glb's uit `modellen/natuur/` (sync.ps1 kopieert ze, de terreintexturen, `natuur_wind.gdshader` en de koe):
+`data/objecten.json` kiest per klasse-id `natuur:<glb>` (+ `varianten` met gewichten, `schaal`); `view/natuur.gd` laadt ze, zet de
+wind- en steen-shader op de materialen, LOD (`visibility_range`, 28 m) en de seizoenstint; `view/props.gd` maakt de losse objecten en het
+kampvuur-effect (GPUParticles3D vlammen en rook op `vuur_bron`, OmniLight3D flikkert in `WereldView`). Bomen zijn gewone instanties
+(geen MultiMesh: `visibility_range` werkt niet per MultiMesh-instantie). `decoratie` in objecten.json (rotstegels op rots/rotsrand, struiken,
+stronken) is ALLEEN weergave: de sim leest het niet en geen tegel wordt erdoor geblokkeerd. Terrein: `shaders/terrein.gdshader` mengt vijf
+texturensets (Texture2DArray, 2,8 m per herhaling) uit de hoekgewichten van `TerreinView._splat()`. De koe (klasse 171) komt uit `view/koe.gd`
+(pad, verborgen onderdelen en animatienaam staan alleen daar; nieuwe glb = sync + import). Seizoen: `Natuur.werk_seizoen()` (tint, rotssneeuw) en
+`TerreinView.zet_sneeuwlaag()` (winter), aangeroepen vanuit `WereldView.werk_seizoen()`.
+Scenario's voor frames: overzicht, dorp, selectie, pad, loop, vlag, bos, rots, koe. De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
 Kinderen (`sex` 13/14, niet geverifieerd) zijn de mangeometrie op schaal 0,81. De hut-glb wordt gesynct maar nog niet gebruikt.
 Hoogte (rotsboog, strand) is alleen weergave; de sim is plat.

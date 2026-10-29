@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad
+## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -137,6 +137,14 @@ func _start_scenario() -> void:
 			cam.zet_direct(vuur + Vector3(2, 0, -2), 0.5, deg_to_rad(52), 26.0)
 		"loop":
 			cam.zet_direct(vuur + Vector3(4, 0, -2), 1.0, deg_to_rad(22), 8.0)
+		"vlag":
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(104, 65)) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
+		"bos":
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(114, 50)), 0.8, deg_to_rad(24), 16.0)
+		"koe":
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(118, 58)) + Vector3(0, 0.6, 0), -2.2, deg_to_rad(28), 7.0)
+		"rots":
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(108, 44)), 0.4, deg_to_rad(30), 20.0)
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))

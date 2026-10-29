@@ -1,9 +1,8 @@
 class_name Props
 extends RefCounted
-## Placeholder-meshes voor kaartobjecten. De naam in data/objecten.json ("placeholder:boom_den") kiest de fabriek;
-## een echt model vervangt later alleen deze functie (of laadt een glb op dezelfde naam).
+## Kaartobjecten als node. data/objecten.json `model`: "natuur:<glb>" laadt assets/<glb>.glb via Natuur (wind, LOD, seizoen),
+## "koe" de koe (Koe), "placeholder:<naam>" de oude blokjes hieronder (terugval als een glb ontbreekt).
 
-static var kroon_mat: StandardMaterial3D        # gedeeld, seizoenstint in WereldView.werk_seizoen()
 static var steen_mat: StandardMaterial3D
 
 
@@ -16,12 +15,6 @@ static func _mat(kleur: Color, ruw := 0.9, emissie := 0.0) -> StandardMaterial3D
 		m.emission = kleur
 		m.emission_energy_multiplier = emissie
 	return m
-
-
-static func _kroon() -> StandardMaterial3D:
-	if kroon_mat == null:
-		kroon_mat = _mat(Color(0.13, 0.30, 0.11), 0.85)
-	return kroon_mat
 
 
 static func _steen() -> StandardMaterial3D:
@@ -59,55 +52,122 @@ static func _bol(r: float, seg := 10) -> SphereMesh:
 	return s
 
 
-## Boommesh met twee vlakken (stam, kroon), geschikt voor MultiMesh. Hoogte ~5-7 m.
-static func boom_mesh(soort: String) -> ArrayMesh:
-	var stam := SurfaceTool.new()
-	var kroon := SurfaceTool.new()
-	stam.begin(Mesh.PRIMITIVE_TRIANGLES)
-	kroon.begin(Mesh.PRIMITIVE_TRIANGLES)
-	match soort:
-		"boom_den":    # grote den: dikke stam, 4 kegels
-			stam.append_from(_cyl(0.18, 0.32, 2.4), 0, Transform3D(Basis(), Vector3(0, 1.2, 0)))
-			for k in 4:
-				kroon.append_from(_kegel(2.0 - k * 0.38, 2.4, 10), 0, Transform3D(Basis(), Vector3(0, 2.4 + k * 1.15, 0)))
-		"boom_spar":   # spar: smal en hoog
-			stam.append_from(_cyl(0.12, 0.22, 1.6), 0, Transform3D(Basis(), Vector3(0, 0.8, 0)))
-			for k in 5:
-				kroon.append_from(_kegel(1.35 - k * 0.2, 2.0, 8), 0, Transform3D(Basis(), Vector3(0, 1.8 + k * 1.0, 0)))
-		_:             # boom_rond: loofboom
-			stam.append_from(_cyl(0.2, 0.3, 2.6), 0, Transform3D(Basis(), Vector3(0, 1.3, 0)))
-			kroon.append_from(_bol(1.7, 12), 0, Transform3D(Basis().scaled(Vector3(1, 0.85, 1)), Vector3(0, 3.7, 0)))
-			kroon.append_from(_bol(1.1, 10), 0, Transform3D(Basis(), Vector3(0.9, 3.1, 0.3)))
-	var m := ArrayMesh.new()
-	stam.generate_normals()
-	kroon.generate_normals()
-	stam.commit(m)
-	kroon.commit(m)
-	m.surface_set_material(0, _mat(Color(0.30, 0.21, 0.13)))
-	m.surface_set_material(1, _kroon() if soort != "boom_rond" else _kroon())
-	return m
-
-
-static func rots_mesh() -> Mesh:
-	var s := _bol(1.0, 6)
-	s.material = _steen()
-	return s
-
-
-## Een los kaartobject. `ob` komt uit Wereld.objecten. Geeft null voor niets-tonen (bv. de koe-generator).
+## Een los kaartobject. `ob` komt uit Wereld.objecten. Geeft null voor niets-tonen.
 static func maak(ob: Dictionary) -> Node3D:
 	var model: String = ob["model"]
-	if not model.begins_with("placeholder:"):
-		return null
+	if model.begins_with("natuur:"):
+		var glb := model.substr(7)
+		var n := Natuur.instantie(glb)
+		if n == null:
+			return _placeholder(glb, ob)
+		var def: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["objecten"][str(ob["cls"])]
+		n.scale = Vector3.ONE * float(def.get("schaal", 1.0))
+		if glb == "kampvuur":
+			_kampvuur_effecten(n)
+		return n
+	if model == "koe":
+		return Koe.maak(Koe.STANDAARD, float((ob["x"] * 31 + ob["y"] * 17) % 30) / 10.0)
+	if model.begins_with("placeholder:"):
+		return _placeholder(model.substr(12), ob)
+	return null
+
+
+static func _placeholder(naam: String, ob: Dictionary) -> Node3D:
 	var n := Node3D.new()
-	match model.substr(12):
+	match naam:
 		"paddenstoel": _paddenstoel(n, ob["state"])
 		"vlag": _vlag(n)
 		"kampvuur": _kampvuur(n)
 		"bron": _bron(n)
-		"beker": _beker(n)
+		"beker", "zilveren_beker": _beker(n)
 		_: return null
 	return n
+
+
+## Kampvuur uit de glb: deeltjes voor vlammen en rook op `vuur_bron`, een OmniLight3D (flikkert in WereldView).
+## De namen "Vlam" (de emissieve vlamkaart, schaalt mee met de flikker) en "Vuurlicht" blijven de koppelpunten.
+static func _kampvuur_effecten(n: Node3D) -> void:
+	var bron := n.find_child("vuur_bron", true, false) as Node3D
+	var plek := bron.position if bron else Vector3(0, 0.22, 0)
+	var vlam := n.find_child("kampvuur_vlam", true, false)
+	if vlam:
+		vlam.name = "Vlam"
+	var licht := OmniLight3D.new()
+	licht.name = "Vuurlicht"
+	licht.position = Vector3(0, 0.7, 0)
+	licht.light_color = Color(1.0, 0.62, 0.30)
+	licht.omni_range = 9.0
+	licht.omni_attenuation = 1.3
+	licht.light_energy = 1.6
+	licht.shadow_enabled = false
+	n.add_child(licht)
+	# zacht rond deeltjesplaatje, zonder bestand
+	var gr := Gradient.new()
+	gr.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	gr.offsets = PackedFloat32Array([0.0, 1.0])
+	var tex := GradientTexture2D.new()
+	tex.gradient = gr
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	tex.width = 64
+	tex.height = 64
+	n.add_child(_deeltjes("Vlammen", tex, 24, 0.8, 0.5, 0.06, Vector3(0, 0.6, 0), 0.7, 0.35,
+		[0.0, 0.12, 0.6, 1.0], [Color(1.0, 0.85, 0.4, 0.0), Color(1.0, 0.7, 0.2, 0.95), Color(1.0, 0.35, 0.05, 0.55), Color(0.6, 0.1, 0.0, 0.0)],
+		true, plek))
+	n.add_child(_deeltjes("Rook", tex, 14, 3.6, 0.7, 0.12, Vector3(0.25, 0.25, 0.1), 0.7, 2.4,
+		[0.0, 0.2, 1.0], [Color(0.35, 0.33, 0.32, 0.0), Color(0.30, 0.29, 0.28, 0.20), Color(0.25, 0.25, 0.26, 0.0)],
+		false, plek + Vector3(0, 0.6, 0)))
+
+
+static func _deeltjes(naam: String, tex: Texture2D, aantal: int, leven: float, grootte: float, straal: float, zwaartekracht: Vector3,
+		snelheid: float, schaal_eind: float, offsets: Array, kleuren: Array, optellend: bool, plek: Vector3) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.name = naam
+	p.amount = aantal
+	p.lifetime = leven
+	p.position = plek
+	p.local_coords = false
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = straal
+	pm.direction = Vector3(0, 1, 0)
+	pm.spread = 18.0
+	pm.initial_velocity_min = snelheid * 0.6
+	pm.initial_velocity_max = snelheid
+	pm.gravity = zwaartekracht
+	pm.scale_min = 0.7
+	pm.scale_max = 1.0
+	var sc := Curve.new()
+	sc.add_point(Vector2(0, 0.6))
+	sc.add_point(Vector2(1, schaal_eind))
+	var sct := CurveTexture.new()
+	sct.curve = sc
+	pm.scale_curve = sct
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array(offsets)
+	g.colors = PackedColorArray(kleuren)
+	var gt := GradientTexture1D.new()
+	gt.gradient = g
+	pm.color_ramp = gt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(grootte, grootte)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD if optellend else BaseMaterial3D.BLEND_MODE_MIX
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.particles_anim_h_frames = 1
+	mat.particles_anim_v_frames = 1
+	mat.vertex_color_use_as_albedo = true
+	mat.albedo_texture = tex
+	mat.disable_receive_shadows = true
+	q.material = mat
+	p.draw_pass_1 = q
+	return p
 
 
 static func _paddenstoel(n: Node3D, soort: int) -> void:

@@ -24,4 +24,21 @@ foreach ($b in $bron) {
         Write-Host "gekopieerd: assets/$(Split-Path $src -Leaf)"
     } else { Write-Host "ontbreekt (overgeslagen): $b" }
 }
+# natuur en props (glb's hebben hun texturen ingebakken), de koe, en de terreintexturen (5 sets x kleur/normaal/ruw)
+$nat = Join-Path $PSScriptRoot '..\modellen\natuur'
+foreach ($g in Get-ChildItem (Join-Path $nat '*.glb')) {
+    Copy-Item $g.FullName (Join-Path $assets $g.Name) -Force
+}
+Write-Host "gekopieerd: natuur-glb's"
+foreach ($t in Get-ChildItem (Join-Path $nat 'textures\terrein_*.jpg')) {
+    Copy-Item $t.FullName (Join-Path $assets $t.Name) -Force
+}
+Write-Host "gekopieerd: terreintexturen"
+# de wind-shader is bron in modellen/natuur; shaders/natuur_wind.gdshader is de gesynchroniseerde kopie
+Copy-Item (Join-Path $nat 'natuur_wind.gdshader') (Join-Path $PSScriptRoot 'shaders\natuur_wind.gdshader') -Force
+foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json')) {
+    $src = Join-Path $PSScriptRoot $b
+    if (Test-Path $src) { Copy-Item $src (Join-Path $assets (Split-Path $src -Leaf)) -Force; Write-Host "gekopieerd: assets/$(Split-Path $src -Leaf)" }
+    else { Write-Host "ontbreekt (overgeslagen): $b" }
+}
 Write-Host "Daarna: Godot --headless --path . --import"

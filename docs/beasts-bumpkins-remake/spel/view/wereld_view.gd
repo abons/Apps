@@ -108,26 +108,20 @@ func werk_seizoen() -> void:
 	terrein.water_mat.set_shader_parameter("ijs", sneeuw)
 	licht.werk(w.uur(), w.kou(), nat)
 	regen.aan(w.regent())
-	# bomen: groen -> herfstoker -> winterdonker met sneeuw; rotsen met sneeuw
-	var zomer := Color(0.13, 0.30, 0.11)
-	var herfst := Color(0.45, 0.32, 0.10)
-	var winter := Color(0.80, 0.85, 0.90)
-	var k := zomer.lerp(herfst, droog / 0.8)
-	k = k.lerp(winter, clampf(sneeuw, 0.0, 1.0) * 0.8)
-	Props.kroon_mat.albedo_color = k
-	Props.steen_mat.albedo_color = Color(0.44, 0.42, 0.39).lerp(Color(0.85, 0.88, 0.92), sneeuw * 0.7)
+	# gebladerte (tint per seizoen), rotsen (sneeuwdek) en de sneeuwlaag op de bomen
+	Natuur.werk_seizoen(w.seizoen(), w.dag_t() / w.seizoen_duur(), sneeuw, nat)
+	terrein.zet_sneeuwlaag(sneeuw > 0.3)
 
 
 func _werk_vuur(donker: float) -> void:
 	if _vuur == null:
 		return
 	var fl := 0.85 + 0.1 * sin(_t * 13.0) + 0.06 * sin(_t * 31.7 + 1.3) + 0.05 * sin(_t * 7.3)
-	var l: OmniLight3D = _vuur.get_node("Vuurlicht")
+	var l: OmniLight3D = _vuur.find_child("Vuurlicht", true, false)
 	l.light_energy = lerpf(0.5, 3.2, donker) * fl
-	var vlam: Node3D = _vuur.get_node("Vlam")
-	vlam.scale = Vector3(1.0 + 0.1 * sin(_t * 9.0), fl * 1.1, 1.0 + 0.1 * cos(_t * 11.0))
-	if terrein.vlag_doek:
-		terrein.vlag_doek.rotation.y = sin(_t * 2.0) * 0.12
+	var vlam := _vuur.find_child("Vlam", true, false) as Node3D
+	if vlam:
+		vlam.scale = Vector3(1.0 + 0.1 * sin(_t * 9.0), fl * 1.1, 1.0 + 0.1 * cos(_t * 11.0))
 
 
 func _werk_pad() -> void:
