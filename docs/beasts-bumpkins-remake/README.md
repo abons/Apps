@@ -62,3 +62,15 @@ Grotendeels wel, maar niet volledig.
 - ⚠️ OptiX faalt op deze driver (kernel compile error), het script neemt CUDA.
 - ⚠️ Selected-to-active cast per pixel naar elk bronobject apart: 460 stenen = 13 min per 512-bake. Het script voegt de bronnen per groep samen en geeft Object-coördinaten, Generated en Object Info > Random mee als attributen: 2 s.
 - Afwijking t.o.v. Cycles: riet iets geler en minder contrast (std 0,11 tegen 0,15), laagranden minder scherp, kuif lichter; achterkant (hoek 350–100°) en aanbouw achter/rechts hebben in de bron geen stenen.
+
+## Stand na sessie 2026-10-29 (volgende stappen)
+
+- **Speelbaar:** `spel/` (missie 1 Aorta: terrein met rotsplateau, natuur, seizoenen, zes bestuurbare dorpelingen). Starten: `spel/README.md`.
+- **Modellen** (scripts in git, glb's lokaal): `modellen/bumpkin/` (6 personages, beoordeling 4,5-6,5), `dieren/koe` (6,5), `natuur/` (29), `gebouwen/` (loods, molen = bakkerij, melkerij, kippenhok; 6-7).
+- **Docs:** `gameplay.md` sectie 7 = besluiten gebruiker; `missies.md` (30 missies); `map1.md`; `audio.md` (besluiten onderaan); `concept/lijst.md`.
+- **Volgende:**
+  1. Spellogica naar `missies.md`/`gameplay.md` sectie 7: economie, werk, bouwen, koe-generator, winst/verlies missie 1.
+  2. Vijf andere personages, gebouwen en koe in het spel zetten (nu alle zes = man).
+  3. Gebouwen: rieten dak opnieuw bakken in melkerij/kippenhok (stralen raken de onderlaag).
+  4. Personages boven ~6: andere aanpak nodig (gebeeldhouwde of basismodel-mens), geen extra procedurele rondes.
+  5. Conceptronde 3 afmaken (Chrome eerst herstarten): voetsoldatengilde downloaden (`gemini.google.com/app/47d87ca270c534fc`), boogschuttersgilde, stadhuis, brouwerij, draagprops.
