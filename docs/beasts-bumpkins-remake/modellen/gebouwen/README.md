@@ -16,7 +16,7 @@ drieluik voor de iteratie: `vergelijk_erf.py` (origineel | render | concept).
   `rt_vergelijk` rendert alleen de glb's opnieuw (`preview/melkerij_boerderij_rt*.png`).
 - Maat: 3,7 x 5,8 m muren, nok 4,3 m, schoorsteen tot 5,3 m, varkenshok 1,4 x 1,35 m achter de
   achtergevel. Teruggerekend uit `Dairy.png` (213x160).
-- Driehoeken: zie de tabel onderaan. Atlassen: `opaak` (2048), `riet` (2048).
+- Driehoeken: LOD0 50.650, LOD1 7.597. Atlassen: `opaak`, `riet`.
 - Ankers (Empties): `deur` (scharnier; open naar buiten = **positieve graden als `dicht - hoek` om
   lokaal Z** in Blender, om lokaal Y in Godot; max. **100°**, eigenschap `open_graden`), `deur_drempel`
   (looppunt voor de deur), `rook_bron` (schoorsteenmond), `melkplek` (voor de gevel, koe op +x),
@@ -46,10 +46,20 @@ drieluik voor de iteratie: `vergelijk_erf.py` (origineel | render | concept).
   sprite is vooral stro met een lage hut; het hok is bewust groter. De gele vlek vooraan in de sprite
   is hier een hoop vers stro.
 
-## Driehoeken
+Glb's: atlassen 1024 (`rt res=1024`, budget 2026-10-29); `res=2048` voor de volle maat.
+Vergelijkingen per ronde: `preview/<naam>_vergelijk_ronde<n>.png`; glb's: `preview/<naam>_rt_vergelijk.png`
+(beauty | LOD0 | LOD1, Cycles).
+
+- ⚠️ Gebakken riet (melkerij en kippenhok) mist de halmen grotendeels: veel stralen raken de onderlaag
+  (die ook bron is) i.p.v. de halmen, het dak wordt bruin-egaal met gele vlekken. Te doen: de rietschil
+  als bron weglaten of de cage groter, opnieuw bakken. De bronnen worden voor het bakken samengevoegd
+  (selected-to-active met honderden objecten liep uren op de CPU), dus de tint per steen gaat verloren.
+- `pack_islands` hangt in Blender 5.2 op duizenden eilandjes; `uv_atlas` gebruikt alleen smart project.
 
 | gebouw | LOD0 | LOD1 |
 | --- | --- | --- |
+| melkerij_boerderij | 50.650 | 7.597 |
+| kippenhok | 15.746 | 6.998 |
 
 ## Gereedschapsloods en molen (`gereedschapsloods.py`, `molen.py`)
 
