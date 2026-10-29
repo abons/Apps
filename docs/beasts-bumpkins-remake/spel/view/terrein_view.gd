@@ -261,7 +261,7 @@ func _splat(soort: String) -> Array:
 		"bosgrond": return [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
 		"rots", "rotsrand": return [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 		"zand": return [0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
-		"pad": return [0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+		"pad": return [0.55, 0.0, 0.0, 0.45, 0.0, 0.6]    # vertrapte grond; de keien zelf komen van view/wegen.gd
 		"aarde": return [0.0, 0.65, 0.0, 0.35, 0.0, 1.0]
 		"overig": return [0.0, 0.5, 0.5, 0.0, 0.0, 0.5]
 	return [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

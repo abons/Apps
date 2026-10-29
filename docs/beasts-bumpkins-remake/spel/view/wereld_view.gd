@@ -19,6 +19,7 @@ var _ring_mat: StandardMaterial3D
 var _t := 0.0
 var _nat := 0.0
 var _vuur: Node3D
+var wegen: Wegen
 
 
 func bouw(wereld: Wereld, l: Licht) -> void:
@@ -29,6 +30,9 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	add_child(terrein)
 	terrein.bouw(w)
 	_vuur = terrein.kampvuur_node
+	wegen = Wegen.new()
+	add_child(wegen)
+	wegen.bouw(w, terrein)
 
 	_ring_mesh = TorusMesh.new()
 	_ring_mesh.inner_radius = 0.50
@@ -287,6 +291,7 @@ func werk_seizoen() -> void:
 	# gebladerte (tint per seizoen), rotsen (sneeuwdek) en de sneeuwlaag op de bomen
 	Natuur.werk_seizoen(w.seizoen(), w.dag_t() / w.seizoen_duur(), sneeuw, nat)
 	terrein.zet_sneeuwlaag(sneeuw > 0.3)
+	wegen.werk_seizoen(sneeuw, nat)
 
 
 func _werk_vuur(donker: float) -> void:

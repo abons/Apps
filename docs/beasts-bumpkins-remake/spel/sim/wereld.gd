@@ -19,6 +19,7 @@ signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
 signal dorpeling_erbij(d: Dorpeling)      ## een kind is geboren
 signal kip_erbij(k: Kip)
 signal rol_veranderd(d: Dorpeling)
+signal wegen_veranderd
 signal volwassen_geworden(d: Dorpeling)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
@@ -925,6 +926,49 @@ func plan_zet(p: Plan) -> bool:
 	return true
 
 
+## Weg van `van` (de deurtegel) naar het dichtste stuk pad, zoals beasts-src de weg naar de deur meebestelt
+## (World.aim). Kortste route over loopbare tegels (BFS, 8 richtingen via kan_stap); elke nieuwe padtegel kost
+## `weg_per_tegel` uit de kas. Water en rots worden nooit pad (niet loopbaar); bestaat er geen pad, dan naar het
+## kampvuur. Geeft het aantal nieuwe padtegels.
+func leg_weg(van: Vector2i) -> int:
+	var pad := raster.namen.find("pad")
+	var start := dichtstbij_loopbaar(van)
+	if start.x < 0 or pad < 0:
+		return 0
+	var vorige := {start: start}
+	var rij: Array[Vector2i] = [start]
+	var doel := Vector2i(-1, -1)
+	var i := 0
+	while i < rij.size():
+		var t := rij[i]
+		i += 1
+		if raster.soort[raster.idx(t.x, t.y)] == pad or (t - kampvuur).length_squared() <= 2:
+			doel = t
+			break
+		for d in 8:
+			var n := t + Vector2i(Raster.DC[d], Raster.DR[d])
+			if vorige.has(n) or not raster.kan_stap(t.x, t.y, n.x, n.y):
+				continue
+			vorige[n] = t
+			rij.append(n)
+	if doel.x < 0:
+		return 0
+	var nieuw := 0
+	var t := doel
+	while true:
+		var ix := raster.idx(t.x, t.y)
+		if raster.soort[ix] != pad:
+			raster.soort[ix] = pad
+			nieuw += 1
+		if t == start:
+			break
+		t = vorige[t]
+	kas = maxi(0, kas - nieuw * int(spel.get("weg_per_tegel", 0)))
+	if nieuw > 0:
+		wegen_veranderd.emit()
+	return nieuw
+
+
 ## Afgebouwd gebouw waarvan de voetafdruk `t` bevat, of null.
 func gebouw_op(t: Vector2i) -> Plan:
 	for p in plannen:
@@ -1015,6 +1059,8 @@ func _rond_af(p: Plan) -> void:
 			if t.x >= 0 and not d.geef_bevel(self, "loop", t):
 				d.zet_tegel(t)
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))   # nieuwe muren kunnen een doorgang afsluiten
+	if Plan.DEUREN.has(p.soort):
+		leg_weg(p.deur_tegel())
 	if p.soort == &"kippenhok":
 		_maak_kippen(p)
 	plan_klaar.emit(p)

@@ -181,7 +181,10 @@ func _initialize() -> void:
 	_check(in_hut == 0, "niemand staat in de afgebouwde hut (%d)" % in_hut)
 
 	# kas: de hut is betaald; te duur kan niet
-	_check(w.kas == int(w.spel["start_kas"]) - w.prijs(&"hut"), "hut kostte %d (kas %d)" % [w.prijs(&"hut"), w.kas])
+	var wegtegels := int(w.spel["start_kas"]) - w.prijs(&"hut") - w.kas
+	_check(wegtegels >= 0 and wegtegels % int(w.spel["weg_per_tegel"]) == 0, "hut kostte %d, plus %d voor de weg naar de deur (kas %d)" % [w.prijs(&"hut"), wegtegels, w.kas])
+	var dt2 := bp.deur_tegel()
+	_check(w.raster.soort_naam(dt2.x, dt2.y) == "pad" or not w.raster.loopbaar(dt2.x, dt2.y), "voor de hutdeur ligt pad")
 	var arm := Wereld.new()
 	arm.laad()
 	arm.kas = 10
