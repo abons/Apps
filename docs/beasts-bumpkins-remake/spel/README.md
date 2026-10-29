@@ -5,6 +5,9 @@ spelersbesturing, dag/nacht, seizoenen en weer. Nog geen economie, gebouwen, die
 
 ## Draaien
 
+Snelst: rechtermuisknop op `speel.ps1` > **Run with PowerShell** (sync, import en spelen in een keer;
+`speel.ps1 -Seizoen winter -Uur 22` voor een ander begin).
+
 ```
 G=$LOCALAPPDATA/Microsoft/WinGet/Packages/GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe/Godot_v4.7.2-stable_win64_console.exe
 powershell -File sync.ps1                       # kaart (data/origineel/) en glb's (assets/) kopieren
