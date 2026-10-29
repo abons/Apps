@@ -11,6 +11,11 @@ const KOU := [0.25, 0.0, 0.5, 1.0]        # stuurt zonnestand/daglengte
 const REGENKANS := [0.35, 0.10, 0.40, 0.0]
 
 signal bevel_gegeven(ids: Array, soort: String, doel: Vector2i)
+signal plan_gezet(plan: Plan)
+
+## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
+const BOUWSOORTEN := {&"hut": Vector2i(2, 2)}
+var plannen: Array[Plan] = []
 
 var spel: Dictionary
 var raster := Raster.new()
@@ -331,3 +336,34 @@ func geef_bevel(ids: Array, soort: String, doel: Vector2i) -> int:
 			gelukt += 1
 	bevel_gegeven.emit(ids, soort, t)
 	return gelukt
+
+
+## Maak een Plan van `soort` op `tegel` (linksboven), `draai` kwartslagen; null als de plek niet kan.
+func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
+	if not BOUWSOORTEN.has(soort):
+		return null
+	var m: Vector2i = BOUWSOORTEN[soort]
+	var p := Plan.new(soort, tegel, posmod(draai, 4), m.x, m.y)
+	return p if kan_bouwen(p) else null
+
+
+## Alle tegels van de voetafdruk loopbaar (objecten staan al in het raster) en vrij van andere plannen.
+func kan_bouwen(p: Plan) -> bool:
+	var r := p.afdruk()
+	for c in range(r.position.x, r.end.x):
+		for rij in range(r.position.y, r.end.y):
+			if not raster.loopbaar(c, rij):
+				return false
+	for q in plannen:
+		if q.afdruk().intersects(r):
+			return false
+	return true
+
+
+## Zet het plan neer. Bouwplaats, werkers en kas volgen; nu alleen bijgehouden en gemeld.
+func plan_zet(p: Plan) -> bool:
+	if not kan_bouwen(p):
+		return false
+	plannen.append(p)
+	plan_gezet.emit(p)
+	return true

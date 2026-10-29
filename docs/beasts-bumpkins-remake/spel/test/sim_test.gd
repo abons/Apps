@@ -145,6 +145,15 @@ func _initialize() -> void:
 	v.vooruit(1.0)
 	_check(v.tik_nr == 50, "4x = 40 tikken erbij (%d)" % v.tik_nr)
 
+	# bouwplan: hut op gras naast het kampvuur kan, op het kampvuur of dubbel niet
+	var vrij := Vector2i(100, 64)
+	_check(w.raster.loopbaar(100, 64) and w.raster.loopbaar(101, 65), "testplek (100,64) is vrij")
+	var bp := w.maak_plan(&"hut", vrij, 0)
+	_check(bp != null and w.plan_zet(bp), "hut kan op een vrije plek")
+	_check(w.maak_plan(&"hut", vrij + Vector2i(1, 1), 0) == null, "tweede hut er half overheen kan niet")
+	_check(w.maak_plan(&"hut", w.kampvuur, 0) == null, "hut op het kampvuur kan niet")
+	_check(w.maak_plan(&"molen", vrij + Vector2i(5, 0), 0) == null, "onbekende soort geeft null")
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
 

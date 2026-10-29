@@ -9,6 +9,7 @@ var view: WereldView
 var cam: Camera3D
 var bestuur: Bestuur
 var hud: Hud
+var bouwmenu: Bouwmenu
 var scenario := ""
 var szt := 0.0
 var _stap := 0
@@ -68,6 +69,10 @@ func _ready() -> void:
 	bestuur.cam = cam
 	hud.bouw(w, bestuur)
 	bestuur.kader = hud.kader
+	bouwmenu = Bouwmenu.new()
+	bouwmenu.name = "Bouwmenu"
+	add_child(bouwmenu)
+	bouwmenu.bouw(w, bestuur, self)
 	if scenario != "":
 		cam.invoer_aan = false
 		_start_scenario()
