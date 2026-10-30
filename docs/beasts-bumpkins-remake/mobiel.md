@@ -25,7 +25,7 @@ Waar Godot-gedrag hieronder uit kennis komt en niet uit een proef, staat "(onbev
 | **Export templates 4.7.2** | **nee**: `%APPDATA%\Godot\export_templates\` is leeg. Download ~1 GB (alle platformen; web + android samen ~150-250 MB als je ze apart pakt uit de .tpz, onbevestigd) |
 | `export_presets.cfg` | nee (en niet committen) |
 | JDK 17 | ja, `E:\werk\tools\jdk-17.0.20+8` (staat al in Godot editor_settings; `java` op PATH is nog de te oude 1.8) |
-| Android SDK | **nee**: `%LOCALAPPDATA%\Android\Sdk` bestaat niet, terwijl editor_settings er wel naar wijst. Nodig: cmdline-tools, platform-tools, build-tools 35.x, platform android-35 (+ NDK niet nodig voor gewone export), ~1-1,5 GB |
+| Android SDK | **ja, op `D:\emulator`** (correctie 2026-10-30): build-tools 36.0.0, platforms 34/35/36, platform-tools, cmdline-tools, emulator + AVD `beasts_api34`. Alleen het SDK-pad in Godots editor_settings omzetten (wijst nu naar het niet-bestaande `%LOCALAPPDATA%\Android\Sdk`) |
 | Debug keystore | ja, `%APPDATA%\Godot\keystores\debug.keystore` (buiten het repo, nooit committen) |
 | Emulator | `beasts` is poort 5564 in `emulator.ps1` (`beasts_api34`); AVD op schijf niet gecontroleerd |
 | Telefoon | Motorola `ZY22GD8FG4`, eerst claimen met `device-lock.ps1 acquire`, na afloop `release` (niet aangeraakt) |
@@ -61,7 +61,7 @@ Dus proefexport (web of apk) kan pas na toestemming voor de download.
 - **Geluid**: `load_from_file(globalize_path(...))` moet `load()` worden, anders is er geen mp3.
 - **Grootte**: APK < 4 GB, maar Google Play en installatie willen liever < 200 MB base; voor sideload (debug-APK of `adb install`) maakt het niet uit. 745 MB assets in een APK installeren op een telefoon kan wel, maar het schrijft 1x en pakt niet uit; laadtijd van pck ok. Textures: ETC2/ASTC-import aanzetten, anders valt het terug op niet-gecomprimeerd en is het geheugen veel hoger. Op een telefoon van 6-8 GB RAM is het eindige geheugen met 393 MB glb-geometrie en alle textures nog de vraag; meten.
 - **Invoer**: touch = muis via emulate; alles wat rechtsklik of toetsenbord nodig heeft (camera draaien, sneltoetsen, randpannen) moet een touch-variant krijgen: twee-vinger-pan/pinch/draai in `rts_camera.gd`, bouwmenu-knoppen groter, minikaart (werkt al via muis-emulatie).
-- Export: `export_presets.cfg` met Android-preset (package `nl.axelbons.beasts_remake` o.i.d., Mobile renderer, arm64-v8a, Gradle-build niet nodig), debug keystore is er al (pad staat in editor_settings), JDK 17 staat erin, Android SDK ontbreekt.
+- Export: `export_presets.cfg` met Android-preset (package `nl.axelbons.beasts_remake` o.i.d., Mobile renderer, arm64-v8a, Gradle-build niet nodig), debug keystore is er al (pad staat in editor_settings), JDK 17 staat erin, Android SDK staat op `D:\emulator`.
 
 ## Vergelijking
 
@@ -73,7 +73,7 @@ Dus proefexport (web of apk) kan pas na toestemming voor de download.
 | Geluid | `load_from_file` vervangen | idem |
 | Grootte/geheugen | 745 MB pck door het netwerk, tabblad-RAM-limiet: groot risico | sideload ok, meten op telefoon |
 | Installeren | via tailscale https, geen store | `adb install`, geen store |
-| Inspanning | groot (assets verkleinen, shaders, tests per browser) | klein-middel (SDK + templates, touch-camera) |
+| Inspanning | groot (assets verkleinen, shaders, tests per browser) | klein-middel (templates, touch-camera) |
 | Risico | hoog | laag |
 
 ## Aanbeveling
@@ -83,7 +83,7 @@ Dus proefexport (web of apk) kan pas na toestemming voor de download.
 ## Wat de gebruiker moet beslissen of leveren
 
 1. Toestemming om de **export templates 4.7.2** te downloaden (~1 GB .tpz, in te pakken naar `%APPDATA%\Godot\export_templates\4.7.2.stable\`), anders geen proefexport.
-2. Toestemming om de **Android SDK** te installeren (cmdline-tools, platform-tools, build-tools, platform; ~1-1,5 GB) naar `%LOCALAPPDATA%\Android\Sdk`.
+2. ~~Android SDK installeren~~: niet nodig, staat op `D:\emulator`.
 3. Keuze APK eerst of PWA eerst, en of de aanpassingen (touchcamera, Geluid, ETC2) erin mogen.
 4. Bevestiging dat de telefoon geclaimd mag worden voor een installatie (`device-lock.ps1 acquire`, daarna `release`), of dat de emulator `beasts` (5564, AVD `beasts_api34` zo nodig kopieren van een sibling) volstaat. Op de emulator is Vulkan/softwarerender traag: voor prestaties is de echte telefoon nodig.
 5. Publiek zetten blijft uitgesloten zolang `data/origineel/` en eventuele originele assets meekomen.
