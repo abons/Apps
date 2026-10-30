@@ -43,7 +43,15 @@ func _initialize() -> void:
 	_check(int(w.missie["doel"].get("kas_boven", 0)) == 10000, "missiedoel kas > 10.000 gelezen")
 	_check(w.eigen_koeien() == 4, "4 eigen koeien uit de kaart (zijn %d)" % w.eigen_koeien())
 	_check(w.vee.size() == 5, "plus 1 wilde koe van de generator (%d koeien)" % w.vee.size())
-	_check(w.eiland.size.x > 60 and w.eiland.size.y > 60, "vasteland is groot: %s" % w.eiland)
+	_check(w.eiland.size.x > 50 and w.eiland.size.y > 50, "vasteland is groot: %s" % w.eiland)
+	var aan_rand := 0             # het buitengebied is onbereikbaar: dicht bos, water of rots ertussen (zoals het origineel)
+	for i in w.bereik.size():
+		if w.bereik[i] == 1:
+			var t := Vector2i(i % w.raster.kolommen, i / w.raster.kolommen)
+			for k in 8:
+				if w.raster.soort_naam(t.x + Raster.DC[k], t.y + Raster.DR[k]) == "leeg":
+					aan_rand += 1
+	_check(aan_rand == 0, "geen bereikbare tegel grenst aan het buitengebied (%d wel)" % aan_rand)
 	_check(w.raster.factor(89, 72) > w.raster.factor(88, 72), "kaartpad bij het dorp is sneller dan gras")
 
 	# voorgebouwde boerderij = melkerij, afgebouwd, kost niets

@@ -85,7 +85,12 @@ static func _reeks(patroon: String, n: int) -> Array:
 
 
 ## Laadt een klank: geimporteerd via de ResourceLoader, anders rechtstreeks van schijf (nog niet geimporteerd).
+## Een .ogg naast een .mp3 gaat voor (haal_beasts.ps1 maakt die met ffmpeg, genormaliseerd).
 static func laad(pad: String) -> AudioStream:
+	if pad.ends_with(".mp3"):
+		var ogg := pad.get_basename() + ".ogg"
+		if ResourceLoader.exists(ogg) or FileAccess.file_exists(ogg):
+			pad = ogg
 	if ResourceLoader.exists(pad):
 		return load(pad) as AudioStream
 	if not FileAccess.file_exists(pad):
@@ -95,6 +100,8 @@ static func laad(pad: String) -> AudioStream:
 		return AudioStreamWAV.load_from_file(echt)
 	if pad.ends_with(".mp3"):
 		return AudioStreamMP3.load_from_file(echt)
+	if pad.ends_with(".ogg"):
+		return AudioStreamOggVorbis.load_from_file(echt)
 	return null
 
 

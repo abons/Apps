@@ -199,11 +199,12 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 			_generator = Vector2i(ob["x"], ob["y"])
 	# Gegenereerde bomen op bosgrond (kaart heeft maar 42 bomen; de originele dennen zijn onbekend, zie map1.md).
 	var dichtheid: float = float(missie.get("bos_dichtheid", spel["bos_dichtheid"]))   # per missie te overschrijven
+	var rand := _afstand_tot_leeg(RAND_DICHT)
 	for y in raster.rijen:
 		for x in raster.kolommen:
 			if raster.soort_naam(x, y) != "bosgrond":
 				continue
-			if _hash2(x, y) < dichtheid:
+			if _hash2(x, y) < dichtheid or rand[raster.idx(x, y)] <= RAND_DICHT:
 				objecten.append({"cls": 1000, "naam": "boom_bos", "model": defs["1000"]["model"], "x": x, "y": y,
 					"blokkeert": true, "voetafdruk": [1, 1], "state": 0, "sex": 0, "spawn": false})
 	for ob in objecten:
@@ -214,6 +215,41 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 				for dx in vw:
 					if raster.in_kaart(ob["x"] + dx, ob["y"] + dy):
 						raster.blok[raster.idx(ob["x"] + dx, ob["y"] + dy)] = 1
+	for i in rand.size():          # oever of open land direct aan het buitengebied: ook dicht
+		if rand[i] == 1:
+			raster.blok[i] = 1
+
+
+## Het buitengebied (leeg) is in het origineel onbereikbaar: dicht bos, water of rots ertussen. Bosgrond binnen
+## `RAND_DICHT` tegels van leeg krijgt altijd een boom, en elke andere tegel direct ernaast wordt geblokkeerd.
+const RAND_DICHT := 3
+
+
+## Per tegel de afstand (8-buren, in tegels) tot de dichtste leeg-tegel, tot `max_d`; verder weg = max_d + 1.
+func _afstand_tot_leeg(max_d: int) -> PackedByteArray:
+	var af := PackedByteArray()
+	af.resize(raster.kolommen * raster.rijen)
+	af.fill(max_d + 1)
+	var leeg := raster.namen.find("leeg")
+	var rij: Array[Vector2i] = []
+	for y in raster.rijen:
+		for x in raster.kolommen:
+			if raster.soort[raster.idx(x, y)] == leeg:
+				af[raster.idx(x, y)] = 0
+				rij.append(Vector2i(x, y))
+	var j := 0
+	while j < rij.size():
+		var t := rij[j]
+		j += 1
+		var d: int = af[raster.idx(t.x, t.y)]
+		if d >= max_d:
+			continue
+		for k in 8:
+			var n := t + Vector2i(Raster.DC[k], Raster.DR[k])
+			if raster.in_kaart(n.x, n.y) and af[raster.idx(n.x, n.y)] > d + 1:
+				af[raster.idx(n.x, n.y)] = d + 1
+				rij.append(n)
+	return af
 
 
 func _maak_dorpelingen() -> void:

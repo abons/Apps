@@ -154,6 +154,6 @@ gelijk: `leeg` is al niet loopbaar.
 
 | vraag | hoe te beantwoorden |
 | --- | --- |
-| Kan een eenheid in het origineel over de rand lopen (de noordoever van het meer, de buitenrand van het bos)? En is de bosband loopbaar? | Missie 2 draaien in DOSBox of het origineel en een boer naar (78,45) sturen. |
+| ~~Kan een eenheid in het origineel over de rand lopen?~~ | **Nee** (gebruiker, 2026-10-30): het buitengebied is onbereikbaar door dicht bos, water of bergen. Remake: `wereld.gd` `RAND_DICHT` = 3, bosgrond binnen 3 tegels van leeg krijgt altijd een boom en open land direct aan leeg wordt geblokkeerd; `missie2_test` controleert dat geen bereikbare tegel aan leeg grenst. |
 | Zijn frames 36/37 echt de mist? | Een savegame van het origineel bekijken of de renderer lezen; nu afgeleid uit de screenshots. |
 | Ligt er ergens in de missiestaart een kaartgrens? | Niet gevonden in kop (74 bytes) of tegelvelden; de staart is niet helemaal gedecodeerd. |
