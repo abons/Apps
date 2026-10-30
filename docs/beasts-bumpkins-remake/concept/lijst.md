@@ -138,6 +138,7 @@ Bronnen: `../onderzoek.md` (aantallen, gilden, 33 units uit BBTools-catalogi), d
 | 83 | Spreukeffecten (9 + extra) | s_* spells | `bb_original/s_cure.png`, `bb_original/s_fear.png`, `bb_original/s_ffood.png`, `bb_original/s_fireb.png`, `bb_original/s_flash.png`, `bb_original/s_heal.png`, `bb_original/s_see.png`, `bb_original/s_summon.png`, `bb_original/s_tport.png`, `bb_original/lgtning.png`, `bb_original/equake.png`, `bb_original/acidbolt.png` | geen | 9 s_* + 3 | 3 | 7 | Slechts 9 s_*-sprites (genezen, angst, voedsel, vuurbal, flits, heal, oog, oproepen, teleport) + bliksem, aardbeving, zuur; rest zelf ontwerpen |
 | 84 | Draagprops (zak, emmer, korf) | f_sack, f_milk | `U/m_sack.png`, `U/f_milk.png` | geen | 1 r, 2 | 3 | 3 | Bij werkanimaties; de sprites zijn mensen die dragen, geen losse props: pas na de rigs |
 | 88 | Slaapzak | sleepers | `bb_original/sleepers.png` | geen | 1 r, 10 varianten | 1 | 3 | Nachts bij het kampvuur voor wie geen bed heeft; bruine zak, paarse deken, hoofd erbuiten; nu een placeholder (capsule) in het spel (2026-10-29) |
+| 89 | Hut in 4 bouwstanden | House (bouwplaats) | `lokaal/map1/map1_buildprogress_house*.png` (screenshots) | geen | 4 standen | 1 | 4 | Bouwterrein met stapels, fundering, muren met spanten zonder riet, af (= goedgekeurde hut); voor de bouwplaats in missie 1 (2026-10-30) |
 | 85 | Regen- en onweerswolken | rain/thunder | `bb_original/rain.png`, `bb_original/cloud.png`, `bb_original/blkcloud.png`, `bb_original/lgtning.png` | geen | 1 r, 4 | 3 | 7 | Weereffect |
 | 86 | Straatlamp en toorts | street lamp | `bb_original/lamp.png`, `bb_original/lantern.png`, `bb_original/torch.png` | geen | 9 + 2 + 6 | 3 | 7 | Straatlamp (49x40), lantaarn, brandende toorts. Nieuw uit origineel |
 | 87 | Meubilair: bank, stoel, kist, drinkbak | bench, logchair, crate, trough | `bb_original/bench.png`, `bb_original/logchair.png`, `bb_original/crate.png`, `bb_original/trough.png`, `bb_original/sign.png`, `bb_original/salepost.png` | geen | 1 r, 6 | 3 | 7 | Kleine props rond huizen; bord/verkoopbord. Nieuw uit origineel |
@@ -154,12 +155,12 @@ Bronnen: `../onderzoek.md` (aantallen, gilden, 33 units uit BBTools-catalogi), d
 | 1 | 14 | Vrouw; Jongen; Meisje; Oudere man; Oudere vrouw; Bouwer; Wolf; Zombie; Koe; Kippen-sheet; Gereedschapsloods; Melkerij / boerderij; Molen; Kippenhok |
 | 2 | 12 | Baby; Waterput; Akker; Dorpsprops; Hek / muur / poort; Dennen-sheet; Loofbomen + struiken; Rotsen-sheet; Rotsrand / klif; Kaartprops; Terreintexturen; Bouwgereedschap |
 | 3 | 16 | Voetsoldaat; Boogschutter; Ridder; Tovenaar; Priester; Minstreel; Wesp; Vleermuis; Voetsoldatengilde; Boogschuttersgilde; Bouwersgilde; Bakkerij; Stadhuis; Brouwerij; Draagprops; Slaapzak |
-| 4 | 8 | Kerk; Ridderlijke gilde; Tovenaarsgilde; Minstrelsgilde; Stallen; Gevangenis; Uitkijkpost; Herberg |
+| 4 | 9 | Hut in 4 bouwstanden; Kerk; Ridderlijke gilde; Tovenaarsgilde; Minstrelsgilde; Stallen; Gevangenis; Uitkijkpost; Herberg |
 | 5 | 15 | Bruid + bruidegom; Monnik; Belastinginner; Wachter; Vlagdrager; Cavalerist + paard; Kruisboog; Bommenwerper; Trebuchet; Nar / jongleur; Reus; Ogre; Vampier; Demon; Struikman / etende struik |
 | 6 | 14 | Skelet; Beul + hakblok; Kalf + varken; Missiegebouwen A: kapel, barak, kasteel; Missiegebouwen B: toren, hut; Tempel + teleporttempel; Duister altaar; Boutval; Zombiegraf; Spookboom + wortelaltaar; Vallen-sheet; Artefacten-sheet 1; Artefacten-sheet 2; Graven / doodskist |
 | 7 | 10 | Graanschuur; Appelboom + appelpluk; Winterbomen en sneeuw; Vuur, rook, explosie; Projectielen; Spreukeffecten; Regen- en onweerswolken; Straatlamp en toorts; Meubilair: bank, stoel, kist, drinkbak |
 
-Totaal **89 beelden in 7 batches** (slaapzak 2026-10-29 bij ronde 3). Batch 1 is het speelbare dorp (vrouw, kinderen, ouderen, bouwer, koe, kippen, eerste vijanden, vier gebouwen) en is ongewijzigd; batch 2 de eerste gilden en basisgebouwen.
+Totaal **90 beelden in 7 batches** (slaapzak 2026-10-29 bij ronde 3, hut in 4 bouwstanden 2026-10-30 bij ronde 4). Batch 1 is het speelbare dorp (vrouw, kinderen, ouderen, bouwer, koe, kippen, eerste vijanden, vier gebouwen) en is ongewijzigd; batch 2 de eerste gilden en basisgebouwen.
 
 ## Beantwoord uit de sprites
 - **Paladijn**: bestaat niet. Geen sprite, niet in `objects_list.txt`; de zwaarst bepantserde eenheid is de ridder (`kn_*`) en te paard de cavalerist (`cavalier`, ruiter en paard in een model).
