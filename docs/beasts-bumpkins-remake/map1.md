@@ -45,7 +45,7 @@ Klasse-ids uit `objects_list.txt`/BBTools-README. Posities zijn tegel (x,y). Lij
 | 98 | vlag (flagpost) | 1 | (104,65), inlever-/spawnpunt |
 | 143 | kampvuur | 1 | (102,68) |
 | 144 | bron (spring) | 1 | (101,70) |
-| 159 | zilveren beker | 1 | (110,53), tutorial: naar de vlag brengen |
+| 159 | zilveren beker | 1 | (110,53), tutorial: naar de vlag brengen = +5.000 kas, beker weg (M1.MIS, zie `missies.md`; remake `sim/voorwerpen.gd`) |
 | 171 | generator (README: "cow") | 1 | (118,58), `gen`=1; niet duidelijk of dit de koeienspawner is. Screenshots tonen meerdere koeien |
 
 Geen gebouwen, geen kippen, geen vijanden en geen triggers in het bestand. Er staat 22 kB ongeparste staart (`ptr_to_smth2_arr`) achter de objecten; mogelijk missiescript, niet gedecodeerd.

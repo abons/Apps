@@ -184,6 +184,10 @@ func bouw(wereld: Wereld, v: WereldView, camera: Camera3D, b: Bestuur) -> void:
 	w.poort_gewisseld.connect(_bij_poort)
 	w.verkocht.connect(func(m: Plan, _waar: String, _prijs: int) -> void: speel3d("munt", _deur(m), -3.0, 6.0, 45.0, 0.04))
 	w.geleverd.connect(func(m: Plan, _brengt: String) -> void: speel3d("plaats", _deur(m), -12.0, 4.0, 30.0))
+	w.voorwerp_opgeraapt.connect(func(ob: Dictionary, _d: Dorpeling) -> void: speel3d("plaats", _tegel3d(ob), -8.0, 4.0, 30.0))
+	w.voorwerp_afgeleverd.connect(func(ob: Dictionary, _d: Dorpeling, _k: int) -> void:
+		for i in 3:          # beker aan de vlag: een handvol munten
+			speel3d("munt", _tegel3d(ob), -1.0, 6.0, 60.0, 0.06))
 	get_tree().node_added.connect(_bij_node)
 	_zoek_knoppen(get_tree().root)
 	_klaar_t = 1.0            # wat plaats_voorgebouwd bij de start zet, klinkt niet
@@ -593,6 +597,10 @@ func _werk_golven() -> void:
 
 
 # ---------------------------------------------------------------- sim-signalen en interface
+
+func _tegel3d(ob: Dictionary) -> Vector3:
+	return view.terrein.tegel_midden(Vector2i(ob["x"], ob["y"]))
+
 
 func _midden(p: Plan) -> Vector3:
 	var r := p.afdruk()

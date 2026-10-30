@@ -34,6 +34,9 @@ signal steen_gegooid(d: Dorpeling, wolf: Wolf)
 signal wolf_geraakt(wolf: Wolf)
 signal wolf_dood(wolf: Wolf)
 signal wolf_weg(wolf: Wolf)
+signal voorwerp_opgeraapt(ob: Dictionary, d: Dorpeling)   ## sim/voorwerpen.gd: beker of kelk aangeraakt
+signal voorwerp_afgeleverd(ob: Dictionary, d: Dorpeling, kas: int)   ## bij het doel (vlag): kas erbij, object weg
+signal voorwerp_gevallen(ob: Dictionary)   ## drager weg: ligt weer op de grond
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -192,6 +195,9 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": d["model"], "x": int(o["x"]), "y": int(o["y"]),
 			"blokkeert": d["blokkeert"], "voetafdruk": d["voetafdruk"], "state": int(o["state"]), "sex": int(o["sex"]),
 			"spawn": d.get("spawn", false), "owner": int(o.get("owner", 0))}
+		if d.get("voorwerp", false):  # op te rapen (sim/voorwerpen.gd)
+			ob["voorwerp"] = true
+			ob["drager"] = -1
 		objecten.append(ob)
 		if int(o["cls"]) == int(spel["kampvuur_id"]):
 			kampvuur = Vector2i(ob["x"], ob["y"])
@@ -339,6 +345,7 @@ func tik(dt: float) -> void:
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
 	Wolf.tik_alle(self, dt)
+	Voorwerpen.tik_alle(self, dt)
 	_werk_generator(dt)
 	_gezin(dt)
 	_economie(dt)

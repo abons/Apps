@@ -11,6 +11,7 @@ var bestuur: Bestuur
 var hud: Hud
 var bouwmenu: Bouwmenu
 var scenario := ""
+var voorwerpen: Node3D            # view/voorwerpen_view.gd
 var szt := 0.0
 var _stap := 0
 
@@ -50,6 +51,9 @@ func _ready() -> void:
 	view.name = "WereldView"
 	add_child(view)
 	view.bouw(w, licht)
+	voorwerpen = preload("res://view/voorwerpen_view.gd").new()   # beker, kelk: op de grond en in de hand
+	add_child(voorwerpen)
+	voorwerpen.bouw(w, view)
 
 	cam = Camera3D.new()
 	cam.set_script(load("res://rts_camera.gd"))
@@ -71,6 +75,7 @@ func _ready() -> void:
 	bestuur.w = w
 	bestuur.view = view
 	bestuur.cam = cam
+	bestuur.voorwerpen = voorwerpen
 	hud.bouw(w, bestuur)
 	bestuur.kader = hud.kader
 	bouwmenu = Bouwmenu.new()
@@ -157,6 +162,9 @@ func _start_scenario() -> void:
 			cam.zet_direct(vuur + Vector3(4, 0, -2), 1.0, deg_to_rad(22), 8.0)
 		"vlag":
 			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("vlag", Vector2i(104, 65))) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
+		"beker":
+			# missie 1: een man staat bij de zilveren beker, raapt hem op (pakbevel) en loopt ermee naar de vlag
+			_beker_scenario()
 		"wolf":
 			# missie 2: de eerste wolf besluipt een wilde koe, een man krijgt na 1 s een vechtbevel en gooit stenen
 			_wolf_scenario()
@@ -313,6 +321,22 @@ func _start_scenario() -> void:
 var _wolf_man: Dorpeling = null
 
 
+func _beker_scenario() -> void:
+	var bekers := Voorwerpen.alle(w)
+	if bekers.is_empty():
+		return
+	var b: Dictionary = bekers[0]
+	for d in w.dorpelingen:
+		if d.volwassen() and d.geslacht == "man":
+			_wolf_man = d
+			break
+	_wolf_man.zet_tegel(w.dichtstbij_loopbaar(Vector2i(b["x"] - 3, b["y"] + 2)))
+	_wolf_man.route.clear()
+	_wolf_man.bevel = {}
+	_wolf_man.anker = _wolf_man.tegel()
+	cam.zet_direct(view.terrein.tegel_midden(Vector2i(b["x"] - 1, b["y"] + 1)), 0.5, deg_to_rad(34), 9.0)
+
+
 ## Scenario wolf: op open grasland (12x8 vrij) staat de eerste wolf aan de oostkant, een wilde koe 5 tegels west en een
 ## man nog 4 tegels verder; de koe houdt het langer vol (koe_beten 20) zodat de stenen vliegen terwijl de wolf bijt.
 func _wolf_scenario() -> void:
@@ -385,6 +409,21 @@ func _camyaw(y: float) -> void:
 
 func _scenario_stap() -> void:
 	match scenario:
+		"beker":
+			if _wolf_man == null or Voorwerpen.alle(w).is_empty():
+				return
+			var b: Dictionary = Voorwerpen.alle(w)[0]
+			if _stap == 0 and szt >= 0.5:
+				bestuur.gekozen = [_wolf_man.id]
+				view.gekozen = bestuur.gekozen
+				print("[scenario] pakbevel ", Voorwerpen.geef_pakbevel(w, bestuur.gekozen, b))
+				_stap = 1
+			elif _stap == 1 and int(b["drager"]) == _wolf_man.id:
+				print("[scenario] beker opgeraapt op ", szt, " s")
+				bestuur.geef_loopbevel(w.dichtstbij_loopbaar(_object_tegel("vlag", Vector2i(104, 65))))
+				_stap = 2
+			if _stap >= 1:
+				cam.doel_focus = cam.doel_focus.lerp(view.unit_pos(_wolf_man.id), 0.05)
 		"wolf":
 			if _stap == 0 and szt >= 1.0 and _wolf_man != null and not w.wolven.is_empty():
 				bestuur.gekozen = [_wolf_man.id]

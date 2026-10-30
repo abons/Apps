@@ -7,6 +7,8 @@ extends Node
 ## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
 ## Klik op een levende wolf met een selectie: vechtbevel (Wereld.geef_vechtbevel; alleen volwassenen, niet de bouwer),
 ## ze lopen erheen en gooien stenen (sim/wolf.gd). Werkbevelen hebben nog geen eigen invoer.
+## Klik op een voorwerp op de grond (beker, kelk) met een selectie: de dichtste loopt erheen en raapt het op
+## (sim/voorwerpen.gd); naar de vlag brengen is daarna een gewoon loopbevel.
 
 const KLIK_DREMPEL := 6.0       # px: minder slepen telt als klik
 const PICK_PX := 30.0           # px rond een unit waarbinnen een klik hem kiest
@@ -15,6 +17,7 @@ const GROND_Y := 0.25           # vlak waar de muisstraal de grond raakt
 var w: Wereld
 var view: WereldView
 var cam: Camera3D
+var voorwerpen: Node3D          # view/voorwerpen_view.gd (grond_pos)
 var kader: Control
 var gekozen: Array = []
 var _links := false
@@ -113,6 +116,10 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			if wf.id == wid:
 				view.markeer(wf.tegel())
 		return
+	var vw := _voorwerp_onder(pos)
+	if not vw.is_empty() and Voorwerpen.geef_pakbevel(w, gekozen, vw) > 0:
+		view.markeer(Vector2i(vw["x"], vw["y"]))
+		return
 	var kid := _koe_onder(pos)
 	if kid >= 0 and w.geef_claimbevel(gekozen, kid) > 0:
 		view.markeer(w.koe(kid).tegel())
@@ -144,6 +151,23 @@ func _wolf_onder(pos: Vector2) -> int:
 		if af < bd:
 			bd = af
 			beste = wf.id
+	return beste
+
+
+## Voorwerp op de grond onder een schermpunt (binnen PICK_PX), {} als er geen is.
+func _voorwerp_onder(pos: Vector2) -> Dictionary:
+	if voorwerpen == null:
+		return {}
+	var beste := {}
+	var bd := PICK_PX
+	for ob in Voorwerpen.alle(w):
+		var p: Vector3 = voorwerpen.grond_pos(ob)
+		if p == Vector3.INF or cam.is_position_behind(p):
+			continue
+		var af := cam.unproject_position(p + Vector3(0, 0.4, 0)).distance_to(pos)
+		if af < bd:
+			bd = af
+			beste = ob
 	return beste
 
 
