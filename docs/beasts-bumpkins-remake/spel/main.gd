@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|deur
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -308,6 +308,9 @@ func _start_scenario() -> void:
 				w.geef_bouwbevel(ids2.slice(2, 4), mk2)
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(103, 62)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
+		"deur":
+			# een dorpeling loopt door de voordeur naar binnen en weer naar buiten (test/deur_scenario.gd, --gebouw= --draai=)
+			add_child(load("res://test/deur_scenario.gd").new().start(self))
 		"sleep":
 			# een weg en een hek slepen door het bouwmenu, met echte muisinvoer (test/sleep_scenario.gd)
 			add_child(load("res://test/sleep_scenario.gd").new().start(self))

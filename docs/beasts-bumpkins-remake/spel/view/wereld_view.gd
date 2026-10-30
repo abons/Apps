@@ -277,6 +277,27 @@ func _werk_koeien(a: float, dt: float) -> void:
 			Koe.speel(n, "grazen", w.tempo)
 
 
+## Naar binnen/buiten lopen door de deur: werkt u["deur_f"], u["deur_plan"] en u["deur_loopt"] bij; true = zichtbaar.
+func _deur_loop(d: Dorpeling, u: Dictionary, wp: Vector3, dt: float) -> bool:
+	var binnen := DeurLoop.binnen(w, d)
+	var f: float = u.get("deur_f", 1.0 if binnen else 0.0)
+	var p: Plan = u.get("deur_plan")
+	if p == null and (binnen or f > 0.0):
+		p = DeurLoop.gebouw(w, d)
+	var oud := f
+	if p == null:
+		f = 1.0 if binnen else 0.0
+	else:
+		var sdt := 0.0 if w.gepauzeerd else dt * w.tempo
+		f = DeurLoop.stap(f, binnen, Vector2(wp.x, wp.z), p, w.tegel_m, w.loop_mps * w.looptempo, sdt)
+		if f <= 0.0 and not binnen:
+			p = null
+	u["deur_f"] = f
+	u["deur_plan"] = p
+	u["deur_loopt"] = f != oud
+	return f < 1.0
+
+
 func _wereld_pos(d: Dorpeling, alpha: float) -> Vector3:
 	var p := d.vorige.lerp(d.pos, alpha) * w.tegel_m
 	return Vector3(p.x, terrein.hoogte_op(p.x, p.y), p.y)
@@ -295,7 +316,14 @@ func _process(dt: float) -> void:
 		var u: Dictionary = units[d.id]
 		var b: Bumpkin = u["bump"]
 		var v := 0.0 if w.gepauzeerd else d.snelheid_mps * w.tempo
-		b.volg(_wereld_pos(d, a), v)
+		var wp := _wereld_pos(d, a)
+		var zichtbaar := _deur_loop(d, u, wp, dt)
+		if u["deur_f"] > 0.0 and u["deur_plan"] != null:       # het laatste stukje door de deur (view/deur_loop.gd)
+			var dp := DeurLoop.punt(Vector2(wp.x, wp.z), u["deur_plan"], w.tegel_m, u["deur_f"])
+			wp = Vector3(dp.x, terrein.hoogte_op(dp.x, dp.y), dp.y)
+			if u["deur_loopt"]:
+				v = w.loop_mps * w.looptempo * w.tempo
+		b.volg(wp, v)
 		# bij het kampvuur liggen: op de zij, wat opgetild zodat de schouder niet in de grond zakt (geen eigen clip)
 		var lig: float = u.get("lig", 0.0)
 		lig = move_toward(lig, 1.0 if (d.slaapt and not d.binnen) else 0.0, dt * 1.5)
@@ -305,7 +333,7 @@ func _process(dt: float) -> void:
 		(u["slaapzak"] as Node3D).visible = lig > 0.6
 		b.werk(d.bouwt and not w.gepauzeerd)
 		b.zet_nacht(donker)
-		b.visible = not d.binnen
+		b.visible = zichtbaar
 		(u["ring"] as MeshInstance3D).visible = d.id in gekozen
 		(u["baby"] as MeshInstance3D).visible = d.baby > 0.0
 		var zak: MeshInstance3D = u["zak"]

@@ -70,5 +70,12 @@ func deur_tegel() -> Vector2i:
 	return t
 
 
+## Het laatste stukje naar binnen, in meters: van het midden van de deurtegel naar het deuranker en BINNEN_M erachter.
+## De sim staat dan stil op de deurtegel; de view loopt het (view/deur_loop.gd).
+const BINNEN_M := 0.6
+func deur_loop_m(tegel_m: float) -> float:
+	return (Vector2(deur_tegel()) + Vector2(0.5, 0.5)).distance_to(deur_punt(tegel_m) / tegel_m) * tegel_m + BINNEN_M
+
+
 func afdruk() -> Rect2i:
 	return Rect2i(tegel, Vector2i(diep, breed) if draai % 2 == 1 else Vector2i(breed, diep))

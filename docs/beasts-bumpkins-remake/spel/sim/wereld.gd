@@ -640,9 +640,17 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 			d.bezig = float(e["melk_s"])
 			if d.melk_koe != null:
 				d.melk_koe.gemolken = true
-		"koop": d.bezig = float(e["toonbank_s"])
+		"koop": d.bezig = float(e["toonbank_s"]) + 2.0 * deur_loop_s(d)
 		"raap": d.bezig = float(e["raap_s"])
-		_: d.bezig = 0.3
+		_: d.bezig = 0.3 + 2.0 * deur_loop_s(d)
+
+
+## Leveren of kopen in een gebouw met een deur: de tijd voor het stukje door de deur (heen = terug); de view laat hem
+## dat lopen (view/deur_loop.gd). 0 zonder deur.
+func deur_loop_s(d: Dorpeling) -> float:
+	if not (d.klus is Plan) or not Plan.DEUREN.has((d.klus as Plan).soort):
+		return 0.0
+	return (d.klus as Plan).deur_loop_m(tegel_m) / (loop_mps * looptempo)
 
 
 func klus_af(d: Dorpeling) -> void:

@@ -37,6 +37,25 @@ func _init():
 			if dp > 0.1:
 				fout += 1
 			print("%s %s draai %d: anker %s, deur_punt %.2f m ernaast, deurtegel %s op %.2f m" % ["ok  " if dp <= 0.1 else "FOUT", soort, draai, Vector2(wp.x, wp.z), dp, dt, dm.distance_to(Vector2(wp.x, wp.z))])
+			# naar binnen lopen (view/deur_loop.gd): van het midden van de deurtegel tot hij verdwijnt, ~0,15 s per stap
+			var buiten := dm
+			var f := 0.0
+			var laatst := buiten
+			var n := 0
+			while f < 1.0 and n < 400:
+				laatst = DeurLoop.punt(buiten, p, 2.0, f)
+				f = DeurLoop.stap(f, true, buiten, p, 2.0, 1.7, 0.15)
+				n += 1
+			var dpt := p.deur_punt(2.0)
+			var rv := Vector2(p.deur_richting())
+			var weg := laatst.distance_to(dpt)                       # verdwijnt bij de deur, niet ervoor
+			var diep := (dpt - laatst).dot(rv)                        # en achter de drempel (binnen)
+			var voor := (buiten - dpt).normalized().dot(rv)           # de deurtegel ligt vóór de deur
+			var in_afdruk := Rect2(Vector2(r.position) * 2.0, Vector2(r.size) * 2.0).has_point(DeurLoop.punt(buiten, p, 2.0, 1.0))
+			var lus_ok := weg <= DeurLoop.BINNEN_M + 0.3 and diep > 0.2 and voor > 0.7 and in_afdruk and p.deur_loop_m(2.0) < 6.0
+			if not lus_ok:
+				fout += 1
+			print("%s %s draai %d: verdwijnt %.2f m van deur_punt (%.2f m binnen), deurtegel voor de deur %.2f, loop %.2f m" % ["ok  " if lus_ok else "FOUT", soort, draai, weg, diep, voor, p.deur_loop_m(2.0)])
 			hut.free()
 	print("---- ", "ALLES OK" if fout == 0 else "%d FOUT(EN)" % fout)
 	quit(0 if fout == 0 else 1)
