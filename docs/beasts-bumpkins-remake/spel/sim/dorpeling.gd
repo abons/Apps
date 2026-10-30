@@ -82,6 +82,8 @@ func kan_bevel(soort: String) -> bool:
 		return false
 	if rol == "voetsoldaat" and soort in ["werk", "claim", "huis", "oogst", "melk", "raap", "lever"]:
 		return false                 # origineel: soldaten boeren en bouwen niet (gameplay.md "Gilden en training")
+	if soort == "koop":
+		return true                  # kinderen kopen ook (origineel, gebruiker 2026-10-30); drinken bij de plas is gratis
 	return soort == "loop" or soort == "slaap" or soort == "vuur" or soort == "vlucht" or volwassen()
 
 

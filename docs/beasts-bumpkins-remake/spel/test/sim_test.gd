@@ -806,6 +806,22 @@ func _test_bron() -> void:
 		w.tik(w.tik_dt)
 	_check(not drank.is_empty() and drank[0][1] == null, "missie 1: dorstige dorpeling drinkt bij de bron (%s)" % str(drank))
 	_check(d.dorst < 1.0 and w.kas >= kas, "dorst weer 0, water kost niets")
+	var kind: Dorpeling = null
+	for x in w.dorpelingen:
+		if not x.volwassen() and kind == null:
+			kind = x
+	if kind != null:
+		drank.clear()
+		kind.bevel = {}
+		kind.route.clear()
+		kind.dorst = float(w.spel["economie"]["dorst_s"]) + 1.0
+		for k in kind.trek:
+			kind.trek[k] = 0.0
+		for i in 900:
+			if not drank.is_empty():
+				break
+			w.tik(w.tik_dt)
+		_check(not drank.is_empty() and drank[0][0] == kind.id, "een kind drinkt ook bij de bron")
 
 
 func _test_stapels() -> void:
