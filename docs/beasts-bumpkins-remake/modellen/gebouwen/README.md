@@ -110,3 +110,12 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
 | --- | --- | --- |
 | gereedschapsloods | ~79k | ~0,4k |
 | molen | ~75k | ~0,5k |
+
+## Bouwstanden van de hut (`../peasant_hut_standen.py`)
+
+- `blender -b -P peasant_hut_standen.py -- [standen=1,2,3] [preview]` (eerst `peasant_hut_realtime.py`): gesneden uit
+  `peasant_hut_rt.blend`, zelfde oorsprong en atlassen; stand 4 = `peasant_hut_rt.glb`. Preview: `../render/hut_standen.png`.
+- Driehoeken: stand 1 5,9k (aarde, paaltjes, touw), 2 29k (muren 0,72 m), 3 87k (volle muren, spanten, ladder,
+  halve schoorsteen); af-hut 112k. Geen LOD1. Ankers: `deur_voor_drempel`, `deur_aanbouw_drempel`.
+- Nog mis: de muurkop is een vlakke specie-strook; binnenstenen zijn kopieen (herhaling zichtbaar); stand 1-aarde
+  is egaal en roodbruin; de vloer van de aanbouw draagt de gebakken afdruk van kist en ton.

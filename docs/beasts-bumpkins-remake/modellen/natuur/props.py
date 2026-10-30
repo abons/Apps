@@ -1,4 +1,4 @@
-"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, hek_poort, bron (put, latere
+"""Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, zaagbok (bouwplaats), hek_poort, bron (put, latere
 missies), bronplas (de spring van missie 1: kring keien om een plasje),
 hek_segment, hek_paal, poort, akker_kaal, akker_rijp.
 
@@ -22,7 +22,7 @@ from mathutils import Matrix, Vector, noise
 import natuur_lib as L
 from atlas import CEL
 
-ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "bron", "bronplas", "hek_segment", "hek_poort",
+ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "zaagbok", "bron", "bronplas", "hek_segment", "hek_poort",
         "hek_paal", "poort", "akker_kaal", "akker_rijp"]
 ALLEEN = [n for n in L.OPTS.get("alleen", ",".join(ALLE)).split(",") if n]
 
@@ -639,6 +639,81 @@ def steenhoop():
         keien.append((L_kei(rnd), (sz * 1.2, sz, sz * 0.85), Vector((0.2 * math.cos(a), 0.2 * math.sin(a), 0.75)),
                       rnd.uniform(0, 6.28)))
     o = gebakken_keien("steenhoop", keien, res=1024, mos=0.1)
+    return [o]
+
+
+# --- Zaagbok (bouwplaats) ----------------------------------------------------------------------
+def zaagbok_textuur():
+    """Oranje geverfd hout: de luminantie van rough_wood op een oranje grond (baseColorFactor kan niet boven 1)."""
+    def maak():
+        p = L.pixels(L.laad(os.path.join(L.TEX, "rough_wood_diff_1k.jpg")))[..., :3]
+        lum = (p * np.array([0.3, 0.55, 0.15])).sum(2, keepdims=True)
+        lum = (lum - lum.mean()) / (lum.std() + 1e-6)
+        return np.clip(np.array([0.78, 0.30, 0.06]) * (1.0 + 0.22 * lum), 0, 1)
+    return eigen_textuur("zaagbok_kleur", maak)
+
+
+def balk(b, p0, p1, w, d, mat, rol=0.0):
+    """Gezaagde balk van p0 naar p1 (doorsnede w x d), UV in meters langs de lengte."""
+    p0, p1 = Vector(p0), Vector(p1)
+    ax = (p1 - p0).normalized()
+    x, y = L.frame(ax)
+    R = Matrix.Rotation(rol, 3, ax)
+    x, y = R @ x * (w / 2), R @ y * (d / 2)
+    Ln = (p1 - p0).length
+    hoek = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    for k in range(4):
+        (a0, b0), (a1, b1) = hoek[k], hoek[(k + 1) % 4]
+        q = [p0 + x * a0 + y * b0, p0 + x * a1 + y * b1, p1 + x * a1 + y * b1, p1 + x * a0 + y * b0]
+        u0 = k * (w + d) / 2
+        u1 = u0 + (w if k % 2 == 0 else d)
+        b.f([b.v(c) for c in q], [(u0, 0), (u1, 0), (u1, Ln), (u0, Ln)], mat)
+    for c, s in ((p0, -1), (p1, 1)):
+        q = [c + x * a + y * bb for a, bb in hoek]
+        if s < 0:
+            q = q[::-1]
+        b.f([b.v(v) for v in q], [((a + 1) * w / 2, (bb + 1) * d / 2) for a, bb in hoek], mat)
+
+
+def zaagbok():
+    """Oranje houten zaagbok (X-poten) met een stam erop, een tweede stam erachter, op een ijzeren gaasmat
+    op een plek aangestampte aarde (concept lokaal/concept/img/bouwgereedschap.jpg). Lang 1,6 m (de stam), langs x."""
+    rnd = random.Random(31)
+    b = L.Bouwer()
+    # materialen: 0 oranje hout, 1 schors, 2 kopshout, 3 ijzer, 4 aarde
+    M = [L.pbr("zaagbok_hout", zaagbok_textuur(), L.laad(os.path.join(L.TEX, "rough_wood_nor_gl_1k.jpg"), data=True),
+               L.orm_van("rough_wood")), m("schors"), m("kopshout"), m("ijzer"), L.ph("farm_soil", "aarde", factor=(0.74, 0.69, 0.62))]
+    # aarde: rafelige schijf, net boven het maaiveld
+    ring, n = [], 28
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        r = 1.0 + 0.12 * noise.noise(Vector((math.cos(a) * 2, math.sin(a) * 2, 0.7)))
+        ring.append(Vector((0.95 * r * math.cos(a), 0.75 * r * math.sin(a), 0.004)))
+    c = b.v((0, 0, 0.012))
+    for k in range(n):
+        p, q = ring[k], ring[(k + 1) % n]
+        b.f([b.v(p), b.v(q), c], [(p.x / 1.6, p.y / 1.6), (q.x / 1.6, q.y / 1.6), (0, 0)], 4)
+    # gaasmat 1,3 x 1,0 m: twee lagen draad, golvend over elkaar
+    sx, sy, st = 0.65, 0.5, 0.07
+    for y in np.arange(-sy, sy + 1e-6, st):
+        balk(b, (-sx, y, 0.022), (sx, y, 0.022), 0.008, 0.008, 3)
+    for x in np.arange(-sx, sx + 1e-6, st):
+        balk(b, (x, -sy, 0.03), (x, sy, 0.03), 0.008, 0.008, 3)
+    # zaagbok: per eind twee gekruiste poten in het y-z-vlak, een regel door de kruising, schoren onderin
+    for x in (-0.33, 0.33):
+        for s in (-1, 1):
+            balk(b, (x + s * 0.025, s * 0.31, 0.03), (x + s * 0.025, -s * 0.17, 0.88), 0.07, 0.05, 0, rol=math.pi / 2)
+        balk(b, (x, -0.24, 0.17), (x, 0.24, 0.17), 0.05, 0.035, 0)
+    zk = 0.03 + 0.85 * 0.31 / 0.48                     # hoogte van de kruising
+    balk(b, (-0.48, 0, zk), (0.48, 0, zk), 0.06, 0.07, 0)
+    balk(b, (-0.33, 0.0, 0.17), (0.33, 0.0, zk - 0.04), 0.045, 0.035, 0)   # schoor
+    # stam in de V, en een tweede erachter op de grond
+    r = 0.15
+    zc = zk + r / math.sin(math.atan2(0.48, 0.85)) + 0.03
+    stam_stuk(b, Vector((-0.8, 0.02, zc)), Vector((0.8, -0.03, zc + 0.02)), r, 1, 2, zijden=14, rnd=rnd, ruw=0.04)
+    stam_stuk(b, Vector((-0.75, 0.48, 0.17)), Vector((0.55, 0.62, 0.16)), 0.16, 1, 2, zijden=14, rnd=rnd, ruw=0.04)
+    o = L.obj("zaagbok", b.mesh("zaagbok", M))
+    o.data.set_sharp_from_angle(angle=math.radians(50))
     return [o]
 
 
