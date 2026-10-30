@@ -53,6 +53,25 @@ Tripo (gratis plan) mag niet exporteren; alleen schermafbeeldingen als referenti
 - Hunyuan3D-2.1 (vorm, `lokaal/hunyuan/`) zou als basis nog beter passen, maar de licentie sluit de EU uit
   (zie `../../README.md`): niet gebruikt.
 
+## Koe naar de Tripo-referentie (2026-10-30, `koe_tripo.py`)
+
+Geen TRELLIS-koe (quotum op): basis is de procedurele koe zelf. Eerst `koe.py` (schrijft `preview/koe.blend`), dan
+`blender -b -P koe_tripo.py -- [zij] [poses] [ankers] [kx=] [kop=] [oor=]`, ~35 s -> `spel/assets/koe_tripo.glb` (+ `koe_tripo_anim.json`).
+Schakelaar `spel.json` `koe_model` = `"tripo"` (standaard sinds 2026-10-30) | `"procedureel"`, frames `-- --koe_model=procedureel`.
+- Referenties `lokaal/tripo/koe/` (nooit in git). Silhouet: `segmenteer` + vlakke grijze vloerschaduw weg; staart uit
+  `koe_links` gesneden (`STAART_RAND`: ligt tegen de billen). 45 `ANKERS`; poten naar het NABIJE been (achterrand binnen
+  het silhouet = losse punten). TPS (y, z), schoft als procedureel (1,11 m): koe wordt korter (1,36 m) en ronder.
+- x: oppervlaktefactor x `KX` 0,93, kop/kaak x `KOP` 0,70, oren x `OOR` 1,35 (naar `koe_voor`).
+- Staart: nieuwe rustbotten langs `STAART_LIJN` (tegen de billen), vertices via lineaire skinning oud -> nieuw.
+- Kleur (zelfde UV-atlas, alleen mat_lijf; normaal-map blijft, ORM-ruwheid uit de helderheid): links uit `koe_links`,
+  rechts uit `koe_rechts` (gespiegeld, eigen TPS: andere vlekken), voorkant (kop, borst) uit `koe_voor` met z-buffer,
+  oren zwart. Studiolicht eruit (`ontlicht`, wit 0,84), buik +30 %, staart en achterkant rond de staart wit.
+  `koe_boven` niet gebruikt: de rug uit beide zijkanten klopte al met het bovenaanzicht.
+- Rek (p99.9) als procedureel: lopen 3,8 (3,7), sterven 7,3 (6,5), geboorte 5,4 (4,5). Lopen 0,71 m/s ongewijzigd.
+- Oordeel: 7 tegen 6,5 (procedureel): natuurlijker vorm en vlekken, echte kop; zwakker: dunne onderbenen, achteraanzicht
+  wat vlak, vlekranden zachter. Kalveren (schaal 0,55) en wilde koeien gebruiken dezelfde glb.
+  Vergelijking: `lokaal/tripo/koe/koe_tripo_zij.png`, `koe_tripo_poses.png`, `koe_spel_vergelijk.png` (links procedureel).
+
 ## Voor koe, personages, gebouwen
 
 - **Dieren**: goed bruikbaar als het skelet al bestaat (`*_rig.py`): alleen `MAAT_T` aflezen + gewichten.

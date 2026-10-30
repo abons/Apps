@@ -4,19 +4,35 @@ extends RefCounted
 ## van de glb afhangt: het pad, de verborgen onderdelen (extras.verborgen) en de animatienamen. Nieuwe versie = sync.ps1 + --import.
 
 const GLB := "res://assets/koe.glb"
+## spel.json `koe_model` "tripo": de procedurele koe vervormd naar de Tripo-referentie met geprojecteerde textuur
+## (modellen/dieren/koe_tripo.py, lokaal: textuur uit de Tripo-render). Zelfde skelet, clips en assen.
+const GLB_TRIPO := "res://assets/koe_tripo.glb"
 const ANIM := "res://assets/koe_anim.json"
 const STANDAARD := "grazen"        # idle, lopen, grazen, gemolken_worden, sterven, geboorte
 
 
 static func bestaat() -> bool:
-	return ResourceLoader.exists(GLB)
+	return ResourceLoader.exists(glb_pad())
+
+
+## Glb-pad: spel.json `koe_model` ("tripo" | "procedureel"; voor vergelijkingsframes overschrijft `-- --koe_model=...`
+## dat), terugval op de procedurele glb.
+static func glb_pad() -> String:
+	var d = Gegevens.lees(Gegevens.SPEL)
+	var keuze := String(d.get("koe_model", "procedureel")) if d is Dictionary else "procedureel"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--koe_model="):
+			keuze = a.get_slice("=", 1)
+	if keuze == "tripo" and ResourceLoader.exists(GLB_TRIPO):
+		return GLB_TRIPO
+	return GLB
 
 
 ## Een koe met verborgen onderdelen weg en de gewenste animatie aan. Null zonder glb.
 static func maak(anim := STANDAARD, start := 0.0) -> Node3D:
 	if not bestaat():
 		return null
-	var n: Node3D = (load(GLB) as PackedScene).instantiate()
+	var n: Node3D = (load(glb_pad()) as PackedScene).instantiate()
 	n.name = "koe"
 	_verberg(n)
 	var ap := _speler(n)

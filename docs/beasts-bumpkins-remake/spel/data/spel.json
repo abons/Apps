@@ -1,6 +1,8 @@
 {
   "_wolf_model": "view/wolf_model.gd: \"tripo\" = assets/wolf_tripo.glb en donkere_wolf_tripo.glb (TRELLIS-mesh vervormd naar de Tripo-referentie, geprojecteerde textuur, modellen/dieren/wolf_tripo.py; lokaal), \"trellis\" = assets/wolf_trellis.glb en donkere_wolf_trellis.glb (AI-model, modellen/dieren/wolf_trellis.py), \"procedureel\" = wolf.glb en donkere_wolf.glb (wolf.py). Ontbreekt de tripo/trellis-glb, dan de procedurele; ontbreekt die ook, de placeholder.",
   "wolf_model": "tripo",
+  "_koe_model": "view/koe.gd: \"tripo\" = assets/koe_tripo.glb (procedurele koe vervormd naar de Tripo-referentie, geprojecteerde textuur, modellen/dieren/koe_tripo.py; lokaal), \"procedureel\" = koe.glb (koe.py). Ontbreekt de tripo-glb, dan de procedurele.",
+  "koe_model": "tripo",
   "tegel_m": 2.0,
   "sim_hz": 10,
   "loop_mps": 0.849,

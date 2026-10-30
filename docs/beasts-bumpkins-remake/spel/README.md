@@ -27,7 +27,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 
 Opties na `--`: `--missie=1|2` (standaard 1), `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, `--regen`, `--fps` (frametijden loggen),
 `--gang=0|1|2` (loopanimatie, zie onder), `--scenario=overzicht|kaart|dorp|selectie|pad|loop` (gescripte camera/invoer voor frames),
-`--geluid-log` (elke klank die start in de uitvoer), `--wolf_model=tripo|trellis|procedureel`, `--camwolf=4.5` (camera volgt de eerste wolf, met `--missie=2 --scenario=wolf`).
+`--geluid-log` (elke klank die start in de uitvoer), `--wolf_model=tripo|trellis|procedureel`, `--koe_model=tripo|procedureel` (spel.json `koe_model`, view/koe.gd), `--camwolf=4.5` (camera volgt de eerste wolf, met `--missie=2 --scenario=wolf`).
 
 ## Geluid
 
