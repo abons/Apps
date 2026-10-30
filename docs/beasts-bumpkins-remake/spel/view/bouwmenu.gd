@@ -20,6 +20,9 @@ extends Node
 ## pant de camera, een tik ernaast zet de ghost daar. Weg/hek: tik = begin, sleep vanaf begin of eind = dat einde
 ## verschuift (de rij volgt), Bouwen legt de rij en het eind wordt het nieuwe begin. Knoppen onderin: Draai, Bouwen
 ## (alleen als het kan), Annuleer; >= 48 dp. De muis-/toetsenbordbesturing hierboven is op de pc ongewijzigd.
+## Staand (view/scherm.gd, 2026-10-30): de bouwknoppen zitten in een lade onderin die de knop Gebouwen (rechtsboven)
+## opent en een keuze weer sluit; hint, Draai/Stop en de touchbalk staan onderin, de balk past in de breedte. Liggend
+## is de indeling zoals ze was. `_indeling` loopt bij elke size_changed.
 
 const GROND_Y := 0.25
 const KLIK_DREMPEL := 6.0
@@ -90,6 +93,13 @@ var knop_bouw: Button       ## alleen touch: Bouwen (bevestigen)
 var hint: Label
 static var touch := OS.has_feature("mobile") or "--touch" in OS.get_cmdline_user_args()   ## touch-bouwen (zie boven)
 var knop_h := KNOP_H        ## touch: >= 48 dp (bouw())
+var kolom: VBoxContainer   ## liggend rechtsboven (knoppen, hint, Draai, Stop); staand onderin (lade, hint, Draai, Stop)
+var rij: HFlowContainer    ## de bouwknoppen
+var rij2: HBoxContainer    ## hint (en op de pc Draai en Stop)
+var balk: HBoxContainer    ## touch: Draai, Bouwen, Annuleer
+var knop_lade: Button      ## staand: Gebouwen (lade open/dicht)
+var lade_open := false
+var _staand := false
 var _t_tegel := Vector2i(-1, -1)   ## touch: gebouw = tegel zoals _plan_onder hem geeft; weg/hek = begintegel
 var _t_eind := Vector2i(-1, -1)    ## touch, weg/hek: eindtegel
 var _t_vinger := -1                ## touch: vinger die de ghost (of een rij-einde) vasthoudt
@@ -114,13 +124,13 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	_hekken.name = "Hekken"
 	parent3d.add_child(_hekken)
 
-	if touch:      # 48 dp met een marge; de Motorola (~400 dpi) geeft ~130 px
-		knop_h = clampf(52.0 * DisplayServer.screen_get_dpi() / 160.0, 110.0, 180.0)
+	if touch:
+		knop_h = touch_knop_h()
 	var laag := CanvasLayer.new()
 	add_child(laag)
 	# rechtsboven, rechts van de stand (linksboven): de knoppen lopen door op een tweede regel als het niet past,
 	# daaronder hint, Draai en Stop. Onder staat de hulptekst.
-	var kolom := VBoxContainer.new()
+	kolom = VBoxContainer.new()
 	kolom.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	kolom.offset_left = MENU_LINKS
 	kolom.offset_top = 12
@@ -128,7 +138,7 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	kolom.add_theme_constant_override("separation", 8)
 	kolom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	laag.add_child(kolom)
-	var rij := HFlowContainer.new()
+	rij = HFlowContainer.new()
 	rij.add_theme_constant_override("h_separation", 8)
 	rij.add_theme_constant_override("v_separation", 8)
 	rij.alignment = FlowContainer.ALIGNMENT_END
@@ -147,7 +157,7 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 		for s2 in knoppen:
 			(knoppen[s2] as Button).visible = w.ontgrendeld(s2))
 	# draaien en stoppen ook zonder toets, wiel of rechterknop (touch): twee knoppen onder het menu, alleen in de modus
-	var rij2 := HBoxContainer.new()
+	rij2 = HBoxContainer.new()
 	rij2.add_theme_constant_override("separation", 8)
 	rij2.alignment = BoxContainer.ALIGNMENT_END
 	rij2.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -170,12 +180,94 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 		knop_stop.custom_minimum_size.x = 130
 		knop_stop.pressed.connect(func() -> void: zet_actief(false))
 		rij2.add_child(knop_stop)
+	knop_lade = _knop("Gebouwen")
+	knop_lade.toggle_mode = true
+	knop_lade.visible = false
+	knop_lade.toggled.connect(zet_lade)
+	laag.add_child(knop_lade)
+	kolom.draw.connect(_teken_lade)
 	zet_actief(false)
+	get_viewport().size_changed.connect(_indeling)
+	_indeling()
+	match Scherm.optie("proef"):     # alleen voor frames (view/scherm.gd)
+		"bouw": kies.call_deferred(&"hut")
+		"lade": zet_lade.call_deferred(true)
+
+
+## 48 dp met een marge; de Motorola (~400 dpi) geeft ~130 px.
+static func touch_knop_h() -> float:
+	return clampf(52.0 * DisplayServer.screen_get_dpi() / 160.0, 110.0, 180.0)
+
+
+## Legt het menu neer voor de huidige viewport: liggend zoals altijd (rechtsboven), staand de lade onderin.
+func _indeling() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	_staand = Scherm.staand(vp)
+	var onder := 12.0
+	if balk != null:
+		var sep := int(knop_h * 0.3)
+		var per := knop_h * 2.4
+		if _staand:
+			per = minf(per, floorf((vp.x - 24.0 - 2.0 * sep) / 3.0))
+		for k: Button in [knop_draai, knop_bouw, knop_stop]:
+			k.custom_minimum_size.x = per
+		balk.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, int(knop_h * 0.25))
+		balk.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		balk.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		onder = knop_h * 1.25 + 12.0
+	if _staand:
+		kolom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		kolom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		kolom.offset_left = 12
+		kolom.offset_right = -12
+		kolom.offset_bottom = -onder
+		kolom.offset_top = -onder
+		rij.alignment = FlowContainer.ALIGNMENT_CENTER
+		rij2.alignment = BoxContainer.ALIGNMENT_CENTER
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		knop_lade.visible = true
+		knop_lade.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 12)
+		knop_lade.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	else:
+		kolom.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		kolom.grow_vertical = Control.GROW_DIRECTION_END
+		kolom.offset_left = MENU_LINKS
+		kolom.offset_top = 12
+		kolom.offset_right = -16
+		kolom.offset_bottom = 12
+		rij.alignment = FlowContainer.ALIGNMENT_END
+		rij2.alignment = BoxContainer.ALIGNMENT_END
+		hint.autowrap_mode = TextServer.AUTOWRAP_OFF
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		hint.size_flags_horizontal = Control.SIZE_FILL
+		knop_lade.visible = false
+	rij.visible = lade_open or not _staand
+	kolom.queue_redraw()
+
+
+## Staand: de lade met bouwknoppen open of dicht (knop Gebouwen; een keuze sluit hem).
+func zet_lade(open: bool) -> void:
+	lade_open = open
+	if knop_lade.button_pressed != open:
+		knop_lade.set_pressed_no_signal(open)
+	rij.visible = open or not _staand
+	kolom.queue_redraw()
+
+
+## Donkere achtergrond achter de open lade (staand); liggend tekent dit niets.
+func _teken_lade() -> void:
+	if _staand and rij.visible:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.55)
+		sb.set_corner_radius_all(8)
+		kolom.draw_style_box(sb, Rect2(rij.position, rij.size).grow(8))
 
 
 ## Touch: Draai, Bouwen en Annuleer onderin het midden, groot genoeg voor een duim.
 func _bouw_touch_balk(laag: CanvasLayer) -> void:
-	var balk := HBoxContainer.new()
+	balk = HBoxContainer.new()
 	balk.add_theme_constant_override("separation", int(knop_h * 0.3))
 	laag.add_child(balk)
 	knop_draai = _knop("Draai")
@@ -192,9 +284,6 @@ func _bouw_touch_balk(laag: CanvasLayer) -> void:
 		k.custom_minimum_size.x = knop_h * 2.4
 		k.expand_icon = false
 		balk.add_child(k)
-	balk.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, int(knop_h * 0.25))
-	balk.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	balk.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 
 ## Vinkje (true) of kruis als knopicoon, zelf getekend: het standaardlettertype heeft misschien geen ✓ en ✗.
@@ -245,6 +334,8 @@ func kies(s: StringName, aan := true) -> void:
 		oud.get_parent().add_child(ghost)
 		oud.queue_free()
 	zet_actief(aan)
+	if aan and _staand and lade_open:
+		zet_lade(false)
 	if aan and touch:
 		_touch_begin()
 

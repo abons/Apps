@@ -1,0 +1,173 @@
+extends SceneTree
+## Headless test schermindeling (view/scherm.gd, hud.gd, bouwmenu.gd, brief.gd, prijzen.gd):
+## godot --headless --path . --script res://test/indeling_test.gd
+## Pc en touch, elk op 2400x1080 (liggend) en 1080x2400 (staand), gewisseld tijdens het spel (size_changed): geen
+## zichtbare Control buiten beeld, en de vaste delen (minikaart, munt-icoon, stand/tellers, bouwknoppen, lade-knop,
+## hint, touchbalk) overlappen elkaar niet; ook met de bouwmodus aan en (staand) de lade open. Brief en prijzenscherm
+## passen in beeld. Touch: de tellers zijn >= 16 dp (Scherm.dp), de stand-tekstregels zijn weg.
+
+var fouten := 0
+var cam: Camera3D
+
+
+func _initialize() -> void:
+	process_frame.connect(_start, CONNECT_ONE_SHOT)
+
+
+func _start() -> void:
+	for touch in [false, true]:
+		await _ronde(touch)
+	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUTEN" % fouten)
+	quit(1 if fouten > 0 else 0)
+
+
+func _ronde(touch: bool) -> void:
+	Bouwmenu.touch = touch
+	root.size = Vector2i(2400, 1080)
+	var w := Wereld.new()
+	_check(w.laad("", 1), "missie 1 laadt")
+	w.alles_open = true
+	w.kas = 100000
+	var bak := Node.new()
+	root.add_child(bak)
+	var wereld3d := Node3D.new()
+	bak.add_child(wereld3d)
+	cam = Camera3D.new()
+	cam.set_script(load("res://rts_camera.gd"))
+	wereld3d.add_child(cam)
+	cam.make_current()
+	var m := w.tegel_m
+	cam.zet_direct(Vector3((w.kampvuur.x + 0.5) * m, 0, (w.kampvuur.y + 0.5) * m), 0.6, deg_to_rad(40), 24.0)
+	var b := Bestuur.new()
+	b.w = w
+	b.cam = cam
+	bak.add_child(b)
+	var hud := Hud.new()
+	bak.add_child(hud)
+	hud.bouw(w, b)
+	b.kader = hud.kader
+	var bm := Bouwmenu.new()
+	bak.add_child(bm)
+	bm.bouw(w, b, wereld3d)
+	cam.pan_blokkade = func() -> bool: return bm.actief and not Bouwmenu.touch
+	var h := Hints.new().bouw(w)
+	hud.zet_hints(h)
+	for s in bm.knoppen:          # alles_open: alle negen knoppen, de volste rij
+		(bm.knoppen[s] as Button).visible = w.ontgrendeld(s)
+
+	var naam := "touch" if touch else "pc"
+	if touch:
+		_check(not hud.stand.visible and hud.tellers != null and hud.tellers.visible, "%s: tekstregels weg, tellers aan" % naam)
+		_check(hud.tellers.kas.get_theme_font_size("font_size") >= roundi(16.0 * Scherm.dp()), "%s: tellers >= 16 dp" % naam)
+	else:
+		_check(hud.stand.visible and hud.tellers == null, "%s: tekstregels, geen tellers" % naam)
+	for maat in [Vector2i(2400, 1080), Vector2i(1080, 2400), Vector2i(2400, 1080), Vector2i(1080, 2400)]:
+		root.size = maat
+		await _frames(3)
+		var tag := "%s %dx%d" % [naam, maat.x, maat.y]
+		_check(hud.brief.visible, "%s: briefing open" % tag)
+		_binnen(hud.brief, "%s briefing" % tag)
+		_check(cam.keep_aspect == (Camera3D.KEEP_WIDTH if maat.y > maat.x else Camera3D.KEEP_HEIGHT), "%s: camera houdt de %s vast" % [tag, "breedte" if maat.y > maat.x else "hoogte"])
+		hud.brief.sluit()
+		await _frames(2)
+		# gewoon, bouwmodus, (staand) lade open
+		_indeling(hud, bm, "%s rust" % tag)
+		bm.kies(&"hut")
+		await _frames(2)
+		_check(bm.actief, "%s: bouwmodus aan" % tag)
+		_indeling(hud, bm, "%s bouwmodus" % tag)
+		if maat.y > maat.x:
+			_check(bm.knop_lade.visible and not bm.rij.visible, "%s: lade dicht, knop Gebouwen" % tag)
+			bm.knop_lade.button_pressed = true
+			await _frames(2)
+			_check(bm.rij.visible, "%s: Gebouwen opent de lade" % tag)
+			_indeling(hud, bm, "%s lade open" % tag)
+			(bm.knoppen[&"kippenhok"] as Button).button_pressed = true
+			await _frames(2)
+			_check(bm.soort == &"kippenhok" and bm.actief and not bm.rij.visible, "%s: keuze in de lade sluit hem" % tag)
+		else:
+			_check(not bm.knop_lade.visible and bm.rij.visible, "%s: knoppen rechtsboven, geen lade" % tag)
+		bm.zet_actief(false)
+		hud.prijzen.open()
+		await _frames(2)
+		_binnen(hud.prijzen._paneel, "%s prijzen" % tag)
+		hud.prijzen.sluit()
+		# een hint (klein) en de briefing weer open voor de volgende maat
+		hud.brief.toon("", "Begin met twee kippenhokken. Kies het kippenhok in het bouwmenu en zet het op vrije grond.")
+		await _frames(1)
+		_binnen(hud.brief, "%s hint" % tag)
+		hud.brief.toon(h.briefing.get("titel", ""), h.briefing.get("tekst", ""), true)
+	bak.queue_free()
+	await _frames(2)
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await process_frame
+
+
+## Rechthoek van een Control op het scherm, met schaal.
+func _rect(c: Control) -> Rect2:
+	var t := c.get_global_transform_with_canvas()
+	return Rect2(t.origin, c.size * t.get_scale())
+
+
+func _binnen(c: Control, wat: String) -> void:
+	var vp := Rect2(Vector2.ZERO, root.get_visible_rect().size).grow(1.0)
+	var r := _rect(c)
+	_check(vp.encloses(r), "%s binnen beeld (%s)" % [wat, r])
+
+
+## Alle zichtbare Controls van Hud en Bouwmenu in beeld; de vaste delen zonder overlap.
+func _indeling(hud: Hud, bm: Bouwmenu, wat: String) -> void:
+	var vp := Rect2(Vector2.ZERO, root.get_visible_rect().size).grow(1.0)
+	var buiten: Array = []
+	for wortel: Node in [hud, bm]:
+		for c in _controls(wortel):
+			if c.size.x < 1.0 or c.size.y < 1.0:
+				continue
+			if not vp.encloses(_rect(c)):
+				buiten.append("%s %s" % [c.get_class() if c.name.begins_with("@") else String(c.name), _rect(c)])
+	_check(buiten.is_empty(), "%s: alles in beeld %s" % [wat, buiten])
+	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "stand": hud.tellers if hud.tellers != null else hud.stand,
+		"lade-knop": bm.knop_lade, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
+	if hud.hulp.get_parent().visible:
+		delen["hulpregels"] = hud.hulp.get_parent()
+	var namen := delen.keys().filter(func(k: String) -> bool:
+		var c: Control = delen[k]
+		return c != null and c.is_visible_in_tree() and c.size.x >= 1.0 and c.size.y >= 1.0 and _heeft_inhoud(c))
+	for i in namen.size():
+		for j in range(i + 1, namen.size()):
+			var a := _rect(delen[namen[i]])
+			var c := _rect(delen[namen[j]])
+			_check(not a.intersects(c), "%s: %s en %s overlappen niet (%s, %s)" % [wat, namen[i], namen[j], a, c])
+
+
+## Een container zonder zichtbare kinderen telt niet mee (rij2 zonder hint en knoppen).
+func _heeft_inhoud(c: Control) -> bool:
+	if not c is Container:
+		return true
+	for k in c.get_children():
+		if k is Control and (k as Control).visible:
+			return true
+	return false
+
+
+func _controls(n: Node) -> Array:
+	var uit: Array = []
+	for k in n.get_children():
+		if k is CanvasItem and not (k as CanvasItem).visible:
+			continue
+		if k is Control and k.get_script() != load("res://view/kader.gd") and not k is Prijzenscherm and not k is Brief:
+			uit.append(k)
+		if not k is Prijzenscherm and not k is Brief:
+			uit.append_array(_controls(k))
+	return uit
+
+
+func _check(ok: bool, wat: String) -> void:
+	if ok:
+		print("  ok   ", wat)
+	else:
+		fouten += 1
+		print("  FOUT ", wat)

@@ -6,12 +6,19 @@ extends Camera3D
 ## true geeft: bouwmenu actief zonder touch-bouwen), twee vingers: midden slepen = pannen, knijpen = zoom, draaien = de
 ## kaart draait met de vingers mee. Een tik blijft
 ## via emulate_mouse_from_touch een linkerklik (Bestuur, bouwmenu, minikaart). Randpannen staat op mobiel uit.
+## Staand scherm (2026-10-30): de beeldhoek houdt de breedte vast (FOV_STAAND horizontaal, ~73 graden verticaal) in
+## plaats van de hoogte (liggend 50 graden verticaal), anders is het eiland een smalle strook; bij het draaien naar
+## staand gaat de camera STAAND_VERDER verder weg en STAAND_KANTEL steiler, bij terugdraaien weer terug.
 
 const AFSTAND_MIN := 2.0
 const AFSTAND_MAX := 130.0
 const PITCH_MIN := deg_to_rad(4.0)
 const PITCH_MAX := deg_to_rad(82.0)
 const RAND := 12  # px voor rand-pannen
+const FOV := 50.0             ## graden, verticaal (liggend)
+const FOV_STAAND := 38.0      ## graden, horizontaal (staand)
+const STAAND_VERDER := 1.3
+const STAAND_KANTEL := deg_to_rad(12.0)   ## staand steiler: met de hoge beeldhoek zie je anders vooral horizon
 
 var doel_focus := Vector3(0.65, 0.0, 0.05)
 var doel_yaw := 0.6
@@ -32,16 +39,41 @@ const TOUCH_DREMPEL := 12.0      # px: minder slepen telt als tik
 var _vingers := {}               # index -> positie, alleen aanrakingen die hier (buiten de GUI) begonnen
 var _touch_start := Vector2.ZERO
 var touch_pant := false          # vinger voorbij de drempel of twee vingers: Bestuur maakt er geen klik van
+var _staand := false
 
 
 func _ready() -> void:
-	fov = 50.0
+	fov = FOV
 	near = 0.05
 	far = 1500.0
+	_kijkhoek(false)
+	get_viewport().size_changed.connect(_kijkhoek)
 	_plaats()
 
 
+## Liggend: verticale beeldhoek vast (Godot-standaard); staand: horizontale. `verder` = bij een draai de zoom meenemen.
+func _kijkhoek(verder := true) -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var st := vp.y > vp.x
+	if st == _staand:
+		return
+	_staand = st
+	keep_aspect = Camera3D.KEEP_WIDTH if st else Camera3D.KEEP_HEIGHT
+	fov = FOV_STAAND if st else FOV
+	if verder:
+		var f := STAAND_VERDER if st else 1.0 / STAAND_VERDER
+		doel_afstand = clampf(doel_afstand * f, AFSTAND_MIN, AFSTAND_MAX)
+		afstand = clampf(afstand * f, AFSTAND_MIN, AFSTAND_MAX)
+		var k := STAAND_KANTEL if st else -STAAND_KANTEL
+		doel_pitch = clampf(doel_pitch + k, PITCH_MIN, PITCH_MAX)
+		pitch = clampf(pitch + k, PITCH_MIN, PITCH_MAX)
+
+
+## `a` en `p` gelden liggend; staand STAAND_VERDER verder en STAAND_KANTEL steiler (zoals na een draai).
 func zet_direct(f: Vector3, y: float, p: float, a: float) -> void:
+	if _staand:
+		a = clampf(a * STAAND_VERDER, AFSTAND_MIN, AFSTAND_MAX)
+		p = clampf(p + STAAND_KANTEL, PITCH_MIN, PITCH_MAX)
 	doel_focus = f; doel_yaw = y; doel_pitch = p; doel_afstand = a
 	focus = f; yaw = y; pitch = p; afstand = a
 	_plaats()
@@ -123,7 +155,8 @@ func _touch(e: InputEvent) -> void:
 
 ## Schuift het brandpunt zo dat de grond ongeveer met de vinger meegaat (`d` = schermverschuiving in px).
 func _pan_scherm(d: Vector2) -> void:
-	var h := get_viewport().get_visible_rect().size.y
+	var vp := get_viewport().get_visible_rect().size
+	var h := vp.x if keep_aspect == Camera3D.KEEP_WIDTH else vp.y     # fov geldt langs deze kant
 	var m_per_px := 2.0 * doel_afstand * tan(deg_to_rad(fov) * 0.5) / maxf(h, 1.0)
 	doel_focus += (-_rechts() * d.x + _vooruit() * d.y / maxf(sin(pitch), 0.35)) * m_per_px
 

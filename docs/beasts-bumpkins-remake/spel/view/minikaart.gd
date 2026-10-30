@@ -229,7 +229,7 @@ func _teken_laag() -> void:
 ## "MOONTON" in 1_lefttop.png.
 func _dorpsnaam() -> void:
 	var naam := str(w.missie.get("dorp", "")).to_upper()
-	if naam == "":
+	if naam == "" or Bouwmenu.touch:     # touch: 11 px is op de telefoon niet te lezen (gebruiker 2026-10-30)
 		return
 	for ob in w.objecten:
 		if ob["naam"] == "vlag" and int(ob.get("owner", 0)) == 0:

@@ -2,6 +2,10 @@ class_name Hud
 extends CanvasLayer
 ## Minimale HUD: linksboven de minikaart (view/minikaart.gd, zoals het origineel), daaronder tijd, seizoen, weer,
 ## selectie, tempo. Linksonder de besturing.
+## Touch (2026-10-30, gebruiker: de tekstregels zijn op de telefoon te klein om te lezen): geen tekstregels en geen
+## sneltoetsuitleg, alleen een rij icoon + getal (kas, dorpelingen en koeien met het missiedoel) op >= 16 dp; minikaart,
+## munt-icoon en rolletjes groter. Staand (view/scherm.gd) op de pc: de stand in korte regels. Brief en prijzenscherm
+## leggen zich opnieuw neer bij size_changed (`_indeling`).
 
 var w: Wereld
 var bestuur: Bestuur
@@ -19,16 +23,28 @@ var prijzen: Prijzenscherm       ## view/prijzen.gd: open met het goudstukken-ic
 var munt_knop: Button
 var kas_toon := -1               ## getoonde kas: loopt in stappen naar w.kas (kas_stap, spel.json kas_teller)
 var _kas_t := 0.0
+var stand: PanelContainer        ## de tekstregels (pc)
+var tellers: Tellers             ## touch: icoon + getal
+var schaal := 1.0                ## touch: minikaart, munt-icoon en rolletjes (1 op de pc)
+var _was_staand := false
+var _hulp_offsets: Array = []    ## liggend: linksonder (zoals altijd); staand onder de stand, want onderin zit het bouwmenu
 
 
 func bouw(wereld: Wereld, b: Bestuur) -> void:
 	w = wereld
 	bestuur = b
+	if is_inside_tree():
+		Scherm.zet_venster(get_tree().root)
+		Scherm.zet_opname(self)
+	if Bouwmenu.touch:
+		schaal = clampf(Scherm.dp() * 0.6, 1.0, 1.6)
 	minikaart = Minikaart.new()
 	add_child(minikaart)
 	minikaart.bouw(w, b.cam, b.view.terrein if b.view != null else null)
+	minikaart.scale = Vector2(schaal, schaal)
 	var pc := PanelContainer.new()
-	pc.position = Vector2(12, minikaart.position.y + minikaart.size.y + 8)
+	stand = pc
+	pc.position = Vector2(12, minikaart.position.y + minikaart.size.y * schaal + 8)
 	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc.add_theme_stylebox_override("panel", _stijl())
 	label = Label.new()
@@ -36,6 +52,12 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc.add_child(label)
 	add_child(pc)
+	if Bouwmenu.touch:
+		pc.visible = false
+		tellers = Tellers.new()
+		tellers.bouw(w, Scherm.dp())
+		tellers.position = pc.position
+		add_child(tellers)
 
 	var pc2 := PanelContainer.new()
 	pc2.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -49,9 +71,10 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	pc2.add_child(hulp)
 	pc2.visible = not Bouwmenu.touch      # sneltoetsen en muisknoppen: zonder toetsenbord zinloos
 	add_child(pc2)
+	_hulp_offsets = [pc2.offset_left, pc2.offset_top, pc2.offset_right, pc2.offset_bottom]
 
 	uitslag = Label.new()
-	uitslag.add_theme_font_size_override("font_size", 44)
+	uitslag.add_theme_font_size_override("font_size", int(44 * maxf(1.0, Scherm.dp() * 0.8)))
 	uitslag.add_theme_color_override("font_outline_color", Color.BLACK)
 	uitslag.add_theme_constant_override("outline_size", 10)
 	uitslag.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -72,13 +95,27 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 
 	# goudstukken-icoon rechts naast de minikaart (origineel: eerste knop in de bovenbalk, hint 1-10) -> prijzenscherm
 	munt_knop = MuntKnop.new()
-	munt_knop.position = Vector2(minikaart.position.x + minikaart.size.x + 10, minikaart.position.y)
+	munt_knop.position = Vector2(minikaart.position.x + minikaart.size.x * schaal + 10, minikaart.position.y)
+	munt_knop.scale = Vector2(schaal, schaal)
 	munt_knop.tooltip_text = "prijzen (O)"
 	add_child(munt_knop)
 	prijzen = Prijzenscherm.new()
 	add_child(prijzen)
 	prijzen.bouw(w)
 	munt_knop.pressed.connect(prijzen.wissel)
+	if is_inside_tree():
+		get_viewport().size_changed.connect(_indeling)
+	if Scherm.optie("proef") == "prijzen":     # alleen voor frames (view/scherm.gd)
+		prijzen.open.call_deferred()
+
+
+## Na een draai van het scherm (size_changed): open brief en prijzenscherm opnieuw neerleggen (de rest hangt aan
+## ankers of staat linksboven; de korte regels kiest _process).
+func _indeling() -> void:
+	if brief != null and brief.visible:
+		brief.herschik()
+	if prijzen.visible:
+		prijzen.leg_neer()
 
 
 func _stijl() -> StyleBoxFlat:
@@ -130,12 +167,37 @@ func _process(dt: float) -> void:
 	var geluk := "geluk: %d%%" % roundi(w.handel.dorp_geluk(w) * 100.0)   # sim/handel.gd, prijzen via het munt-icoon
 	if w.handel.misdaad_aan(w):
 		geluk += "   misdaden: %d" % w.handel.totaal_misdaden()
-	label.text = "%02d:%02d%s  dag %d  %s  %s
+	if tellers != null:
+		tellers.zet(kas_toon)
+		return
+	var regels := "%02d:%02d%s  dag %d  %s  %s
 kas: %s   dorpelingen: %s   koeien: %s   bedden: %d   brood: %d   melk: %d   eieren: %d
-%s   geselecteerd: %d   tempo: %s" % [
+%s   geselecteerd: %d   tempo: %s"
+	var staand: bool = is_inside_tree() and Scherm.staand(get_viewport().get_visible_rect().size)
+	if staand:      # smal: korte regels
+		regels = "%02d:%02d%s  dag %d  %s  %s
+kas: %s   dorpelingen: %s   koeien: %s
+bedden: %d   brood: %d   melk: %d   eieren: %d
+%s
+geselecteerd: %d   tempo: %s"
+	label.text = regels % [
 		h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer,
 		kas, dorp, koe, w.bedden(), w.brood(), w.melk(), w.eieren(),
 		geluk, bestuur.gekozen.size(), tempo]
+	if staand != _was_staand:      # van lange naar korte regels of terug: het paneel krimpt mee
+		_was_staand = staand
+		stand.reset_size()
+		var pc2 := hulp.get_parent() as Control
+		if staand:
+			pc2.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		else:
+			pc2.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+			pc2.offset_left = _hulp_offsets[0]
+			pc2.offset_top = _hulp_offsets[1]
+			pc2.offset_right = _hulp_offsets[2]
+			pc2.offset_bottom = _hulp_offsets[3]
+	if staand:
+		(hulp.get_parent() as Control).position = Vector2(12, stand.position.y + stand.size.y + 8)
 
 
 # ---------------------------------------------------------------- briefing en hints (sim/hints.gd, data/hints.json)
@@ -167,6 +229,8 @@ func _hint(hint: Dictionary) -> void:
 		_volgende_brief()
 		return
 	var r := Rol.new()
+	r.k = schaal
+	r.custom_minimum_size *= schaal
 	r.tooltip_text = "nieuwe hint"
 	r.pressed.connect(func() -> void:
 		r.queue_free()
@@ -224,6 +288,8 @@ class MuntKnop extends Button:
 
 ## Rolletje: opgerolde brief met rode zegel (naar MAIL uit het origineel), knippert zachtjes tot je erop klikt.
 class Rol extends Button:
+	var k := 1.0                 ## touch: groter (Hud.schaal)
+
 	func _init() -> void:
 		flat = true
 		focus_mode = Control.FOCUS_NONE
@@ -234,6 +300,7 @@ class Rol extends Button:
 		modulate.a = 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.006)
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(k, k))
 		var r := Rect2(Vector2(8, 10), Vector2(48, 20))
 		draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.4))
 		draw_rect(r, Color8(214, 200, 160))
@@ -244,3 +311,89 @@ class Rol extends Button:
 			draw_circle(Vector2(x, r.get_center().y), r.size.y * 0.22, Color8(110, 90, 60))
 		draw_circle(r.get_center(), 8.0, Color8(120, 10, 10))
 		draw_circle(r.get_center(), 6.0, Color8(190, 30, 30))
+
+
+## Touch: icoon + getal op >= 16 dp, zonder woorden: kas (munten), dorpelingen en eigen koeien, met het missiedoel
+## erachter als de missie dat doel heeft (missie 1: 6 dorpelingen en 4 koeien, missie 2: kas > 10.000).
+class Tellers extends PanelContainer:
+	var w: Wereld
+	var kas: Label
+	var dorp: Label
+	var koe: Label
+
+	func bouw(wereld: Wereld, dp: float) -> void:
+		w = wereld
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.5)
+		sb.set_content_margin_all(roundf(6 * dp))
+		sb.set_corner_radius_all(roundi(4 * dp))
+		add_theme_stylebox_override("panel", sb)
+		var rij := HBoxContainer.new()
+		rij.add_theme_constant_override("separation", roundi(6 * dp))
+		rij.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(rij)
+		var px := roundi(18.0 * dp)
+		kas = _teller(rij, "munt", px, false)
+		dorp = _teller(rij, "dorpeling", px, false)
+		koe = _teller(rij, "koe", px, true)
+
+	func _teller(rij: HBoxContainer, soort: String, px: int, laatste: bool) -> Label:
+		var ik := Ikoon.new()
+		ik.soort = soort
+		ik.custom_minimum_size = Vector2(px, px) * 1.15
+		ik.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rij.add_child(ik)
+		var l := Label.new()
+		l.add_theme_font_size_override("font_size", px)
+		l.add_theme_color_override("font_outline_color", Color.BLACK)
+		l.add_theme_constant_override("outline_size", maxi(4, px / 6))
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rij.add_child(l)
+		if not laatste:
+			var tussen := Control.new()
+			tussen.custom_minimum_size.x = px * 0.6
+			tussen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rij.add_child(tussen)
+		return l
+
+	func zet(kas_toon: int) -> void:
+		var doel: Dictionary = w.missie.get("doel", {})
+		var t := ["%d" % kas_toon + ("/%d" % int(doel["kas_boven"]) if doel.has("kas_boven") else ""),
+			"%d" % w.dorpelingen.size() + ("/%d" % int(doel["dorpelingen"]) if doel.has("dorpelingen") else ""),
+			"%d" % w.eigen_koeien() + ("/%d" % int(doel["koeien"]) if doel.has("koeien") else "")]
+		if t[0] != kas.text or t[1] != dorp.text or t[2] != koe.text:
+			kas.text = t[0]
+			dorp.text = t[1]
+			koe.text = t[2]
+			reset_size()
+
+
+## Zelf getekend icoon (geen lettertekens: het standaardlettertype heeft misschien geen emoji).
+class Ikoon extends Control:
+	var soort := "munt"
+
+	func _draw() -> void:
+		var s := size.y
+		var c := size * 0.5
+		match soort:
+			"munt":
+				for m in [Vector2(-0.2, 0.18), Vector2(0.2, 0.18), Vector2(0.0, -0.16)]:
+					var p: Vector2 = c + m * s
+					draw_circle(p + Vector2(0, s * 0.04), s * 0.24, Color8(150, 105, 25))
+					draw_circle(p, s * 0.24, Color8(236, 190, 60))
+					draw_circle(p, s * 0.11, Color8(250, 222, 120))
+			"dorpeling":
+				var paars := Color8(214, 70, 214)
+				draw_rect(Rect2(c + Vector2(-0.24, -0.04) * s, Vector2(0.48, 0.48) * s), paars)
+				draw_circle(c + Vector2(0, -0.04) * s, s * 0.24, paars)
+				draw_circle(c + Vector2(0, -0.28) * s, s * 0.17, Color8(240, 200, 160))
+			"koe":
+				var wit := Color8(245, 245, 240)
+				draw_rect(Rect2(c + Vector2(-0.4, -0.14) * s, Vector2(0.62, 0.32) * s), wit)
+				for x in [-0.36, -0.2, 0.0, 0.14]:
+					draw_rect(Rect2(c + Vector2(x, 0.16) * s, Vector2(0.07, 0.24) * s), wit)
+				draw_rect(Rect2(c + Vector2(0.18, -0.32) * s, Vector2(0.24, 0.24) * s), wit)
+				draw_circle(c + Vector2(-0.2, 0.0) * s, s * 0.08, Color8(40, 36, 32))
+				draw_circle(c + Vector2(0.02, 0.08) * s, s * 0.06, Color8(40, 36, 32))
+				draw_rect(Rect2(c + Vector2(0.3, -0.14) * s, Vector2(0.14, 0.08) * s), Color8(230, 160, 160))

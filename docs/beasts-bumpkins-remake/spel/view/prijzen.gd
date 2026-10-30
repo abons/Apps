@@ -99,7 +99,7 @@ func bouw(wereld: Wereld) -> void:
 	kolom.add_child(doel_label)
 	misdaad_label = _label("", 15)
 	kolom.add_child(misdaad_label)
-	var sluit_k := _knop("Sluiten (O / Esc)")
+	var sluit_k := _knop("Sluiten" if Bouwmenu.touch else "Sluiten (O / Esc)")
 	sluit_k.pressed.connect(sluit)
 	kolom.add_child(sluit_k)
 	_paneel.size = Vector2(B, kolom.get_combined_minimum_size().y + 36.0)
@@ -137,12 +137,21 @@ func open() -> void:
 	if not w.gepauzeerd:
 		w.gepauzeerd = true
 		_pauzeerde = true
+	leg_neer()
+	visible = true
+	_ververs()
+
+
+## Paneel midden in beeld, ook na een draai van het scherm (Hud._indeling). Touch: groter (16 dp en meer), maar
+## nooit breder of hoger dan het scherm; op de pc schaal 1 tenzij het venster te klein is.
+func leg_neer() -> void:
 	var vp := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1600, 900)
 	position = Vector2.ZERO
 	size = vp                                     # het hele scherm: dimt en vangt klikken
-	_paneel.position = ((vp - _paneel.size) * 0.5).floor()
-	visible = true
-	_ververs()
+	var s := maxf(1.0, Scherm.dp() * 0.85)
+	s = minf(s, minf((vp.x - 24.0) / _paneel.size.x, (vp.y - 24.0) / _paneel.size.y))
+	_paneel.scale = Vector2(s, s)
+	_paneel.position = ((vp - _paneel.size * s) * 0.5).floor()
 
 
 func sluit() -> void:
@@ -197,7 +206,7 @@ func _input(e: InputEvent) -> void:
 func _gui_input(e: InputEvent) -> void:
 	# een klik naast het paneel sluit het (zoals de brief)
 	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
-		if not Rect2(_paneel.position, _paneel.size).has_point(e.position):
+		if not Rect2(_paneel.position, _paneel.size * _paneel.scale).has_point(e.position):
 			sluit()
 		accept_event()
 

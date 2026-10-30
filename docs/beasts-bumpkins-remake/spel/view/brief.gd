@@ -15,6 +15,7 @@ var titel: Label
 var tekst: Label
 var voet: Label
 var _rand: PackedVector2Array
+var _laatst := ["", "", false]      ## kop, tekst, groot: voor herschik() na een draai van het scherm
 
 
 func _init() -> void:
@@ -24,7 +25,7 @@ func _init() -> void:
 	tekst.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	voet = _label(14)
 	voet.modulate.a = 0.75
-	voet.text = "klik om verder te spelen"
+	voet.text = "tik om verder te spelen" if Bouwmenu.touch else "klik om verder te spelen"
 	visible = false
 
 
@@ -41,9 +42,42 @@ func _label(px: int) -> Label:
 
 
 ## Toont de brief midden in beeld; `groot` = briefing (breder, met titel).
+## Touch (2026-10-30): de hele brief geschaald tot de tekst >= 16 dp is; is het scherm daarvoor te smal, dan wordt
+## de brief smaller (meer regels), te laag: breder, en pas als laatste kleiner. Op de pc schaal 1 zoals altijd.
 func toon(kop: String, inhoud: String, groot := false) -> void:
+	_laatst = [kop, inhoud, groot]
 	var vp := get_viewport_rect().size if is_inside_tree() else Vector2(1600, 900)
 	var b := 640.0 if groot else 520.0
+	var s := maxf(1.0, Scherm.dp() * 0.85)
+	var breed := (vp.x - 32.0) / s                 # zoveel past er naast elkaar bij schaal s
+	b = minf(b, breed)
+	while _hoogte(kop, inhoud, b) * s > vp.y - 32.0 and b + 40.0 <= breed:
+		b += 40.0
+	s = minf(s, minf((vp.x - 32.0) / b, (vp.y - 32.0) / _hoogte(kop, inhoud, b)))
+	_leg(kop, inhoud, groot, b)
+	scale = Vector2(s, s)
+	if s == 1.0:
+		position = Vector2((vp.x - size.x) * 0.5, maxf(40.0, (vp.y - size.y) * 0.42))
+	else:
+		position = Vector2((vp.x - size.x * s) * 0.5, maxf(16.0, (vp.y - size.y * s) * 0.42))
+	_maak_rand()
+	visible = true
+	queue_redraw()
+
+
+## Na een draai van het scherm: dezelfde brief opnieuw neerleggen (blijft open, geen signaal).
+func herschik() -> void:
+	if visible:
+		toon(_laatst[0], _laatst[1], _laatst[2])
+
+
+func _hoogte(kop: String, inhoud: String, b: float) -> float:
+	var y := 34.0 + (50.0 if kop != "" else 0.0)
+	var th := get_theme_default_font().get_multiline_string_size(inhoud, HORIZONTAL_ALIGNMENT_LEFT, b - 96, 19).y + 8.0
+	return y + th + 26.0 + 56.0
+
+
+func _leg(kop: String, inhoud: String, groot: bool, b: float) -> void:
 	titel.text = kop
 	titel.visible = kop != ""
 	tekst.text = inhoud
@@ -61,10 +95,6 @@ func toon(kop: String, inhoud: String, groot := false) -> void:
 	voet.position = Vector2(40, y)
 	voet.size = Vector2(b - 80, 20)
 	size = Vector2(b, y + 56.0)
-	position = Vector2((vp.x - size.x) * 0.5, maxf(40.0, (vp.y - size.y) * 0.42))
-	_maak_rand()
-	visible = true
-	queue_redraw()
 
 
 func sluit() -> void:

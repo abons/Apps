@@ -22,6 +22,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
+"$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 
@@ -131,6 +132,17 @@ ghost op de tegel midden in beeld; vinger op de ghost = schuiven (geen pannen), 
 daarheen; weg/hek: tik = begin, sleep vanaf begin of eind = dat einde verschuift. Niets staat er voor **Bouwen** (onderin,
 naast Draai en Annuleer, >= 110 px / 48 dp, alleen aan als het kan); daarna blijft de modus aan (rij: eind = nieuw begin).
 De sneltoetsuitleg onderin is weg. Test `test/touch_bouw_test.gd`. Nog niet: selectie wissen zonder rechterklik, kader.
+Touch-HUD (gebruiker 2026-10-30, tekst te klein op de telefoon): geen tekstregels, alleen icoon + getal (kas, dorpelingen
+x/doel, koeien x/doel) op >= 16 dp; minikaart, munt-icoon en rolletjes x1,3-1,6; brief en prijzenscherm geschaald tot
+>= 16 dp en nooit groter dan het scherm (`Scherm.dp()` = touchknophoogte / 52).
+
+**Staand en liggend** (2026-10-30, `view/scherm.gd`): de telefoon draait mee (`display/window/handheld/orientation=6`,
+sensor) en alles legt zich opnieuw neer bij `size_changed`. Staand: bouwknoppen in een lade onderin (knop **Gebouwen**
+rechtsboven, een keuze sluit hem), hint en Draai/Bouwen/Annuleer onderin op schermbreedte, camera houdt de breedte vast
+(38 graden horizontaal) en staat 1,3x verder en 12 graden steiler. Liggend (en de pc op 1600x900) zoals het was.
+Op de pc proberen: `-- --venster=1080x2400` (viewport op die maat, venster geschaald); frames op die maat:
+`-- --venster=1080x2400 --opname=out/x.png --opname_frame=30` (`--write-movie` neemt het venster op, niet de viewport),
+met `--proef=bouw|lade|prijzen` voor de bouwmodus, de open lade of de prijzen. `bash test/portret_frames.sh` maakt de set in `out/portret/`.
 
 Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`; vechten = stenen gooien naar een wolf, werken heeft nog geen eigen invoer).
 
