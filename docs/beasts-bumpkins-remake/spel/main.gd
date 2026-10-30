@@ -30,6 +30,13 @@ func _ready() -> void:
 		return
 	Prestatie.merk("wereld geladen (sim)")
 	Voorladen.start(w.missie_nr)       # alleen mobiel: glb's parallel lezen (view/voorladen.gd)
+	var laadscherm: CanvasLayer = null
+	if Voorladen.aan:                  # alleen mobiel: briefing als laadscherm, eerst een frame tekenen, dan opbouwen
+		set_process(false)
+		laadscherm = Voorladen.scherm(self, w)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		Prestatie.merk("laadscherm getekend")
 	if opt.has("seizoen"):
 		var i: int = Wereld.SEIZOENEN.find(opt["seizoen"])
 		if i >= 0:
@@ -128,6 +135,9 @@ func _ready() -> void:
 		add_child(_prestatie)
 		_prestatie.bouw(self)
 	Prestatie.merk("main _ready klaar")
+	if laadscherm != null:
+		laadscherm.queue_free()
+		set_process(true)
 	print("[spel] missie ", w.missie_nr, " (", w.missie.get("naam", "?"), ") eiland ", w.eiland, " dorpelingen ", w.dorpelingen.size(), " objecten ", w.objecten.size(), " seizoen ", w.seizoen_naam())
 
 

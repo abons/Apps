@@ -20,3 +20,7 @@ lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
 lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
 environment/ssao/quality=2
 textures/vram_compression/import_etc2_astc=true
+
+[threading]
+
+worker_pool/low_priority_thread_ratio.mobile=0.9

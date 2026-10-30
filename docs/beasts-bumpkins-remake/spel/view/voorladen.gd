@@ -35,3 +35,22 @@ static func start(missie: int) -> void:
 		if ResourceLoader.exists(p) and ResourceLoader.load_threaded_request(p, "", false) == OK:
 			k += 1
 	Prestatie.merk("voorladen: %d glb's aangevraagd" % k)
+
+
+## Laadscherm (alleen mobiel): donker vlak met de briefing van de missie op perkament (view/brief.gd), zodat er binnen een
+## paar seconden iets te lezen is terwijl main.gd de wereld opbouwt. main.gd haalt het weg als alles staat; dan opent de
+## gewone briefing van de HUD op dezelfde plek.
+static func scherm(ouder: Node, w: Wereld) -> CanvasLayer:
+	var laag := CanvasLayer.new()
+	laag.layer = 110
+	ouder.add_child(laag)
+	var bg := ColorRect.new()
+	bg.color = Color(0.03, 0.05, 0.08)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	laag.add_child(bg)
+	var b := Brief.new()
+	laag.add_child(b)
+	var br: Dictionary = Hints.new().bouw(w).briefing
+	b.toon(String(br.get("titel", w.missie.get("naam", ""))), String(br.get("tekst", "")), true)
+	b.voet.text = "laden..."
+	return laag
