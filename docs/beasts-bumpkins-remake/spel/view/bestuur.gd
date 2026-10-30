@@ -72,7 +72,8 @@ func _unhandled_input(e: InputEvent) -> void:
 
 func wis_selectie() -> void:
 	gekozen.clear()
-	view.gekozen = gekozen
+	if view != null:
+		view.gekozen = gekozen
 
 
 func _scherm(id: int) -> Vector2:

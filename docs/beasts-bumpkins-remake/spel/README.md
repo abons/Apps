@@ -21,6 +21,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
+"$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 
@@ -122,10 +123,14 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 
 Alles van het bouwen kan met alleen een linkerknop of een vinger (besluit gebruiker 2026-10-30): kiezen, Draai en Stop
 zijn knoppen (44 px hoog), plaatsen is indrukken-slepen-loslaten, en de ghost volgt de laatste wijzerpositie uit de invoer
-(`Bouwmenu._input`), dus zonder hover. Wiel, rechterklik en toetsen zijn alleen sneltoetsen. Voor touch nog nodig:
-`emulate_mouse_from_touch` staat standaard aan (een vinger = linkerknop, zo werkt het bouwen al); daarnaast camera pannen,
-zoomen en draaien met twee vingers (`InputEventScreenDrag`/`InputEventMagnifyGesture` in `rts_camera.gd`, nu muis en
-toetsen), een selectie wissen zonder rechterklik (knop), en het kader (links slepen) naast slepen-om-te-pannen.
+(`Bouwmenu._input`), dus zonder hover. Wiel, rechterklik en toetsen zijn alleen sneltoetsen.
+
+**Touch** (telefoon, of `-- --touch` op de pc; `Bouwmenu.touch`, 2026-10-30 na de Motorola-proef; de pc-besturing hierboven
+blijft gelijk): een vinger pant, twee vingers pannen/knijpen/draaien (de kaart draait met de vingers mee). Bouwen: knop =
+ghost op de tegel midden in beeld; vinger op de ghost = schuiven (geen pannen), slepen ernaast = pannen, tik ernaast = ghost
+daarheen; weg/hek: tik = begin, sleep vanaf begin of eind = dat einde verschuift. Niets staat er voor **Bouwen** (onderin,
+naast Draai en Annuleer, >= 110 px / 48 dp, alleen aan als het kan); daarna blijft de modus aan (rij: eind = nieuw begin).
+De sneltoetsuitleg onderin is weg. Test `test/touch_bouw_test.gd`. Nog niet: selectie wissen zonder rechterklik, kader.
 
 Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`; vechten = stenen gooien naar een wolf, werken heeft nog geen eigen invoer).
 

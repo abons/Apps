@@ -15,6 +15,11 @@ extends Node
 ## de kist er. De materialen van een stand worden op naam die van de af-glb (dus ook dezelfde atlassen), en de
 ## bouwgrond van stand 1 is een gedeeld materiaal: de eigen atlassen van de stand-glb's vallen daarna vrij.
 ## Moet NA Bestuur in de boom staan: dan krijgt het de invoer eerst en neemt het de linkerklik van het kiezen over.
+## Touch (`touch`: telefoon, of `-- --touch` op de pc; besluit gebruiker 2026-10-30 na de Motorola-proef): niets wordt
+## geplaatst voor Bouwen. Bouwknop = ghost op de tegel midden in beeld; een vinger op de ghost sleept hem, slepen ernaast
+## pant de camera, een tik ernaast zet de ghost daar. Weg/hek: tik = begin, sleep vanaf begin of eind = dat einde
+## verschuift (de rij volgt), Bouwen legt de rij en het eind wordt het nieuwe begin. Knoppen onderin: Draai, Bouwen
+## (alleen als het kan), Annuleer; >= 48 dp. De muis-/toetsenbordbesturing hierboven is op de pc ongewijzigd.
 
 const GROND_Y := 0.25
 const KLIK_DREMPEL := 6.0
@@ -81,7 +86,20 @@ var _rij_sleutel := []                  ## wanneer de route opnieuw moet (begin,
 var _rij_ghosts: Array[MeshInstance3D] = []
 var knop_draai: Button
 var knop_stop: Button
+var knop_bouw: Button       ## alleen touch: Bouwen (bevestigen)
 var hint: Label
+static var touch := OS.has_feature("mobile") or "--touch" in OS.get_cmdline_user_args()   ## touch-bouwen (zie boven)
+var knop_h := KNOP_H        ## touch: >= 48 dp (bouw())
+var _t_tegel := Vector2i(-1, -1)   ## touch: gebouw = tegel zoals _plan_onder hem geeft; weg/hek = begintegel
+var _t_eind := Vector2i(-1, -1)    ## touch, weg/hek: eindtegel
+var _t_vinger := -1                ## touch: vinger die de ghost (of een rij-einde) vasthoudt
+var _t_greep := Vector2i.ZERO      ## touch, gebouw: tegel onder de vinger min _t_tegel bij het vastpakken
+var _t_einde := 1                  ## touch, weg/hek: 0 = begin vast, 1 = eind vast
+var _t_tik := {}                   ## touch: vinger naast de ghost -> startpositie (tik = ghost daarheen)
+var _t_rij: Array[Vector2i] = []   ## touch, weg/hek: route _t_tegel -> _t_eind
+var _t_st: Array[int] = []         ## en de BouwRij-status per tegel
+var _t_sleutel := []
+var _t_getoond := []               ## de _t_sleutel waarvan de rij-ghosts nu staan
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -96,6 +114,8 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	_hekken.name = "Hekken"
 	parent3d.add_child(_hekken)
 
+	if touch:      # 48 dp met een marge; de Motorola (~400 dpi) geeft ~130 px
+		knop_h = clampf(52.0 * DisplayServer.screen_get_dpi() / 160.0, 110.0, 180.0)
 	var laag := CanvasLayer.new()
 	add_child(laag)
 	# rechtsboven, rechts van de stand (linksboven): de knoppen lopen door op een tweede regel als het niet past,
@@ -116,7 +136,8 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	kolom.add_child(rij)
 	for s: StringName in GEBOUWEN:
 		var g: Dictionary = GEBOUWEN[s]
-		var k := _knop("%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])])
+		var k := _knop(("%s %d" % [g["tekst"], w.prijs(s)]) if touch \
+				else ("%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])]))
 		k.toggle_mode = true
 		k.toggled.connect(func(aan: bool) -> void: kies(s, aan))
 		rij.add_child(k)
@@ -132,28 +153,77 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	rij2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kolom.add_child(rij2)
 	hint = Label.new()
-	hint.add_theme_font_size_override("font_size", 15)
+	hint.add_theme_font_size_override("font_size", int(knop_h * 0.3) if touch else 15)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 5)
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	rij2.add_child(hint)
-	knop_draai = _knop("Draai (R / wiel)")
-	knop_draai.custom_minimum_size.x = 150
-	knop_draai.pressed.connect(draai_verder)
-	rij2.add_child(knop_draai)
-	knop_stop = _knop("X  Stop (Esc)")
-	knop_stop.custom_minimum_size.x = 130
-	knop_stop.pressed.connect(func() -> void: zet_actief(false))
-	rij2.add_child(knop_stop)
+	if touch:
+		_bouw_touch_balk(laag)
+	else:
+		knop_draai = _knop("Draai (R / wiel)")
+		knop_draai.custom_minimum_size.x = 150
+		knop_draai.pressed.connect(draai_verder)
+		rij2.add_child(knop_draai)
+		knop_stop = _knop("X  Stop (Esc)")
+		knop_stop.custom_minimum_size.x = 130
+		knop_stop.pressed.connect(func() -> void: zet_actief(false))
+		rij2.add_child(knop_stop)
 	zet_actief(false)
+
+
+## Touch: Draai, Bouwen en Annuleer onderin het midden, groot genoeg voor een duim.
+func _bouw_touch_balk(laag: CanvasLayer) -> void:
+	var balk := HBoxContainer.new()
+	balk.add_theme_constant_override("separation", int(knop_h * 0.3))
+	laag.add_child(balk)
+	knop_draai = _knop("Draai")
+	knop_draai.pressed.connect(draai_verder)
+	knop_bouw = _knop("Bouwen")
+	knop_bouw.icon = _ikoon(true)
+	knop_bouw.add_theme_color_override("font_color", Color(0.75, 1.0, 0.7))
+	knop_bouw.pressed.connect(bevestig)
+	knop_stop = _knop("Annuleer")
+	knop_stop.icon = _ikoon(false)
+	knop_stop.add_theme_color_override("font_color", Color(1.0, 0.75, 0.7))
+	knop_stop.pressed.connect(func() -> void: zet_actief(false))
+	for k: Button in [knop_draai, knop_bouw, knop_stop]:
+		k.custom_minimum_size.x = knop_h * 2.4
+		k.expand_icon = false
+		balk.add_child(k)
+	balk.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, int(knop_h * 0.25))
+	balk.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	balk.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+
+## Vinkje (true) of kruis als knopicoon, zelf getekend: het standaardlettertype heeft misschien geen ✓ en ✗.
+func _ikoon(vink: bool) -> ImageTexture:
+	var n := int(knop_h * 0.45)
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var kleur := Color(0.45, 1.0, 0.4) if vink else Color(1.0, 0.4, 0.35)
+	var lijnen: Array = [[Vector2(0.12, 0.55), Vector2(0.4, 0.82)], [Vector2(0.4, 0.82), Vector2(0.9, 0.2)]] if vink \
+			else [[Vector2(0.18, 0.18), Vector2(0.82, 0.82)], [Vector2(0.82, 0.18), Vector2(0.18, 0.82)]]
+	var dik := 0.075 * n
+	for y in n:
+		for x in n:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var d := INF
+			for l in lijnen:
+				var a: Vector2 = l[0] * n
+				var b: Vector2 = l[1] * n
+				d = minf(d, p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)))
+			var al := clampf(dik + 0.5 - d, 0.0, 1.0)
+			if al > 0.0:
+				img.set_pixel(x, y, Color(kleur, al))
+	return ImageTexture.create_from_image(img)
 
 
 func _knop(tekst: String) -> Button:
 	var k := Button.new()
 	k.text = tekst
-	k.custom_minimum_size = Vector2(0, KNOP_H)
-	k.add_theme_font_size_override("font_size", 18)
+	k.custom_minimum_size = Vector2(0, knop_h)
+	k.add_theme_font_size_override("font_size", int(knop_h * 0.33) if touch else 18)
 	k.focus_mode = Control.FOCUS_NONE
 	return k
 
@@ -175,6 +245,8 @@ func kies(s: StringName, aan := true) -> void:
 		oud.get_parent().add_child(ghost)
 		oud.queue_free()
 	zet_actief(aan)
+	if aan and touch:
+		_touch_begin()
 
 
 func zet_actief(aan: bool) -> void:
@@ -182,6 +254,10 @@ func zet_actief(aan: bool) -> void:
 	ghost.visible = aan
 	_drukt = false
 	_sleep_start = Vector2i(-1, -1)
+	_t_vinger = -1
+	_t_tik.clear()
+	_t_sleutel = []
+	_t_getoond = []
 	_toon_rij([], [])
 	for s in knoppen:
 		var k: Button = knoppen[s]
@@ -194,9 +270,14 @@ func zet_actief(aan: bool) -> void:
 		knop_draai.disabled = soort in RIJ_SOORTEN
 		hint.visible = aan
 		var g: String = GEBOUWEN[soort]["tekst"]
-		hint.text = ("%s: slepen = rij, loslaten = plaatsen" % g) if soort in RIJ_SOORTEN \
-				else ("%s: loslaten = plaatsen" % g)
-		hint.text += "   rechts = stop"
+		if touch:
+			knop_bouw.visible = aan
+			hint.text = ("%s: tik = begin, sleep het eind, dan Bouwen" % g) if soort in RIJ_SOORTEN \
+					else ("%s: sleep de ghost, dan Bouwen" % g)
+		else:
+			hint.text = ("%s: slepen = rij, loslaten = plaatsen" % g) if soort in RIJ_SOORTEN \
+					else ("%s: loslaten = plaatsen" % g)
+			hint.text += "   rechts = stop"
 	if aan:
 		bestuur.wis_selectie()
 
@@ -225,7 +306,11 @@ func _midden(p: Plan) -> Vector3:
 
 
 func _plan_onder(pos: Vector2) -> Plan:
-	var t := bestuur.tegel_onder(pos)
+	return _plan_op(bestuur.tegel_onder(pos))
+
+
+## Het plan van de huidige soort en draai met tegel `t` als middentegel (zoals onder de wijzer), null buiten de grond.
+func _plan_op(t: Vector2i) -> Plan:
 	if t.x < 0:
 		return null
 	var af: Vector2i = Wereld.BOUWSOORTEN[soort]
@@ -265,6 +350,9 @@ func _process(_dt: float) -> void:
 		dr.rotation.y = lerp_angle(dr.rotation.y, POORT_OPEN_RAD if pt.open else 0.0, minf(1.0, _dt * 5.0))
 	if not actief:
 		return
+	if touch:
+		_toon_touch()
+		return
 	if soort in RIJ_SOORTEN and _drukt and _sleep_start.x >= 0:
 		ghost.visible = false
 		var eind := bestuur.tegel_onder(_wijzer)
@@ -276,10 +364,14 @@ func _process(_dt: float) -> void:
 			_rij = BouwRij.route(w, soort, _sleep_start, eind)
 			_toon_rij(_rij, BouwRij.statussen(w, soort, _rij))
 		return
-	var p := _plan_onder(_wijzer)
+	_toon_ghost(_plan_onder(_wijzer))
+
+
+## De ghost op plan `p` (groen = kan, rood = kan niet); geeft of het kan. Null = geen ghost.
+func _toon_ghost(p: Plan) -> bool:
 	ghost.visible = p != null
 	if p == null:
-		return
+		return false
 	ghost.position = _midden(p)
 	if soort == &"weg":
 		ghost.position.y = _grond(p.tegel).y + _hoogte(soort) * 0.5
@@ -288,6 +380,7 @@ func _process(_dt: float) -> void:
 	if soort in RIJ_SOORTEN:
 		kan = BouwRij.statussen(w, soort, [p.tegel])[0] == BouwRij.KAN
 	(ghost.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if kan else KLEUR_NIET
+	return kan
 
 
 ## Een ghost-tegel per tegel van de rij, gekleurd naar BouwRij-status (groen kan, rood kan niet of te duur, grijs al
@@ -757,6 +850,13 @@ func _unhandled_input(e: InputEvent) -> void:
 			zet_actief(false)
 			get_viewport().set_input_as_handled()
 		return
+	if touch and actief:
+		if e is InputEventScreenTouch or e is InputEventScreenDrag:
+			_touch(e)
+			return
+		if e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			get_viewport().set_input_as_handled()   # de geemuleerde muisklik van de vinger: Bestuur kiest of loopt niet
+			return
 	if not actief or not e is InputEventMouseButton:
 		return
 	var mb := e as InputEventMouseButton
@@ -799,3 +899,130 @@ func _plaats(pos: Vector2) -> void:
 	var p := _plan_onder(pos)
 	if p != null:
 		w.plan_zet(p)
+
+
+# ---------------------------------------------------------------- touch (zie de kop)
+
+## Bouwknop getikt: de ghost (of het begin van de rij) op de tegel midden in beeld.
+func _touch_begin() -> void:
+	var r := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2.ZERO
+	var t := bestuur.tegel_onder(r * 0.5)
+	if t.x < 0 and bestuur.cam != null:
+		var f: Vector3 = bestuur.cam.global_position
+		if bestuur.cam.get("focus") is Vector3:
+			f = bestuur.cam.get("focus")
+		t = Vector2i(int(floor(f.x / w.tegel_m)), int(floor(f.z / w.tegel_m)))
+	_t_tegel = t
+	_t_eind = t
+	_t_vinger = -1
+	_t_sleutel = []
+
+
+func _touch(e: InputEvent) -> void:
+	var idx: int = e.index
+	var pos: Vector2 = e.position
+	if e is InputEventScreenTouch:
+		if e.pressed:
+			if _t_vinger < 0 and _t_tik.is_empty() and _pak(pos):
+				_t_vinger = idx
+				get_viewport().set_input_as_handled()     # de camera ziet deze vinger niet: geen pannen
+			else:
+				_t_tik[idx] = pos
+		elif idx == _t_vinger:
+			_t_vinger = -1
+			get_viewport().set_input_as_handled()
+		elif _t_tik.has(idx):
+			var start: Vector2 = _t_tik[idx]
+			_t_tik.erase(idx)
+			# een tik (niet gesleept, geen tweede vinger: de camera zette dan touch_pant) zet de ghost of het begin daar
+			if _t_tik.is_empty() and pos.distance_to(start) <= knop_h * 0.15 and bestuur.cam.get("touch_pant") != true:
+				var t := bestuur.tegel_onder(pos)
+				if t.x >= 0:
+					_t_tegel = t
+					_t_eind = t
+		return
+	if idx == _t_vinger:
+		var t := bestuur.tegel_onder(pos)
+		if t.x >= 0:
+			if not soort in RIJ_SOORTEN:
+				_t_tegel = t - _t_greep
+			elif _t_einde == 1:
+				_t_eind = t
+			else:
+				_t_tegel = t
+		get_viewport().set_input_as_handled()
+
+
+## Raakt de vinger op `pos` de ghost (gebouw: de voetafdruk plus een tegel rand, of binnen een knophoogte van het midden)
+## of een einde van de rij? Dan houdt hij die vast (_t_greep, _t_einde).
+func _pak(pos: Vector2) -> bool:
+	var t := bestuur.tegel_onder(pos)
+	if soort in RIJ_SOORTEN:
+		for einde in [1, 0]:          # het eind eerst: bij een rij van een tegel trekt slepen hem uit
+			var et: Vector2i = _t_eind if einde == 1 else _t_tegel
+			if et.x < 0:
+				continue
+			var bij := t.x >= 0 and maxi(absi(t.x - et.x), absi(t.y - et.y)) <= 1
+			if bij or _scherm_af(_grond(et), pos) < knop_h * 0.6:
+				_t_einde = einde
+				return true
+		return false
+	var p := _plan_op(_t_tegel)
+	if p == null:
+		return false
+	if (t.x >= 0 and p.afdruk().grow(1).has_point(t)) or _scherm_af(_midden(p), pos) < knop_h * 0.6:
+		_t_greep = t - _t_tegel if t.x >= 0 else Vector2i.ZERO
+		return true
+	return false
+
+
+func _scherm_af(p: Vector3, pos: Vector2) -> float:
+	var cam := bestuur.cam
+	if cam == null or cam.is_position_behind(p):
+		return INF
+	return cam.unproject_position(p).distance_to(pos)
+
+
+## Touch: de route van begin naar eind (opnieuw als er iets veranderd is) met de status per tegel.
+func _touch_rij() -> void:
+	var sleutel := [soort, _t_tegel, _t_eind, w.plannen.size(), w.kas]
+	if sleutel == _t_sleutel:
+		return
+	_t_sleutel = sleutel
+	_t_rij = BouwRij.route(w, soort, _t_tegel, _t_eind) if _t_tegel.x >= 0 and _t_eind.x >= 0 else ([] as Array[Vector2i])
+	_t_st = BouwRij.statussen(w, soort, _t_rij)
+
+
+## Kan Bouwen nu iets neerzetten?
+func kan_bevestigen() -> bool:
+	if not actief:
+		return false
+	if soort in RIJ_SOORTEN:
+		_touch_rij()
+		return BouwRij.KAN in _t_st
+	var p := _plan_op(_t_tegel)
+	return p != null and w.kan_bouwen(p) and w.kan_betalen(p.soort)
+
+
+## Bouwen (touch): het plan of de rij neerzetten. De modus blijft aan; bij een rij wordt het eind het nieuwe begin.
+func bevestig() -> void:
+	if not kan_bevestigen():
+		return
+	if soort in RIJ_SOORTEN:
+		BouwRij.zet(w, soort, _t_rij)
+		_t_tegel = _t_eind
+		_t_sleutel = []
+	else:
+		w.plan_zet(_plan_op(_t_tegel))
+
+
+func _toon_touch() -> void:
+	if soort in RIJ_SOORTEN:
+		ghost.visible = false
+		_touch_rij()
+		if _t_sleutel != _t_getoond:
+			_t_getoond = _t_sleutel
+			_toon_rij(_t_rij, _t_st)
+		knop_bouw.disabled = not BouwRij.KAN in _t_st
+		return
+	knop_bouw.disabled = not _toon_ghost(_plan_op(_t_tegel))

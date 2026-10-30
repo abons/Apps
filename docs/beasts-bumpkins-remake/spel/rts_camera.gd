@@ -3,7 +3,8 @@ extends Camera3D
 ## tot `grens` (main.gd: met mist het hele raster plus marge, zoals het origineel ver het zwart in liet scrollen).
 ## Alle invoer zet doelwaarden; _process loopt er zacht naartoe.
 ## Touch (alleen InputEventScreenTouch/Drag, op pc dus niets): een vinger slepen = pannen (niet als `pan_blokkade`
-## true geeft: bouwmenu actief), twee vingers: midden slepen = pannen, knijpen = zoom, draaien = yaw. Een tik blijft
+## true geeft: bouwmenu actief zonder touch-bouwen), twee vingers: midden slepen = pannen, knijpen = zoom, draaien = de
+## kaart draait met de vingers mee. Een tik blijft
 ## via emulate_mouse_from_touch een linkerklik (Bestuur, bouwmenu, minikaart). Randpannen staat op mobiel uit.
 
 const AFSTAND_MIN := 2.0
@@ -113,7 +114,9 @@ func _touch(e: InputEvent) -> void:
 		var d_nieuw := pos.distance_to(p2)
 		if d_oud > 1.0 and d_nieuw > 1.0:
 			doel_afstand = clampf(doel_afstand * d_oud / d_nieuw, AFSTAND_MIN, AFSTAND_MAX)
-			doel_yaw -= wrapf((pos - p2).angle() - (oud - p2).angle(), -PI, PI)
+			# de kaart draait met de vingers mee (Google Maps): yaw op = beeld met de klok mee, net als angle() in
+			# schermcoordinaten (y omlaag); tot 2026-10-30 andersom (gebruiker op de Motorola)
+			doel_yaw += wrapf((pos - p2).angle() - (oud - p2).angle(), -PI, PI)
 		_pan_scherm((pos - oud) * 0.5)
 	_vingers[idx] = pos
 

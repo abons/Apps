@@ -47,6 +47,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop"
 	pc2.add_child(hulp)
+	pc2.visible = not Bouwmenu.touch      # sneltoetsen en muisknoppen: zonder toetsenbord zinloos
 	add_child(pc2)
 
 	uitslag = Label.new()

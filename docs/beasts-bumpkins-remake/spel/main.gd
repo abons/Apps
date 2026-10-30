@@ -102,7 +102,9 @@ func _ready() -> void:
 	bouwmenu.view = view            # bouwers kijken naar zaagbok of steenhoop
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
-	cam.pan_blokkade = func() -> bool: return bouwmenu.actief   # touch: een vinger slepen plaatst dan, pant niet
+	# een vinger slepen in de bouwmodus schuift de ghost (muisstijl) en pant niet; met touch-bouwen sleept alleen een
+	# vinger op de ghost hem (Bouwmenu vangt die af), de rest pant
+	cam.pan_blokkade = func() -> bool: return bouwmenu.actief and not Bouwmenu.touch
 	var geluid: Node3D = preload("res://view/geluid.gd").new()   # stemmen, werk, dieren, omgeving (view/geluid.gd)
 	add_child(geluid)
 	geluid.bouw(w, view, cam, bestuur)
