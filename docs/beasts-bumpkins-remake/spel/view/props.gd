@@ -80,6 +80,9 @@ static func _placeholder(naam: String, ob: Dictionary) -> Node3D:
 		"kampvuur": _kampvuur(n)
 		"bron": _bron(n)
 		"beker", "zilveren_beker": _beker(n)
+		"gouden_kelk": _beker(n, Color(0.95, 0.75, 0.25))
+		"put": _put(n)
+		"gilde": _gilde(n)
 		"wolf": _wolf(n)
 		"goud": _goud(n)
 		"drankje": _drankje(n)
@@ -321,8 +324,54 @@ static func _bron(n: Node3D) -> void:
 	n.add_child(w)
 
 
-static func _beker(n: Node3D) -> void:
-	var m := _mat(Color(0.85, 0.87, 0.92), 0.25, 0.25)
+## Missie 3, nog zonder glb: put = stenen ring met een dakje op twee palen.
+static func _put(n: Node3D) -> void:
+	var ring := MeshInstance3D.new()
+	ring.mesh = _cyl(0.55, 0.6, 0.6, 12)
+	ring.material_override = _steen()
+	ring.position.y = 0.3
+	n.add_child(ring)
+	var hout := _mat(Color(0.42, 0.28, 0.16))
+	for z in [-0.5, 0.5]:
+		var paal := MeshInstance3D.new()
+		paal.mesh = _cyl(0.05, 0.05, 1.4)
+		paal.material_override = hout
+		paal.position = Vector3(0, 0.7, z)
+		n.add_child(paal)
+	var dak := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(1.2, 0.08, 1.3)
+	dak.mesh = bm
+	dak.material_override = _mat(Color(0.5, 0.22, 0.14))
+	dak.position.y = 1.45
+	n.add_child(dak)
+
+
+## Missie 3, nog zonder glb: voetvolkgilde = grijs stenen blok met een rood dak en een schild op de gevel.
+static func _gilde(n: Node3D) -> void:
+	var muur := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(3.4, 2.4, 3.4)
+	muur.mesh = bm
+	muur.material_override = _steen()
+	muur.position.y = 1.2
+	n.add_child(muur)
+	var dak := MeshInstance3D.new()
+	dak.mesh = _kegel(2.7, 1.6, 4)
+	dak.material_override = _mat(Color(0.6, 0.15, 0.12))
+	dak.rotation.y = PI * 0.25
+	dak.position.y = 3.2
+	n.add_child(dak)
+	var schild := MeshInstance3D.new()
+	schild.mesh = _cyl(0.35, 0.35, 0.06, 10)
+	schild.material_override = _mat(Color(0.75, 0.65, 0.2), 0.4)
+	schild.rotation.x = PI * 0.5
+	schild.position = Vector3(0, 1.5, 1.72)
+	n.add_child(schild)
+
+
+static func _beker(n: Node3D, kleur := Color(0.85, 0.87, 0.92)) -> void:
+	var m := _mat(kleur, 0.25, 0.25)
 	m.metallic = 0.9
 	var voet := MeshInstance3D.new()
 	voet.mesh = _cyl(0.12, 0.16, 0.05)

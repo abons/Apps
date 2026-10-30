@@ -15,6 +15,7 @@ var anker := Vector2i.ZERO
 var wacht := 2.0
 var eigenaar := -1            ## -1 wild, 0 speler
 var van_generator := false    ## telt mee voor het maximum van de generator zolang ze wild is
+var generator := 0            ## welke generator (Wereld._generatoren), missie 3 heeft er twee
 var vast := false             ## er loopt iemand naartoe om haar te claimen: blijft staan
 var snelheid_mps := 0.0
 var weide := {}               ## tegels van de weide waar ze in hoort (eigen koe, Wereld.weides), {} = vrij rond het anker

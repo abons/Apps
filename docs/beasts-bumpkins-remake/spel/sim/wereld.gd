@@ -70,8 +70,8 @@ var wolven: Array[Wolf] = []             # missie 2: klasse 104 (objecten.json "
 var _kaart_wolven: Array = []            # tegels van de wolven uit de kaart
 var kas := 0
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
-var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 171), (-1,-1) = geen
-var _generator_t := 0.0
+var _generatoren: Array[Vector2i] = []    # tegels van de koe-generators (klasse 171); missie 3 heeft er twee
+var _generator_t: Array[float] = []
 var _volgende_koe_id := 1
 var wiegen: Array[Dictionary] = []        # {moeder, vader, hut: Plan, wacht}
 var akkers := {}                          # tegel -> s groei (>= economie.rijp_s = rijp)
@@ -196,7 +196,8 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 		if int(o["cls"]) == int(spel["kampvuur_id"]):
 			kampvuur = Vector2i(ob["x"], ob["y"])
 		elif int(o["cls"]) == int(spel.get("koe_generator_id", -1)):
-			_generator = Vector2i(ob["x"], ob["y"])
+			_generatoren.append(Vector2i(ob["x"], ob["y"]))
+			_generator_t.append(0.0)
 	# Gegenereerde bomen op bosgrond (kaart heeft maar 42 bomen; de originele dennen zijn onbekend, zie map1.md).
 	var dichtheid: float = float(missie.get("bos_dichtheid", spel["bos_dichtheid"]))   # per missie te overschrijven
 	var rand := _afstand_tot_leeg(RAND_DICHT)
@@ -824,29 +825,28 @@ func _geboren(moeder: Dorpeling) -> void:
 
 ## Koe-generator (missie 1, klasse 171: spawnt cls 110 = koe). `start` koeien meteen; daarna elke `interval_s` een
 ## nieuwe zolang er minder dan `max` wilde van de generator rondlopen. Een geclaimde koe telt niet meer mee.
+## Meerdere generators (missie 3): `start` en `max` gelden per generator.
 func _start_generator() -> void:
-	if _generator.x < 0:
-		return
 	var g: Dictionary = missie.get("koe_generator", {})
-	for _i in int(g.get("start", 1)):
-		_spawn_koe()
+	for gi in _generatoren.size():
+		for _i in int(g.get("start", 1)):
+			_spawn_koe(gi)
 
 
 func _werk_generator(dt: float) -> void:
-	if _generator.x < 0:
-		return
 	var g: Dictionary = missie.get("koe_generator", {})
-	var wild := 0
-	for k in vee:
-		if k.van_generator and k.eigenaar < 0:
-			wild += 1
-	if wild >= int(g.get("max", 3)):
-		_generator_t = 0.0
-		return
-	_generator_t += dt
-	if _generator_t >= float(g.get("interval_s", 45.0)):
-		_generator_t = 0.0
-		_spawn_koe()
+	for gi in _generatoren.size():
+		var wild := 0
+		for k in vee:
+			if k.van_generator and k.generator == gi and k.eigenaar < 0:
+				wild += 1
+		if wild >= int(g.get("max", 3)):
+			_generator_t[gi] = 0.0
+			continue
+		_generator_t[gi] += dt
+		if _generator_t[gi] >= float(g.get("interval_s", 45.0)):
+			_generator_t[gi] = 0.0
+			_spawn_koe(gi)
 
 
 ## Koeien die al op de kaart staan (missie 2: 4 eigen koeien bij het dorp). Eigen: zwerft rond het kampvuur.
@@ -924,8 +924,10 @@ func _afstand_tot_soort(t: Vector2i, s: int) -> float:
 	return beste
 
 
-func _spawn_koe() -> Vee:
-	var t := dichtstbij_loopbaar(_generator)
+func _spawn_koe(gi := 0) -> Vee:
+	if gi >= _generatoren.size():
+		return null
+	var t := dichtstbij_loopbaar(_generatoren[gi])
 	if t.x < 0:
 		return null
 	var k := Vee.new()
@@ -934,6 +936,7 @@ func _spawn_koe() -> Vee:
 	k.zet_tegel(t)
 	k.anker = t
 	k.van_generator = true
+	k.generator = gi
 	k.wacht = rng.randf_range(0.5, 4.0)
 	vee.append(k)
 	koe_erbij.emit(k)
