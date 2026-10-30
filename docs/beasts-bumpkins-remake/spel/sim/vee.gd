@@ -25,6 +25,8 @@ var kalf := 0.0               ## > 0: een kalf (origineel klasse 96 `baby cow`),
 var moeder: Vee = null        ## een kalf loopt achter haar aan
 var samen_s := 0.0            ## s deze lente dicht bij een andere eigen koe (Wereld._kalveren)
 var kalf_jaar := -1           ## het jaar waarin ze al gekalfd heeft (een kalf per lente)
+var leeftijd_s := -1.0       ## s oud; -1 = nog niet gezet (Wereld._kalveren zet hem bij de eerste tik)
+var levensduur_s := 0.0       ## sterft van ouderdom als leeftijd_s dit haalt (spel.json economie.koe_levensduur_s)
 
 
 func is_kalf() -> bool:

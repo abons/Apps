@@ -999,6 +999,8 @@ func kalveren() -> int:
 	return n
 
 
+## Ouderdom: elke koe sterft na `koe_levensduur_s` (per koe tussen min en max; startkoeien beginnen op 0-50 %), net als
+## door een wolf, dus de kudde groeit en krimpt (gebruiker 2026-10-30). Kalven stopt bij `vee_max` koeien in totaal.
 ## Kalven (hint 1-11: "koeien kalven in de lente, houd ze bij elkaar"; origineel klasse 96 `baby cow`, sprite cowborn).
 ## Een volwassen koe (eigen of wild) die deze lente `kalf_samen_s` binnen `kalf_straal` tegels van een andere volwassen
 ## koe stond (ongeacht eigenaar, besluit gebruiker 2026-10-30), krijgt met kans `kalf_kans` (hash, geen rng: zelfde spel, zelfde kalveren) een kalf naast zich; een keer per
@@ -1006,6 +1008,22 @@ func kalveren() -> int:
 func _kalveren(dt: float) -> void:
 	var e: Dictionary = spel["economie"]
 	var groei := float(e.get("kalf_groei_s", 270.0))
+	var vee_max := int(missie.get("vee_max", e.get("vee_max", 24)))
+	var duur: Array = e.get("koe_levensduur_s", [4320.0, 6480.0])
+	var oud: Array[Vee] = []
+	for k in vee:
+		if k.leeftijd_s < 0.0:                # eerste tik: levensduur per koe, startkoeien al een stuk oud
+			var h := _hash2(k.id * 3 + 1, 77)
+			k.levensduur_s = lerpf(float(duur[0]), float(duur[1]), h)
+			k.leeftijd_s = 0.0 if k.is_kalf() else _hash2(k.id * 5 + 2, 91) * 0.5 * k.levensduur_s
+		k.leeftijd_s += dt
+		if k.leeftijd_s >= k.levensduur_s:
+			oud.append(k)
+	for k in oud:
+		for c in vee:
+			if c.moeder == k:
+				c.moeder = null
+		verwijder_koe(k)                         # dood van ouderdom
 	for k in vee:
 		if k.is_kalf():
 			k.kalf = maxf(0.0, k.kalf - dt)
@@ -1022,8 +1040,8 @@ func _kalveren(dt: float) -> void:
 	for k in vee:
 		if k.is_kalf() or k.kalf_jaar == jaar:        # elke koe, eigen of wild (gebruiker 2026-10-30)
 			continue
-		if k.eigenaar < 0 and k.van_generator and _wild_van(k.generator) >= int(missie.get("koe_generator", {}).get("max", 3)):
-			continue                                   # wilde kudde niet boven het maximum van zijn generator
+		if vee.size() + nieuw.size() >= vee_max:
+			break                                      # de kudde groeit niet onbeperkt (sterven houdt haar in evenwicht)
 		for o in vee:
 			if o != k and not o.is_kalf() and k.pos.distance_to(o.pos) <= straal:    # ongeacht eigenaar
 				k.samen_s += dt
@@ -1046,8 +1064,6 @@ func _kalveren(dt: float) -> void:
 		c.weide = m.weide
 		c.kalf = groei
 		c.moeder = m
-		c.van_generator = m.van_generator          # een wild kalf telt mee voor het maximum van de generator
-		c.generator = m.generator
 		c.wacht = 2.0
 		vee.append(c)
 		koe_erbij.emit(c)

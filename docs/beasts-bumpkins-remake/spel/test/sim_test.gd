@@ -724,7 +724,11 @@ func _test_kalveren() -> void:
 	_check(kalf.moeder == null or Vector2(kalf.tegel()).distance_to(Vector2(kalf.moeder.tegel())) <= 3.0, "kalf blijft bij de moeder")
 	for i in int(240.0 / w.tik_dt):
 		w.tik(w.tik_dt)
-	_check(w.kalveren() == 0 and w.eigen_koeien() == 5, "na kalf_groei_s zijn de kalveren koeien (%d koeien, %d kalveren, %d vee, t=%.0f)" % [w.eigen_koeien(), w.kalveren(), w.vee.size(), w.tijd_s])
+	var eigen_kalf := 0                         # wilde koeien kalven ook; tel alleen de eigen kalveren
+	for kk in w.vee:
+		if kk.is_kalf() and kk.eigenaar == 0:
+			eigen_kalf += 1
+	_check(eigen_kalf == 0 and w.eigen_koeien() == 5, "na kalf_groei_s zijn de kalveren koeien (%d koeien, %d kalveren, %d vee, t=%.0f)" % [w.eigen_koeien(), w.kalveren(), w.vee.size(), w.tijd_s])
 	var z := Wereld.new()
 	z.laad()
 	z.spel["economie"]["kalf_kans"] = 1.0
@@ -760,6 +764,25 @@ func _test_kalveren() -> void:
 		if k.is_kalf() and k.eigenaar != 0:
 			wilde_kalveren += 1
 	_check(wilde_kalveren >= 1, "twee wilde koeien bij elkaar in de lente: wild kalf (%d)" % wilde_kalveren)
+	# ouderdom: een koe die haar levensduur haalt sterft, haar kalf blijft
+	var oud := wild[0]
+	oud.leeftijd_s = oud.levensduur_s - 0.05
+	var n_voor := v.vee.size()
+	v.tik(v.tik_dt)
+	v.tik(v.tik_dt)
+	_check(not oud in v.vee and v.vee.size() == n_voor - 1, "koe sterft van ouderdom (%d -> %d)" % [n_voor, v.vee.size()])
+	var levens := []
+	for k in v.vee:
+		levens.append(k.levensduur_s)
+	_check(levens.min() >= 4320.0 and levens.max() <= 6480.0, "levensduur 4-6 jaar")
+	# kudde-maximum los van de generator
+	v.spel["economie"]["vee_max"] = v.vee.size()
+	v.tijd_s = 4.0 * v.seizoen_duur() + 10.0    # volgende lente
+	var n_max := v.vee.size()
+	for i in int(30.0 / v.tik_dt):
+		v.tik(v.tik_dt)
+	_check(v.vee.size() <= n_max + 1, "boven vee_max geen kalveren meer (%d, max %d; generator mag er 1 bij zetten)" % [v.vee.size(), n_max])
+	v.spel["economie"]["vee_max"] = 24
 func _test_stapels() -> void:
 	var w := Wereld.new()
 	w.laad()
