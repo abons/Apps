@@ -532,10 +532,16 @@ func _kies_klus(d: Dorpeling) -> void:
 			d.klus = m
 			d.koopt = waar
 			return
-	if d.dorst >= float(e.get("dorst_s", 90.0)):     # put (missie 3): water halen, gratis
+	if d.dorst >= float(e.get("dorst_s", 90.0)):     # water halen, gratis: bij de put (missie 3) of de bron/plas (origineel)
 		var put := dichtste_gebouw(&"put", d.tegel())
-		if put != null and d.geef_bevel(self, "koop", dichtstbij_loopbaar(put.deur_tegel())):
+		var bron := _dichtste_bron(d.tegel())
+		var naar_put := put != null and (bron.x < 0 or Vector2(d.tegel()).distance_to(Vector2(put.deur_tegel())) <= Vector2(d.tegel()).distance_to(Vector2(bron)))
+		if naar_put and d.geef_bevel(self, "koop", dichtstbij_loopbaar(put.deur_tegel())):
 			d.klus = put
+			d.koopt = "water"
+			return
+		if not naar_put and bron.x >= 0 and d.geef_bevel(self, "koop", dichtstbij_loopbaar(bron)):
+			d.klus = null
 			d.koopt = "water"
 			return
 	if not d.volwassen() or d.rol == "voetsoldaat":    # soldaten boeren niet (origineel)
@@ -698,6 +704,22 @@ func deur_loop_s(d: Dorpeling) -> float:
 	return (d.klus as Plan).deur_loop_m(tegel_m) / (loop_mps * looptempo)
 
 
+## Dichtste bron (klasse 144 `spring`, de plas bij het dorp) die bereikbaar is, of (-1, -1). Dorpelingen drinken er ook
+## uit (gebruiker 2026-10-30: "in het origineel drinken ze ook uit de pond").
+func _dichtste_bron(van: Vector2i) -> Vector2i:
+	var beste := Vector2i(-1, -1)
+	var bd := INF
+	for ob in objecten:
+		if ob["naam"] != "bron":
+			continue
+		var t := Vector2i(ob["x"], ob["y"])
+		var af := Vector2(van).distance_squared_to(Vector2(t))
+		if af < bd and dichtstbij_loopbaar(t).x >= 0:
+			bd = af
+			beste = t
+	return beste
+
+
 func klus_af(d: Dorpeling) -> void:
 	var e: Dictionary = spel["economie"]
 	if d.klus_tegel.x >= 0:
@@ -722,9 +744,9 @@ func klus_af(d: Dorpeling) -> void:
 			k.leeg = float(e["kip_leeg_s"])
 			d.draagt = "ei"
 		d.raap_kip = null
-	elif d.klus is Plan and d.koopt == "water":
+	elif d.koopt == "water":
 		d.dorst = 0.0
-		gedronken.emit(d, d.klus)
+		gedronken.emit(d, d.klus as Plan)          # null = gedronken bij de bron/plas
 		d.koopt = ""
 	elif d.klus is Plan:
 		var m: Plan = d.klus

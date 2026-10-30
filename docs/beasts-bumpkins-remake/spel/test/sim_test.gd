@@ -606,6 +606,7 @@ func _initialize() -> void:
 	_test_wegen()
 	_test_kalveren()
 	_test_stapels()
+	_test_bron()
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
@@ -783,6 +784,30 @@ func _test_kalveren() -> void:
 		v.tik(v.tik_dt)
 	_check(v.vee.size() <= n_max + 1, "boven vee_max geen kalveren meer (%d, max %d; generator mag er 1 bij zetten)" % [v.vee.size(), n_max])
 	v.spel["economie"]["vee_max"] = 24
+## Missie 1 heeft geen put: wie dorst heeft drinkt bij de bron (de plas bij het dorp), gratis.
+func _test_bron() -> void:
+	var w := Wereld.new()
+	w.laad()
+	var drank := []
+	w.gedronken.connect(func(d: Dorpeling, p: Plan) -> void: drank.append([d.id, p]))
+	var d: Dorpeling = null
+	for x in w.dorpelingen:
+		if x.volwassen() and d == null:
+			d = x
+	d.bevel = {}
+	d.route.clear()
+	d.dorst = float(w.spel["economie"]["dorst_s"]) + 1.0
+	for k in d.trek:
+		d.trek[k] = 0.0
+	var kas := w.kas
+	for i in 900:
+		if not drank.is_empty():
+			break
+		w.tik(w.tik_dt)
+	_check(not drank.is_empty() and drank[0][1] == null, "missie 1: dorstige dorpeling drinkt bij de bron (%s)" % str(drank))
+	_check(d.dorst < 1.0 and w.kas >= kas, "dorst weer 0, water kost niets")
+
+
 func _test_stapels() -> void:
 	var w := Wereld.new()
 	w.laad()
