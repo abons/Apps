@@ -171,7 +171,15 @@ dorpelingen (4 x type 1, 4 x type 2, 2 x type 13: geen meisje), **4 eigen koeien
 de kleine "vlekken" in het gras zijn bosjes met overgangsranden (tex 115-130).
 Wolven (2026-10-30, `spel/sim/wolf.gd`): zwerven rond hun startplek, jagen op koeien (wild of eigen) en eten ze op; een koe in een weide
 achter een dichte poort halen ze niet ("omheining helpt"). Volwassenen (niet de bouwer) gooien stenen op bevel (klik op de wolf) of zelf
-als een wolf vlakbij jaagt. Kinderen en baby's pakken (origineel) komt later (gameplay.md 7: "baby's als moeilijkheid later").
+als een wolf vlakbij jaagt.
+**Leven (2026-10-30, `spel/sim/leven.gd`, spel.json `leven`).** **Besluit gebruiker:** wolven pakken geen kinderen weg maar
+bijten dorpelingen (ook kinderen) en kunnen ze doden. Gezondheid 24, beet 5 met 3 s pauze, prooikeuze afstand x voorkeur
+(kind 0,6, koe/oud 0,8, volwassen 1,3) x zwakte; herstel na 20 s. Kind, oudere, bouwer en gewonde vluchten. Levensloop baby >
+kind > volwassene > oudere (vanaf 0,75 x levensduur, model `bumpkin_oudere_*`, werkt en vecht niet) > dood; levensduur
+4.320-5.400 s (4-5 jaar), start 0-0,7. Dode valt om, ligt 40 s. Kas-beloningen (`sim/beloningen.gd`): M2 4x timer 6.480
+tikken +1.000, eigen keuze na elkaar. Wolf-generators per missie (`wolf_generator`; M2 heeft er geen). Alle getallen eigen keuze.
+Test `spel/test/wolf_test.gd`. De "bruine koepel" in `wolf_model.jpg` was een paddenstoel (klasse 83, schaal 2,3) op de koetegel
+van het wolf-scenario; de koe staat nu ernaast (`spel/screenshots/missie2_wolf.jpg`). Frames M3: `missie3_dorp.jpg`, `missie3_soldaat.jpg`, `missie3_put.jpg`.
 
 **Prijzen, geluk en misdaad (2026-10-30).** **Besluit gebruiker:** misdaad en de straf-schuiven per misdaad pas vanaf M13 (met de gevangenis), zoals het origineel. Origineel: goudicoon in de bovenbalk (MIS1-10) opent `STATS.MFB` (`lokaal/bb_original/stats.png`):
 een schuif per waar (eieren, water, brood, melk, cider, kerk, belasting) van weinig munten naar een stapel goud, daaronder per misdaad
