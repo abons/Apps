@@ -1,7 +1,7 @@
 # Dieren: AI-route (TRELLIS)
 
 Proef 2026-10-30: de wolf uit TRELLIS (beeld -> 3D) op het bestaande wolfskelet, naast de procedurele
-`wolf.py`. Schakelaar: `spel/data/spel.json` `wolf_model` = `"trellis"` | `"procedureel"` (voor frames:
+`wolf.py`. Schakelaar: `spel/data/spel.json` `wolf_model` = `"tripo"` (standaard sinds 2026-10-30) | `"trellis"` | `"procedureel"` (voor frames:
 `-- --wolf_model=procedureel`); zonder trellis-glb valt `WolfModel.maak` terug op de procedurele.
 
 ## Werkwijze (herhaalbaar)
@@ -36,6 +36,22 @@ Proef 2026-10-30: de wolf uit TRELLIS (beeld -> 3D) op het bestaande wolfskelet,
   3D-positie via de UV's).
 - Uitkomst: anatomisch schoner en "echter" dan procedureel, maar leest als vos/husky (slank, kop hoog),
   minder als de ruige B&B-wolf. Zie `spel/screenshots/wolf_vergelijk.jpg` (links procedureel, rechts trellis).
+
+## Tripo-route: TRELLIS-mesh naar een referentie-render (2026-10-30, `wolf_tripo.py`)
+
+Tripo (gratis plan) mag niet exporteren; alleen schermafbeeldingen als referentie (`lokaal/tripo/*.png`, nooit in git).
+`blender -b -P wolf_tripo.py -- [zij] [poses] [ankers]`, ~30 s -> `spel/assets/wolf_tripo.glb` + `donkere_wolf_tripo.glb`.
+- Silhouet van de ruwe TRELLIS-mesh en van `wolf_links.png` (achtergrond weg: `projectie.segmenteer`) als contour;
+  41 `ANKERS` (m op TRELLIS -> pixel) + tussenpunten = thin-plate spline (y, z). Elke vertex en `MAAT_T` gaan erdoor:
+  kop laag, lange dunne poten, hangende pluimstaart. x: wortel van de oppervlaktefactor rond lijf- of pootmidden,
+  staart x 1,6. Geen vouwen (det min 0,26).
+- Textuur 2048: per texel de referentiepixel (beide kanten gespiegeld, scherend iets naar binnen, fijne ruis).
+  Ogen = rode texels -> gloeibollen (`extras(haar=0)`). Donker: zwart, keel/borst licht via een gebied in referentiepixels.
+- ⚠️ Textuur komt uit de Tripo-render: glb's, previews en spelframes blijven lokaal (`lokaal/tripo/`).
+  Voor een publieke release eerst een eigen geschilderde textuur.
+- Rek (p99.9): lopen 3,7, rennen 3,1, bijten 3,4, dood 3,2 (tussen de dijen). Oordeel: 7,5 tegen 6,5 (trellis).
+- Hunyuan3D-2.1 (vorm, `lokaal/hunyuan/`) zou als basis nog beter passen, maar de licentie sluit de EU uit
+  (zie `../../README.md`): niet gebruikt.
 
 ## Voor koe, personages, gebouwen
 

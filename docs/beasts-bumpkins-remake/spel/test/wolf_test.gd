@@ -441,11 +441,12 @@ func _test_generator() -> void:
 func _test_model() -> void:
 	var d = Gegevens.lees(Gegevens.SPEL)
 	var keuze := String(d.get("wolf_model", ""))
-	_check(keuze in ["trellis", "procedureel"], "spel.json wolf_model is trellis of procedureel (%s)" % keuze)
+	_check(keuze in ["tripo", "trellis", "procedureel"], "spel.json wolf_model is tripo, trellis of procedureel (%s)" % keuze)
+	var ai := {"trellis": WolfModel.GLB_TRELLIS, "tripo": WolfModel.GLB_TRIPO}
 	for soort in [&"wolf", &"donkere_wolf"]:
 		var pad := WolfModel.glb_pad(soort)
-		if keuze == "trellis" and ResourceLoader.exists(WolfModel.GLB_TRELLIS[soort]):
-			_check(pad == WolfModel.GLB_TRELLIS[soort], "%s: trellis-glb gekozen" % soort)
+		if ai.has(keuze) and ResourceLoader.exists(ai[keuze][soort]):
+			_check(pad == ai[keuze][soort], "%s: %s-glb gekozen" % [soort, keuze])
 		else:
 			_check(pad == WolfModel.GLB[soort], "%s: procedurele glb (terugval)" % soort)
 		if not ResourceLoader.exists(pad):

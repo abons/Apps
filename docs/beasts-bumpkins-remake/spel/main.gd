@@ -47,6 +47,8 @@ func _ready() -> void:
 		w.voorgebouwd_draai = int(opt["voordraai"])
 	if opt.has("camyaw"):      # alleen voor frames: --camyaw=<graden> overschrijft na het scenario de camerahoek
 		call_deferred("_camyaw", deg_to_rad(float(opt["camyaw"])))
+	if opt.has("camwolf"):     # alleen voor frames: --camwolf=<afstand> volgt de eerste wolf van dichtbij (wolfmodel vergelijken)
+		_camwolf = float(opt["camwolf"])
 	_fps_aan = opt.has("fps")
 	_trace = opt.has("trace")
 	if opt.has("gang"):
@@ -121,6 +123,7 @@ func _opties() -> Dictionary:
 
 
 var _trace := false
+var _camwolf := 0.0
 var _fps_aan := false
 var _fps_n := 0
 var _fps_som := 0.0
@@ -559,6 +562,10 @@ func _camyaw(y: float) -> void:
 
 
 func _scenario_stap() -> void:
+	if _camwolf > 0.0 and not w.wolven.is_empty():
+		var wp: Vector3 = view.wolven.wolf_pos(w.wolven[0].id)
+		if wp.is_finite():
+			cam.zet_direct(wp + Vector3(0, 0.4, 0), cam.yaw, deg_to_rad(28), _camwolf)
 	match scenario:
 		"hints":
 			_hints_stap()

@@ -424,8 +424,8 @@ def _oog_mat():
     return m
 
 
-def extras(o, rig, sk, img):
-    """Na de gewichten: haarplukken (driehoeken, dubbelzijdig, kleur van het ankerpunt, gewichten van het
+def extras(o, rig, sk, img, haar=1.0):
+    """haar: dichtheid van de plukken (0 = alleen de ogen; wolf_tripo.py). Na de gewichten: haarplukken (driehoeken, dubbelzijdig, kleur van het ankerpunt, gewichten van het
     ankerpunt) op nek/manen, rugkam en staart, en twee gloeiende oogbollen star aan Head. Geeft het
     haarmateriaal terug (eigen texture-node, die bij de donkere wolf mee moet wisselen)."""
     rng = np.random.default_rng(11)
@@ -470,7 +470,7 @@ def extras(o, rig, sk, img):
     L = np.array(MAAT_T["staart"], float)
     nv, nuv, nw, nn_ = [], [], [], []
     for naam, masker, dicht, (l0, l1), br in soorten:
-        n = rng.poisson(opp * masker * dicht)
+        n = rng.poisson(opp * masker * dicht * haar)
         ids = np.repeat(np.arange(len(tris)), n)
         if not len(ids):
             continue
@@ -575,6 +575,9 @@ def extras(o, rig, sk, img):
 
 
 # --- Skelet + gewichten ---------------------------------------------------------------------------------
+KOP_Z = 0.62        # star aan Head alleen boven deze hoogte (wolf_tripo.py: lagere kop)
+
+
 def bouw_rig():
     rig = R.K.bouw_rig(MAAT_T, "wolf_rig")
     rig["rustpose"] = "staand, kijkt naar -Y"
@@ -640,7 +643,7 @@ def skin(o, rig):
     H0 = sk.J["Head"]
     tk = (P - H0) @ d
     kaak = (seg_d(P, sk.J["Jaw"], sk.T["Jaw"]) < 0.035 * s) & (((P - H0) @ u) > 0.06 * s) & (tk > 0.10 * s)
-    kop = (tk > 0.04 * s) & ~kaak & (P[:, 2] > 0.62 * s) & (P[:, 1] < sk.J["Head"][1] + 0.02)
+    kop = (tk > 0.04 * s) & ~kaak & (P[:, 2] > KOP_Z * s) & (P[:, 1] < sk.J["Head"][1] + 0.02)
     oor = np.zeros(len(P), bool)
     for v in me.vertices:
         for ge in v.groups:

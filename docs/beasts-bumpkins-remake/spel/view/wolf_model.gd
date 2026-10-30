@@ -9,6 +9,8 @@ extends RefCounted
 const GLB := {&"wolf": "res://assets/wolf.glb", &"donkere_wolf": "res://assets/donkere_wolf.glb"}
 ## AI-model (TRELLIS, modellen/dieren/wolf_trellis.py): zelfde skelet, clips en assen; spel.json wolf_model.
 const GLB_TRELLIS := {&"wolf": "res://assets/wolf_trellis.glb", &"donkere_wolf": "res://assets/donkere_wolf_trellis.glb"}
+## TRELLIS-mesh vervormd naar de Tripo-referentie, met geprojecteerde textuur (modellen/dieren/wolf_tripo.py).
+const GLB_TRIPO := {&"wolf": "res://assets/wolf_tripo.glb", &"donkere_wolf": "res://assets/donkere_wolf_tripo.glb"}
 const ANIM := "res://assets/wolf_anim.json"
 const SCHAAL := {&"wolf": 1.0, &"donkere_wolf": 1.08}
 const REN_MPS := 1.5            ## boven deze sim-snelheid de galop
@@ -70,7 +72,7 @@ static func _kegel(r: float, h: float) -> CylinderMesh:
 	return c
 
 
-## Glb-pad per soort: spel.json `wolf_model` ("trellis" | "procedureel"; voor vergelijkingsframes overschrijft
+## Glb-pad per soort: spel.json `wolf_model` ("tripo" | "trellis" | "procedureel"; voor vergelijkingsframes overschrijft
 ## `-- --wolf_model=procedureel` dat), terugval op de procedurele glb.
 static func glb_pad(soort: StringName) -> String:
 	var d = Gegevens.lees(Gegevens.SPEL)
@@ -78,8 +80,9 @@ static func glb_pad(soort: StringName) -> String:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--wolf_model="):
 			keuze = a.get_slice("=", 1)
-	if keuze == "trellis":
-		var t: String = GLB_TRELLIS.get(soort, GLB_TRELLIS[&"wolf"])
+	var ai := {"trellis": GLB_TRELLIS, "tripo": GLB_TRIPO}
+	if ai.has(keuze):
+		var t: String = ai[keuze].get(soort, ai[keuze][&"wolf"])
 		if ResourceLoader.exists(t):
 			return t
 	return GLB.get(soort, GLB[&"wolf"])
