@@ -852,13 +852,18 @@ func _start_generator() -> void:
 			_spawn_koe(gi)
 
 
+func _wild_van(gi: int) -> int:
+	var wild := 0
+	for k in vee:
+		if k.van_generator and k.generator == gi and k.eigenaar < 0:
+			wild += 1
+	return wild
+
+
 func _werk_generator(dt: float) -> void:
 	var g: Dictionary = missie.get("koe_generator", {})
 	for gi in _generatoren.size():
-		var wild := 0
-		for k in vee:
-			if k.van_generator and k.generator == gi and k.eigenaar < 0:
-				wild += 1
+		var wild := _wild_van(gi)
 		if wild >= int(g.get("max", 3)):
 			_generator_t[gi] = 0.0
 			continue
@@ -995,8 +1000,8 @@ func kalveren() -> int:
 
 
 ## Kalven (hint 1-11: "koeien kalven in de lente, houd ze bij elkaar"; origineel klasse 96 `baby cow`, sprite cowborn).
-## Een volwassen eigen koe die deze lente `kalf_samen_s` binnen `kalf_straal` tegels van een andere volwassen eigen koe
-## stond, krijgt met kans `kalf_kans` (hash, geen rng: zelfde spel, zelfde kalveren) een kalf naast zich; een keer per
+## Een volwassen koe (eigen of wild) die deze lente `kalf_samen_s` binnen `kalf_straal` tegels van een andere volwassen
+## koe stond (ongeacht eigenaar, besluit gebruiker 2026-10-30), krijgt met kans `kalf_kans` (hash, geen rng: zelfde spel, zelfde kalveren) een kalf naast zich; een keer per
 ## lente. Een kalf is na `kalf_groei_s` een koe. Getallen zijn eigen keuze (niet in de data gevonden).
 func _kalveren(dt: float) -> void:
 	var e: Dictionary = spel["economie"]
@@ -1015,10 +1020,12 @@ func _kalveren(dt: float) -> void:
 	var straal := float(e.get("kalf_straal", 4.0))
 	var nieuw: Array[Vee] = []
 	for k in vee:
-		if k.eigenaar != 0 or k.is_kalf() or k.kalf_jaar == jaar:
+		if k.is_kalf() or k.kalf_jaar == jaar:        # elke koe, eigen of wild (gebruiker 2026-10-30)
 			continue
+		if k.eigenaar < 0 and k.van_generator and _wild_van(k.generator) >= int(missie.get("koe_generator", {}).get("max", 3)):
+			continue                                   # wilde kudde niet boven het maximum van zijn generator
 		for o in vee:
-			if o != k and o.eigenaar == 0 and not o.is_kalf() and k.pos.distance_to(o.pos) <= straal:
+			if o != k and not o.is_kalf() and k.pos.distance_to(o.pos) <= straal:    # ongeacht eigenaar
 				k.samen_s += dt
 				break
 		if k.samen_s < float(e.get("kalf_samen_s", 20.0)):
@@ -1039,6 +1046,8 @@ func _kalveren(dt: float) -> void:
 		c.weide = m.weide
 		c.kalf = groei
 		c.moeder = m
+		c.van_generator = m.van_generator          # een wild kalf telt mee voor het maximum van de generator
+		c.generator = m.generator
 		c.wacht = 2.0
 		vee.append(c)
 		koe_erbij.emit(c)

@@ -205,6 +205,8 @@ func _initialize() -> void:
 	# koeien: generator, claimen, loslaten, missie 1 winnen
 	var k := Wereld.new()
 	k.laad()
+	k.spel = k.spel.duplicate(true)           # zonder kalveren: deze test telt koeien uit de generator
+	k.spel["economie"]["kalf_kans"] = 0.0
 	_check(k.vee.size() == 1 and k.vee[0].eigenaar == -1, "generator begint met 1 wilde koe")
 	for i in int(200.0 / k.tik_dt):
 		k.tik(k.tik_dt)
@@ -738,6 +740,26 @@ func _test_kalveren() -> void:
 
 ## Bouwplaatsstapels (view/bouwmenu.gd _stapelplekken): voor elk gebouw in elke draaiing twee tegels buiten de
 ## voetafdruk, aan de deurkant (langs de gevel of een rij verder), niet op de deurtegel of het pad ervoor.
+
+	# wilde koeien kalven ook, ongeacht eigenaar (gebruiker 2026-10-30)
+	var v := Wereld.new()
+	v.laad()
+	v.spel["economie"]["kalf_kans"] = 1.0
+	v.tijd_s = 10.0
+	var wild: Array[Vee] = []
+	for i in 2:
+		var k := v._spawn_koe()
+		k.van_generator = false
+		k.vast = true
+		k.zet_tegel(v.dichtstbij_loopbaar(v.kampvuur + Vector2i(8 + i, 6)))
+		wild.append(k)
+	for i in int(30.0 / v.tik_dt):
+		v.tik(v.tik_dt)
+	var wilde_kalveren := 0
+	for k in v.vee:
+		if k.is_kalf() and k.eigenaar != 0:
+			wilde_kalveren += 1
+	_check(wilde_kalveren >= 1, "twee wilde koeien bij elkaar in de lente: wild kalf (%d)" % wilde_kalveren)
 func _test_stapels() -> void:
 	var w := Wereld.new()
 	w.laad()

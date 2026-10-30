@@ -16,7 +16,7 @@
   "bouwtijd_s": {"hut": 60, "gereedschapsloods": 60, "kippenhok": 60, "molen": 60, "akker": 16, "melkerij": 60, "hek": 3, "poort": 6, "weg": 3},
   "economie": {"rijp_s": 60, "oogst_s": 2.0, "winkel_start": 8, "prijs_per_stuk": 3, "trek_s": 30, "toonbank_s": 1.2,
     "melk_s": 2.2, "koe_leeg_s": 90, "melk_straal": 14, "kippen_per_hok": 3, "kip_leeg_s": 55, "raap_s": 1.6,
-    "_kalf": "sim/wereld.gd _kalveren: eigen koe die in de lente kalf_samen_s binnen kalf_straal tegels van een andere eigen koe staat, kalft met kalf_kans (een keer per lente); kalf is na kalf_groei_s een koe. Eigen keuze, niet in de data.",
+    "_kalf": "sim/wereld.gd _kalveren: koe (eigen of wild) die in de lente kalf_samen_s binnen kalf_straal tegels van een andere koe staat, ongeacht eigenaar (gebruiker 2026-10-30), kalft met kalf_kans (een keer per lente); kalf is na kalf_groei_s een koe. Groei 1 seizoen goedgekeurd door de gebruiker.",
     "kalf_samen_s": 20, "kalf_straal": 4, "kalf_kans": 0.5, "kalf_groei_s": 270},
   "koe_generator_id": 171,
   "weg_per_tegel": 2,
