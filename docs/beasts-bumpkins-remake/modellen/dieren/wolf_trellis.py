@@ -5,7 +5,7 @@ Draaien:
   blender -b -P wolf_trellis.py -- [poses] [zij] [detail] [blend] [geen_export]   (werkwijze: README.md)
 - `zij`: preview/wolf_trellis_zij.png (zij- en bovenaanzicht met raster per 10 cm en het skelet erover; om
   de MAAT hieronder op de vorm te zetten). Bevat geen sprites/concept: mag in git.
-- `poses`: preview/wolf_trellis_poses.png (standen uit alle clips, iso + van opzij, grijs en donker).
+- `poses`: preview/wolf_trellis_v2_poses.png (standen uit alle clips, iso + van opzij, grijs en donker).
 - `detail`: preview/wolf_trellis_detail.png (zes standen groot, vervorming nakijken; lokaal).
 
 Invoer: lokaal/trellis/wolf_trellis.glb (gitignored; TRELLIS-Space, zie README.md in deze map). Eén mesh,
@@ -188,9 +188,149 @@ def donkere_textuur(img, o):
     A = np.array(img.pixels[:], np.float32).reshape(h, w, 4)
     rgb = A[..., :3]
     lum = rgb @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    rood = (rgb[..., 0] > 0.25) & (rgb[..., 0] > 2.2 * rgb[..., 1]) & (rgb[..., 0] > 2.2 * rgb[..., 2])
-    # per texel de 3D-positie: rasteriseer de UV-driehoeken (grof, per driehoek het zwaartepunt is genoeg
-    # bij 1024 px en ~6k driehoeken niet; daarom per texel barycentrisch)
+    rood = is_rood(rgb)
+    pos, nrm, gezet = texels(img, o)
+    y, z = pos[..., 1], pos[..., 2]
+    vb = MAAT_T["voorbeen"]
+    # borst: voor de schouders, onder 0,72 m, boven de elleboog-ish; keel: onder de nek/kaak, naar voren gericht
+    borst = gladstap(vb[1][0] + 0.10, vb[1][0] - 0.02, y) * gladstap(0.78, 0.66, z) * gladstap(0.30, 0.42, z)
+    keel = (gladstap(-0.38, -0.47, y) * gladstap(-0.60, -0.54, y) * gladstap(0.80, 0.72, z) * gladstap(0.55, 0.62, z)
+            * (nrm[..., 2] < 0.3))
+    wit = np.clip(np.maximum(borst * gladstap(-0.1, -0.6, nrm[..., 1]), keel), 0, 1) * gezet
+    # zwart: luminantie omlaag geperst, structuur blijft; borst licht (gebroken wit) met dezelfde structuur
+    ln = lum / max(float(np.percentile(lum[gezet], 95)), 1e-3)
+    zwart = (0.035 + 0.11 * ln)[..., None] * np.array([1.0, 0.97, 0.95], np.float32)
+    licht = (0.45 + 0.35 * ln)[..., None] * np.array([1.0, 0.98, 0.95], np.float32)
+    uit = zwart * (1 - wit[..., None]) + licht * wit[..., None]
+    uit = np.where(rood[..., None], rgb, uit)
+    uit = np.where(gezet[..., None] | rood[..., None], uit, rgb * 0.15)
+    D = bpy.data.images.new("donkere_wolf_trellis_kleur", w, h)
+    D.pixels.foreach_set(np.concatenate([uit, A[..., 3:]], 2).ravel())
+    D.pack()
+    return D
+
+
+# --- Minder husky, meer B&B-wolf (v2) --------------------------------------------------------------
+# TRELLIS levert een slanke, hoogkoppige husky/vos. De B&B-wolf (concept lokaal/concept/img/wolf.jpg, sprites
+# wolf*) is ruig: kop laag en breed, dikke manen, zware pluimstaart, donker zadel, gloeiende rode ogen.
+KOP_ZAK = 13.0          # graden: kop+hals draaien omlaag om de halsbasis
+KOP_BREED = 1.13        # schedel/wangen breder (x)
+NEK_BREED = 1.10
+STAART_DIK, STAART_LANG, STAART_OP = 1.28, 1.15, 9.0   # x dikte, x lengte, graden naar achteren
+OOR_KLEIN = 0.86       # oren kleiner (husky-oren zijn groot en hoog)
+HALS_SPIL = (-0.34, 0.64)   # (y, z): draaipunt van de kopzak
+
+
+def _kopzak_w(y):
+    return gladstap(-0.36, -0.52, y)
+
+
+def _draai(y, z, th):
+    yp, zp = HALS_SPIL
+    c, s_ = np.cos(th), np.sin(th)
+    dy, dz = y - yp, z - zp
+    return yp + dy * c - dz * s_, zp + dy * s_ + dz * c
+
+
+def _draai_om(Q, c, th):
+    """Draai punten Q (n, yz) om c met hoek th (n of scalar), zelfde zin als _draai."""
+    th = np.broadcast_to(th, (len(Q),))
+    co, si = np.cos(th), np.sin(th)
+    d = Q - c
+    return np.stack([c[0] + d[:, 0] * co - d[:, 1] * si, c[1] + d[:, 0] * si + d[:, 1] * co], 1)
+
+
+def _op_lijn(Q, L):
+    """Dichtstbijzijnde punt op polylijn L (yz) en de parameter (0..n-1) per punt Q (yz)."""
+    best = np.full(len(Q), 1e9)
+    C = np.zeros_like(Q)
+    T = np.zeros(len(Q))
+    for i in range(len(L) - 1):
+        a, b = L[i], L[i + 1]
+        ab = b - a
+        t = np.clip((Q - a) @ ab / (ab @ ab), 0, 1)
+        c = a + t[:, None] * ab
+        d = np.linalg.norm(Q - c, axis=1)
+        m = d < best
+        best[m], C[m], T[m] = d[m], c[m], i + t[m]
+    return C, T, best
+
+
+def vorm(o):
+    """Vorm aanpassen in de rustpose (vóór skelet en gewichten), en MAAT_T meeschuiven."""
+    me = o.data
+    P = np.array([v.co for v in me.vertices], float)
+    x, y, z = P[:, 0].copy(), P[:, 1].copy(), P[:, 2].copy()
+    # staart: dikker rond de staartlijn en langer vanaf de wortel
+    L = np.array(MAAT_T["staart"], float)
+    st = (y > L[0][0] - 0.02) & (np.abs(x) < 0.09)
+    Q = np.stack([y, z], 1)
+    C, T, d = _op_lijn(Q, L)
+    st &= d < 0.12
+    w = gladstap(0.0, 0.6, T) * st
+    k = 1 + (STAART_DIK - 1) * w
+    x = x * k
+    Q2 = C + (Q - C) * k[:, None]
+    wl = gladstap(0.0, 0.4, T) * st
+    r0 = L[0]
+    Q2 = r0 + (Q2 - r0) * (1 + (STAART_LANG - 1) * wl)[:, None]
+    Q2 = _draai_om(Q2, r0, np.radians(STAART_OP) * wl)
+    y, z = Q2[:, 0], Q2[:, 1]
+    # oren kleiner naar hun basis toe (vóór de kopzak, in de oorspronkelijke maat)
+    ox, oy, oz = MAAT_T["oor"]
+    od = np.array(MAAT_T["oor_richting"], float)
+    od /= np.linalg.norm(od)
+    for sg in (1, -1):
+        b0 = np.array((sg * ox, oy, oz))
+        e = np.array((sg * od[0], od[1], od[2]))
+        Pk = np.stack([x, y, z], 1)
+        t = (Pk - b0) @ e
+        r = np.linalg.norm(Pk - b0 - t[:, None] * e, axis=1)
+        m = (t > -0.01) & (r < 0.06) & (np.sign(x) == sg) & (z > oz - 0.02)
+        wo = gladstap(-0.01, 0.02, t) * m
+        Pk = b0 + (Pk - b0) * (1 - (1 - OOR_KLEIN) * wo)[:, None]
+        x, y, z = Pk[:, 0], Pk[:, 1], Pk[:, 2]
+    # kop + hals omlaag, schedel en hals breder
+    wk = _kopzak_w(y) * gladstap(0.42, 0.55, z)
+    y, z = _draai(y, z, np.radians(KOP_ZAK) * wk)
+    kb = gladstap(-0.47, -0.53, P[:, 1]) * gladstap(0.62, 0.72, P[:, 2])
+    nb = gladstap(-0.28, -0.38, P[:, 1]) * gladstap(-0.58, -0.50, P[:, 1]) * gladstap(0.50, 0.62, P[:, 2])
+    x = x * (1 + (KOP_BREED - 1) * kb + (NEK_BREED - 1) * nb)
+    for i, v in enumerate(me.vertices):
+        v.co = (x[i], y[i], z[i])
+    me.update()
+
+    # skelet mee: staart langer, kop/hals/oren gedraaid
+    MAAT_T["staart"] = [tuple(_draai_om((r0 + (np.array(p) - r0) * STAART_LANG)[None], r0,
+                                        np.radians(STAART_OP) * (1.0 if i else 0.0))[0])
+                        for i, p in enumerate(MAAT_T["staart"])]
+    MAAT_T["oor_lengte"] *= OOR_KLEIN
+
+    def dr(p):
+        th = np.radians(KOP_ZAK) * float(_kopzak_w(np.array(p[0])))
+        a, b = _draai(np.array(p[0]), np.array(p[1]), th)
+        return (float(a), float(b))
+    MAAT_T["nek"] = [MAAT_T["nek"][0]] + [dr(p) for p in MAAT_T["nek"][1:]]
+    MAAT_T["kop"] = [dr(p) for p in MAAT_T["kop"]]
+    MAAT_T["kaak"] = [dr(p) for p in MAAT_T["kaak"]]
+    ox, oy, oz = MAAT_T["oor"]
+    oy2, oz2 = dr((oy, oz))
+    MAAT_T["oor"] = (ox * KOP_BREED, oy2, oz2)
+    rx_, ry_, rz_ = MAAT_T["oor_richting"]
+    th = np.radians(KOP_ZAK)
+    MAAT_T["oor_richting"] = (rx_, ry_ * np.cos(th) - rz_ * np.sin(th), ry_ * np.sin(th) + rz_ * np.cos(th))
+    MAAT_T["bel"] = dr(MAAT_T["bel"])
+    log("vorm: staart x", STAART_DIK, "/", STAART_LANG, "kop", KOP_ZAK, "gr omlaag, kop x", KOP_BREED)
+
+
+_RASTER = {}
+
+
+def texels(img, o):
+    """Per texel 3D-positie en normaal in de rustpose (UV-driehoeken gerasteriseerd); eenmalig per mesh."""
+    if "r" in _RASTER:
+        return _RASTER["r"]
+    w, h = img.size
     pos = np.zeros((h, w, 3), np.float32)
     nrm = np.zeros((h, w, 3), np.float32)
     gezet = np.zeros((h, w), bool)
@@ -223,24 +363,215 @@ def donkere_textuur(img, o):
             pos[iy, ix] = bc @ V[vi]
             nrm[iy, ix] = bc @ N[vi]
             gezet[iy, ix] = True
-    y, z = pos[..., 1], pos[..., 2]
-    vb = MAAT_T["voorbeen"]
-    # borst: voor de schouders, onder 0,72 m, boven de elleboog-ish; keel: onder de nek/kaak, naar voren gericht
-    borst = gladstap(vb[1][0] + 0.10, vb[1][0] - 0.02, y) * gladstap(0.78, 0.66, z) * gladstap(0.30, 0.42, z)
-    keel = (gladstap(-0.38, -0.47, y) * gladstap(-0.60, -0.54, y) * gladstap(0.80, 0.72, z) * gladstap(0.55, 0.62, z)
-            * (nrm[..., 2] < 0.3))
-    wit = np.clip(np.maximum(borst * gladstap(-0.1, -0.6, nrm[..., 1]), keel), 0, 1) * gezet
-    # zwart: luminantie omlaag geperst, structuur blijft; borst licht (gebroken wit) met dezelfde structuur
-    ln = lum / max(float(np.percentile(lum[gezet], 95)), 1e-3)
-    zwart = (0.035 + 0.11 * ln)[..., None] * np.array([1.0, 0.97, 0.95], np.float32)
-    licht = (0.45 + 0.35 * ln)[..., None] * np.array([1.0, 0.98, 0.95], np.float32)
-    uit = zwart * (1 - wit[..., None]) + licht * wit[..., None]
-    uit = np.where(rood[..., None], rgb, uit)
-    uit = np.where(gezet[..., None] | rood[..., None], uit, rgb * 0.15)
-    D = bpy.data.images.new("donkere_wolf_trellis_kleur", w, h)
-    D.pixels.foreach_set(np.concatenate([uit, A[..., 3:]], 2).ravel())
-    D.pack()
-    return D
+    _RASTER["r"] = (pos, nrm, gezet)
+    return _RASTER["r"]
+
+
+def is_rood(rgb):
+    return (rgb[..., 0] > 0.25) & (rgb[..., 0] > 2.2 * rgb[..., 1]) & (rgb[..., 0] > 2.2 * rgb[..., 2])
+
+
+def tekening(img, o):
+    """Koeler grijs (geen bruine husky-oren/-wangen), donker zadel over rug, nek en staart (gebroken door
+    ruis), donkerder schedel/oren; de lichte keel/snuit blijft. Rode ogen blijven."""
+    w, h = img.size
+    A = np.array(img.pixels[:], np.float32).reshape(h, w, 4)
+    rgb = A[..., :3]
+    rood = is_rood(rgb)
+    pos, nrm, gezet = texels(img, o)
+    x, y, z = pos[..., 0], pos[..., 1], pos[..., 2]
+    lum = rgb @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    grijs = lum[..., None] * np.array([0.98, 1.0, 1.03], np.float32)
+    rgb = 0.35 * rgb + 0.65 * grijs                                     # bijna ontzadigd, iets koel
+    ru = BM.ruis(pos.reshape(-1, 3), f=(14, 9, 14), seed=7, octaven=3).reshape(h, w)
+    boven = gladstap(0.05, 0.55, nrm[..., 2])
+    zadel = boven * gladstap(-0.40, -0.28, y) * gladstap(0.50, 0.60, z) * gladstap(0.12, 0.02, np.abs(x) - 0.02 * ru)
+    zadel = np.maximum(zadel, boven * gladstap(-0.42, -0.30, y) * gladstap(0.62, 0.70, z))      # schoft/rug breed
+    staart = gladstap(0.42, 0.50, y) * gladstap(-0.2, 0.4, nrm[..., 2] - 0.6 * nrm[..., 1])
+    staart_punt = gladstap(0.72, 0.84, y)                                                    # donkere pluim
+    schedel = gladstap(-0.47, -0.53, y) * gladstap(0.80, 0.88, z)
+    d = np.clip(np.maximum.reduce([zadel * (0.75 + 0.35 * ru), staart * 0.45, staart_punt * 0.8, schedel * 0.5]), 0, 1)
+    d = d * gezet
+    rgb = rgb * (1 - 0.55 * d[..., None])
+    # fijne vachtstreping overal (ruig, niet glad)
+    fijn = BM.ruis(pos.reshape(-1, 3), f=(90, 40, 90), seed=3).reshape(h, w)
+    rgb = rgb * (1 + 0.10 * fijn * gezet)[..., None]
+    rgb = np.where(rood[..., None], A[..., :3], np.clip(rgb, 0, 1))
+    A[..., :3] = rgb
+    img.pixels.foreach_set(A.ravel())
+    img.pack()
+    return rood
+
+
+def _gewichten(o):
+    me = o.data
+    W = np.zeros((len(me.vertices), len(o.vertex_groups)), np.float32)
+    for v in me.vertices:
+        for ge in v.groups:
+            W[v.index, ge.group] = ge.weight
+    return W
+
+
+def _oog_mat():
+    m = bpy.data.materials.new("mat_oog")
+    m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    c = (1.0, 0.03, 0.02, 1)
+    b.inputs["Base Color"].default_value = c
+    b.inputs["Roughness"].default_value = 0.2
+    b.inputs["Emission Color"].default_value = c
+    b.inputs["Emission Strength"].default_value = 3.0
+    return m
+
+
+def extras(o, rig, sk, img):
+    """Na de gewichten: haarplukken (driehoeken, dubbelzijdig, kleur van het ankerpunt, gewichten van het
+    ankerpunt) op nek/manen, rugkam en staart, en twee gloeiende oogbollen star aan Head. Geeft het
+    haarmateriaal terug (eigen texture-node, die bij de donkere wolf mee moet wisselen)."""
+    rng = np.random.default_rng(11)
+    me = o.data
+    pos, nrm, gezet = texels(img, o)          # eerst: daarna zitten de plukken in de mesh
+    W = _gewichten(o)
+    gi = {g.name: i for i, g in enumerate(o.vertex_groups)}
+    V = np.array([v.co for v in me.vertices], float)
+    Nv = np.array([v.normal for v in me.vertices], float)
+    tris = []
+    for p in me.polygons:
+        li = list(p.loop_indices)
+        for k in range(1, len(li) - 1):
+            tris.append((li[0], li[k], li[k + 1]))
+    tris = np.array(tris)
+    LV = np.array([l.vertex_index for l in me.loops])
+    UV = np.array([l.uv for l in me.uv_layers.active.data], float)
+    TV = LV[tris]
+    A, B, C = V[TV[:, 0]], V[TV[:, 1]], V[TV[:, 2]]
+    opp = 0.5 * np.linalg.norm(np.cross(B - A, C - A), axis=1)
+    M = (A + B + C) / 3
+    Mn = Nv[TV].mean(1)
+    Mn /= np.linalg.norm(Mn, axis=1, keepdims=True) + 1e-9
+    som = lambda namen: sum(W[TV, gi[n]].mean(1) for n in namen if n in gi)
+    tail = som(("Tail", "Tail1", "Tail2", "Tail3"))
+    oor = som(("LeftEar", "RightEar"))
+    kop = som(("Head", "Jaw"))
+    poot = som([z_ + b for z_ in ("Left", "Right") for b in ("UpperArm", "ForeArm", "FrontCannon", "FrontHoof",
+                                                           "Thigh", "Shin", "HindCannon", "HindHoof")])
+    y, z = M[:, 1], M[:, 2]
+    yk = MAAT_T["kop"][0][0]
+    manen = (gladstap(-0.22, -0.32, y) * gladstap(yk - 0.12, yk - 0.04, y) * gladstap(0.40, 0.52, z)
+             * (oor < 0.2) * (tail < 0.1) * (kop < 0.6) * (poot < 0.3))
+    kam = (gladstap(-0.1, 0.4, Mn[:, 2]) * (np.abs(M[:, 0]) < 0.07) * gladstap(0.44, 0.35, y) * (manen < 0.3)
+           * (tail < 0.1) * (kop < 0.1) * (y > -0.40) * (poot < 0.3))
+    st = np.clip(tail, 0, 1) * (M[:, 1] > MAAT_T["staart"][0][0])
+    soorten = [  # (naam, masker, dichtheid /m2, lengte, breedte)
+        ("manen", manen, 4200, (0.04, 0.075), 0.042),
+        ("kam", kam, 1500, (0.03, 0.05), 0.032),
+        ("staart", st, 3600, (0.035, 0.065), 0.040),
+    ]
+    L = np.array(MAAT_T["staart"], float)
+    nv, nuv, nw, nn_ = [], [], [], []
+    for naam, masker, dicht, (l0, l1), br in soorten:
+        n = rng.poisson(opp * masker * dicht)
+        ids = np.repeat(np.arange(len(tris)), n)
+        if not len(ids):
+            continue
+        r1, r2 = rng.random(len(ids)), rng.random(len(ids))
+        sq = np.sqrt(r1)
+        bc = np.stack([1 - sq, sq * (1 - r2), sq * r2], 1)
+        p = (bc[:, :, None] * V[TV[ids]]).sum(1)
+        nn = (bc[:, :, None] * Nv[TV[ids]]).sum(1)
+        nn /= np.linalg.norm(nn, axis=1, keepdims=True) + 1e-9
+        uv = (bc[:, :, None] * UV[tris[ids]]).sum(1)
+        ww = (bc[:, :, None] * W[TV[ids]]).sum(1)
+        if naam == "staart":
+            _, T, _ = _op_lijn(p[:, 1:], L)
+            i = np.clip(T.astype(int), 0, len(L) - 2)
+            dyz = L[i + 1] - L[i]
+            flow = np.stack([np.zeros(len(p)), dyz[:, 0], dyz[:, 1]], 1)
+            uit, mee = 0.45, 0.9
+        else:
+            flow = np.tile(np.array([0.0, 1.0, -0.7]), (len(p), 1))
+            uit, mee = (0.65, 0.75) if naam == "manen" else (0.8, 0.5)
+        flow -= nn * (flow * nn).sum(1, keepdims=True)
+        flow /= np.linalg.norm(flow, axis=1, keepdims=True) + 1e-9
+        d = nn * uit + flow * mee + rng.normal(0, 0.18, (len(p), 3))
+        d -= nn * np.minimum((d * nn).sum(1, keepdims=True) - 0.25, 0)        # nooit het lijf in
+        d /= np.linalg.norm(d, axis=1, keepdims=True)
+        lang = rng.uniform(l0, l1, len(p))
+        zij = np.cross(d, nn)
+        zij /= np.linalg.norm(zij, axis=1, keepdims=True) + 1e-9
+        b = br * rng.uniform(0.7, 1.2, len(p))
+        basis = p - nn * 0.006
+        for j in range(len(p)):
+            nv += [basis[j] - zij[j] * b[j] / 2, basis[j] + zij[j] * b[j] / 2, p[j] + d[j] * lang[j]]
+            nuv += [uv[j]] * 3
+            nw += [ww[j]] * 3
+            nn_ += [nn[j]] * 3
+        log("  haar", naam, len(p), "plukken")
+    nh = len(nv) // 3
+    # ogen: zwaartepunt van de rode texels per kant (rustpose)
+    Aimg = np.array(img.pixels[:], np.float32).reshape(img.size[1], img.size[0], 4)
+    rood = is_rood(Aimg[..., :3]) & gezet & (pos[..., 1] < MAAT_T["kop"][0][0])
+    ogen = []
+    for sg in (1, -1):
+        m = rood & (np.sign(pos[..., 0]) == sg) & (np.abs(pos[..., 0]) > 0.01)
+        if m.sum() >= 3:
+            c = pos[m].mean(0).astype(float)
+            n_ = nrm[m].mean(0).astype(float)
+            log("  oog", sg, "uit", int(m.sum()), "rode texels", np.round(c, 3).tolist())
+        else:
+            d_, u_ = KO.kop_assen(sk)
+            c = sk.J["Head"] + d_ * 0.07 + np.array((sg * 0.045, 0, 0)) - u_ * 0.03
+            n_ = np.array((sg * 0.7, -0.7, 0.1))
+            log("  oog", sg, "geschat", np.round(c, 3).tolist())
+        ogen.append((c, n_ / (np.linalg.norm(n_) + 1e-9)))
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    dl = bm.verts.layers.deform.verify()
+    uvlay = bm.loops.layers.uv.active
+    haar = me.materials[0].copy()
+    haar.name = "mat_haar"
+    haar.use_backface_culling = False
+    i_haar = len(me.materials)
+    me.materials.append(haar)
+    i_oog = len(me.materials)
+    me.materials.append(_oog_mat())
+    for t in range(nh):
+        vs = [bm.verts.new(Vector(nv[3 * t + k])) for k in range(3)]
+        for k, v in enumerate(vs):
+            wk = nw[3 * t + k]
+            for g in np.nonzero(wk > 0.01)[0]:
+                v[dl][int(g)] = float(wk[g])
+        f = bm.faces.new(vs)
+        f.material_index = i_haar
+        f.smooth = True
+        for k, lp in enumerate(f.loops):
+            lp[uvlay].uv = nuv[3 * t + k]
+    h_ = gi["Head"]
+    for c, n_ in ogen:
+        r = 0.013
+        res = bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=r)
+        a1 = np.cross(n_, (0.0, 0.0, 1.0))
+        a1 /= np.linalg.norm(a1) + 1e-9
+        a2 = np.cross(n_, a1)
+        for v in res["verts"]:
+            q = np.array(v.co) / r
+            v.co = Vector(c + n_ * (0.002 + q[2] * r * 0.55) + a1 * q[0] * r * 1.25 + a2 * q[1] * r)
+            v[dl][h_] = 1.0
+        for f in {f for v in res["verts"] for f in v.link_faces}:
+            f.material_index = i_oog
+            f.smooth = True
+    n_oud = len(me.polygons)
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    # plukken krijgen de normaal van hun ankerpunt (schaduw als de vacht eronder, geen donkere zijkanten)
+    CN = np.array([c.vector for c in me.corner_normals], np.float32)
+    for t in range(nh):
+        for li in me.polygons[n_oud + t].loop_indices:
+            CN[li] = nn_[3 * t]
+    me.normals_split_custom_set(CN.tolist())
+    log("extras:", nh, "haarplukken, 2 ogen; driehoeken", len(me.polygons))
+    return next(nd for nd in haar.node_tree.nodes if nd.type == "TEX_IMAGE")
 
 
 # --- Skelet + gewichten ---------------------------------------------------------------------------------
@@ -321,7 +652,7 @@ def skin(o, rig):
     st = [sk.J[n] for n in ("Tail", "Tail1", "Tail2", "Tail3")] + [sk.T["Tail3"]]
     dst = np.min([seg_d(P, st[i], st[i + 1]) for i in range(4)], 0)
     hak = min(sk.J["LeftHindCannon"][2], sk.J["RightHindCannon"][2])
-    staart = (dst < 0.09 * s) & (P[:, 1] > sk.J["Tail"][1] + 0.02) & (np.abs(P[:, 0]) < 0.07) & (P[:, 2] > hak + 0.05)
+    staart = (dst < 0.09 * s) & (P[:, 1] > sk.J["Tail"][1] + 0.02) & (np.abs(P[:, 0]) < 0.10) & (P[:, 2] > hak + 0.05)
     ids = np.nonzero(staart)[0]
     namen = ["Tail", "Tail1", "Tail2", "Tail3"]
     Dt = np.stack([seg_d(P[ids], st[i], st[i + 1]) for i in range(4)], 1)
@@ -473,7 +804,7 @@ def poses(sc, rig, tex, kleuren):
             panelen.append(BM.bijsnijden(BM.render_np(sc, os.path.join(bpy.app.tempdir, f"p_{act}_{f}.png"))))
         rijen.append(BM.plak(panelen))
     tex.image = kleuren["wolf"]
-    BM.schrijf(BM.onder(*rijen), os.path.join(PREV, "wolf_trellis_poses.png"))
+    BM.schrijf(BM.onder(*rijen), os.path.join(PREV, "wolf_trellis_v2_poses.png"))
     rust(rig)
 
 
@@ -499,17 +830,34 @@ def exporteer(pad):
     log("export", pad, f"{os.path.getsize(pad) / 1e6:.1f} MB")
 
 
+class Texen:
+    """Lijf- en haarmateriaal delen de textuur: `.image = ` zet hem in beide (grijs/donker wisselen)."""
+
+    def __init__(self, nodes):
+        self.__dict__["nodes"] = nodes
+
+    def __setattr__(self, k, v):
+        for n in self.nodes:
+            setattr(n, k, v)
+
+    def __getattr__(self, k):
+        return getattr(self.nodes[0], k)
+
+
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.fps = R.FPS
     sc.frame_start = 0
     lijf = laad()
-    mat, tex, img = materiaal(lijf)
+    vorm(lijf)
+    mat, tex0, img = materiaal(lijf)
+    tekening(img, lijf)
     rig = bouw_rig()
     if "zij" in OPTS:
         zij(sc, rig)
-    skin(lijf, rig)
+    sk = skin(lijf, rig)
+    tex = Texen([tex0, extras(lijf, rig, sk, img)])
     info = R.bouw_animaties(rig)
     log("animaties", list(info))
     log("rek (p99.9 / max/2)", json.dumps(rek(lijf, rig, sc)))

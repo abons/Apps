@@ -300,7 +300,18 @@ def pose_frame(M, pose):
         p = M.ouder[b1]
         wortel = pos[p] + Dw[p] @ (M.kop[b1] - M.kop[p])
         F = M.kop[b4] + Vector((sg * dx, dy, lift))
-        Dc = rx(ca)
+        Dc, Dh = rx(ca), rx(hp)
+        # kanaal "BL" (0..1, optioneel; de koe gebruikt het niet): beendoel en pijp-/hoefhoek in het lijfkader
+        # (Spine2 voor, Hips achter) in plaats van de wereld. Bij een rol op de flank draaien de poten dan
+        # mee met het lijf in plaats van vanuit de rust-voetplek naar een wereldpunt te reiken (gedraaide romp).
+        w = pose.get("BL", (0.0,))[0]
+        if w > 1e-4:
+            ref = "Spine2" if voor else "Hips"
+            Fb = pos[ref] + Dw[ref] @ (M.kop[b4] + Vector((sg * dx, dy, lift)) - M.kop[ref])
+            F = F.lerp(Fb, min(w, 1.0))
+            Dc = Dc.slerp(Dw[ref] @ rx(ca), min(w, 1.0))
+            Dh = Dh.slerp(Dw[ref] @ rx(hp), min(w, 1.0))
+            F.z = max(F.z, 0.03 * M.s)        # tijdens de val niet door de grond
         C = F - Dc @ (M.kop[b4] - M.kop[b3])
         L1 = (M.kop[b2] - M.kop[b1]).length
         L2 = (M.kop[b3] - M.kop[b2]).length
@@ -310,7 +321,6 @@ def pose_frame(M, pose):
             TEKORT["n"] += 1
         D1 = (M.kop[b2] - M.kop[b1]).normalized().rotation_difference(r1)
         D2 = (M.kop[b3] - M.kop[b2]).normalized().rotation_difference(r2)
-        Dh = rx(hp)
         qs[b1] = rr[b1].inverted() @ Dw[p].inverted() @ D1 @ rr[b1]
         qs[b2] = rr[b2].inverted() @ D1.inverted() @ D2 @ rr[b2]
         qs[b3] = rr[b3].inverted() @ D2.inverted() @ Dc @ rr[b3]

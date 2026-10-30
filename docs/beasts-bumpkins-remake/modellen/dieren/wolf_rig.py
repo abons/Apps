@@ -138,8 +138,9 @@ def clip_rennen(M):
                       A_B={True: (0.5, 0.5), False: (0.5, 0.5)},
                       lift={True: 0.13, False: 0.11},
                       ca_td={True: -22.0, False: -14.0}, ca_lo={True: 45.0, False: 40.0},
-                      ca_swing={True: [(0.3, 95.0), (0.75, -25.0)], False: [(0.3, 70.0), (0.75, -20.0)]},
-                      hp_swing={True: [(0.3, 70.0), (0.7, 10.0)], False: [(0.3, 60.0), (0.7, 8.0)]})
+                      # voor: pols 62 (was 95) en zool 38 (was 70): bij 95 plooide de TRELLIS-pols tot een knik
+                      ca_swing={True: [(0.3, 62.0), (0.75, -25.0)], False: [(0.3, 70.0), (0.75, -20.0)]},
+                      hp_swing={True: [(0.3, 38.0), (0.7, 10.0)], False: [(0.3, 60.0), (0.7, 8.0)]})
     poses = [dict() for _ in range(N + 1)]
     # rugbuiging: gebogen (+rx = punt omlaag aan de voorkant) als de achterpoten onder het lijf komen
     buig = lambda f: golf(f, N, 1, 0.9)
@@ -194,27 +195,36 @@ def clip_bijten(M):
 
 
 def clip_dood(M):
-    """Wankelen, door de voorpoten, op de flank rollen; kop en staart vallen op de grond. Eindigt liggend."""
+    """Wankelen, door de voorpoten zakken, achterhand zakt mee, op de rechterflank vallen; kop en staart
+    komen op de grond en liggen stil. Eindigt liggend.
+
+    De poten wisselen tijdens de val van wereld- naar lijfkader (kanaal "BL", zie koe_rig.pose_frame): eerst
+    staan de voeten op de grond en knikken de poten onder het zakkende lijf, daarna draaien ze mee met de
+    rol (Hips ry) en liggen ze ontspannen opzij. Vroeger bleven de doelen in de wereld terwijl het lijf 82
+    graden rolde: de poten reikten dwars onder het lijf door naar hun rust-voetplek (gedraaide romp)."""
     N = 24
-    # liggen op de flank: Hips rolt (ry), benen gestrekt naar de buikzijde; wortel van de benen draait mee
-    rol = 82.0
-    lig = {"T": (0.0, 0.02, -0.55), "Hips": (0, rol, 0), "Spine2": (0, 4, 0), "Neck": (-8, 6, 0), "Neck1": (-6, 0, 0),
-           "Head": (-6, 10, 0), "Jaw": (10, 0, 0), "LeftEar": (-30, 0, 14), "RightEar": (-30, 0, 14),
-           "Tail": (-30, 0, 10), "Tail1": (-20, 0, 6), "Tail2": (-10, 0, 0),
-           # dx is naar buiten (links +X, rechts -X); na de rol wijst de buik naar -X en ligt de linkerflank onder
-           "LF": (-0.30, -0.10, 0.04, 70, 60), "RF": (0.42, -0.16, 0.20, 70, 60),
-           "LH": (-0.28, -0.05, 0.04, -30, -50), "RH": (0.44, 0.02, 0.22, -30, -50)}
-    K_ = {0: {},
-          4: {"T": (0.02, 0.0, -0.02), "Hips": (0, 6, 0), "Neck": (10, 0, 6), "Head": (8, 0, 4),
-              "LF": (0.02, 0.03, 0.0, 0, 8)},
-          9: {"T": (0.04, -0.02, -0.16), "Hips": (-6, 14, 0), "Neck": (20, 0, 8), "Head": (6, 0, 0), "Jaw": (6, 0, 0),
-              "LF": (0.02, 0.06, 0.0, 70, 80), "RF": (0.0, 0.06, 0.0, 70, 80), "LeftEar": (-20, 0, 10),
-              "RightEar": (-20, 0, 10)},
-          14: {"T": (0.10, 0.0, -0.40), "Hips": (0, 45, 0), "Neck": (10, 4, 4), "Head": (0, 6, 0), "Jaw": (8, 0, 0),
-               "LF": (-0.10, 0.0, 0.03, 70, 70), "RF": (0.25, -0.05, 0.10, 70, 70),
-               "LH": (-0.10, 0.0, 0.02, -20, -30), "RH": (0.20, 0.0, 0.10, -10, -20),
-               "LeftEar": (-26, 0, 12), "RightEar": (-26, 0, 12), "Tail": (-10, 0, 6)},
-          19: {**lig, "T": (0.0, 0.02, -0.57), "Head": (-2, 10, 0)},
+    rol = 90.0
+    # liggend, lijfkader: dx naar buiten, dy (- = voor), lift = naar het lijf toe (dus poot iets gebogen)
+    lig = {"BL": (1.0,), "T": (0.0, 0.0, -0.46), "Hips": (0, rol, 0), "Spine": (0, 0, 2), "Spine1": (0, 0, 2),
+           "Spine2": (0, 0, 2), "Neck": (-14, 0, 12), "Neck1": (-6, 0, 8), "Head": (6, 0, 8), "Jaw": (8, 0, 0),
+           "LeftEar": (-30, 0, 16), "RightEar": (-30, 0, 16),
+           "Tail": (24, 0, -6), "Tail1": (10, 0, -6), "Tail2": (4, 0, -4),     # staart achteruit langs de grond
+           # rol +90: rechts ligt onder; de linkerpoten (boven) zakken naar binnen op de onderste
+           "LF": (-0.10, -0.10, 0.06, 20, 15), "RF": (0.05, -0.06, 0.06, 25, 15),
+           "LH": (-0.10, 0.08, 0.05, -10, -15), "RH": (0.05, 0.04, 0.05, -10, -15)}
+    K_ = {0: {"BL": (0.0,)},
+          4: {"BL": (0.0,), "T": (0.0, 0.0, -0.03), "Hips": (0, 4, 0), "Neck": (12, 0, 4), "Head": (8, 0, 0),
+              "LF": (0.0, 0.02, 0.0, 0, 6)},
+          9: {"BL": (0.0,), "T": (0.02, -0.02, -0.20), "Hips": (-8, 10, 0), "Spine2": (4, 0, 0), "Neck": (22, 0, 6),
+              "Head": (6, 0, 0), "Jaw": (6, 0, 0), "LeftEar": (-20, 0, 10), "RightEar": (-20, 0, 10),
+              "LF": (0.0, 0.0, 0.0, 30, 20), "RF": (0.0, 0.0, 0.0, 30, 20),
+              "LH": (0.0, 0.0, 0.0, -4, -6), "RH": (0.0, 0.0, 0.0, -4, -6), "Tail": (34, 0, 0), "Tail1": (14, 0, 0)},
+          14: {"BL": (0.55,), "T": (0.06, 0.0, -0.31), "Hips": (-4, 45, 0), "Neck": (8, 0, 8), "Neck1": (0, 0, 4),
+               "Head": (4, 0, 4), "Jaw": (8, 0, 0),
+               "LF": (-0.05, -0.04, 0.06, 25, 20), "RF": (0.02, -0.04, 0.08, 30, 20),
+               "LH": (-0.05, 0.04, 0.05, -8, -14), "RH": (0.02, 0.02, 0.06, -10, -14),
+               "LeftEar": (-26, 0, 12), "RightEar": (-26, 0, 12), "Tail": (30, 0, -2), "Tail1": (12, 0, 0)},
+          19: {**lig, "Hips": (0, rol + 2, 0), "T": (0.0, 0.0, -0.45), "Neck": (-10, 0, 14), "Head": (8, 0, 8)},
           24: lig}
     poses = sleutels(K_, N, False)
     return N, False, poses, {"snelheid_mps": 0.0}, {"impact_s": 19 / FPS}
