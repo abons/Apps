@@ -1,12 +1,14 @@
 class_name WolfModel
 extends RefCounted
-## De wolf (missie 2 en 3): assets/wolf.glb of assets/donkere_wolf.glb + wolf_anim.json (uit modellen/dieren/wolf.py;
+## De wolf (missie 2 en 3): assets/wolf[_trellis].glb of assets/donkere_wolf[_trellis].glb + wolf_anim.json (uit modellen/dieren/wolf.py;
 ## clips idle, lopen, rennen, bijten, dood). Kijkt langs +Z, zoals Bumpkin. `werk()` kiest de clip uit de sim-toestand
 ## (sim/wolf.gd): lopen/rennen op de loopsnelheid, bijten en dood op `slag` (deterministisch, zoals de sim), en het karkas
 ## zakt weg als het vergaat. Zonder glb (assets/ staat niet in git) de oude placeholder uit meshes.
 ## Soorten: &"wolf" (grijs) en &"donkere_wolf" (zwart met witte borst, sprites dw_*; iets groter).
 
 const GLB := {&"wolf": "res://assets/wolf.glb", &"donkere_wolf": "res://assets/donkere_wolf.glb"}
+## AI-model (TRELLIS, modellen/dieren/wolf_trellis.py): zelfde skelet, clips en assen; spel.json wolf_model.
+const GLB_TRELLIS := {&"wolf": "res://assets/wolf_trellis.glb", &"donkere_wolf": "res://assets/donkere_wolf_trellis.glb"}
 const ANIM := "res://assets/wolf_anim.json"
 const SCHAAL := {&"wolf": 1.0, &"donkere_wolf": 1.08}
 const REN_MPS := 1.5            ## boven deze sim-snelheid de galop
@@ -68,8 +70,23 @@ static func _kegel(r: float, h: float) -> CylinderMesh:
 	return c
 
 
+## Glb-pad per soort: spel.json `wolf_model` ("trellis" | "procedureel"; voor vergelijkingsframes overschrijft
+## `-- --wolf_model=procedureel` dat), terugval op de procedurele glb.
+static func glb_pad(soort: StringName) -> String:
+	var d = Gegevens.lees(Gegevens.SPEL)
+	var keuze := String(d.get("wolf_model", "procedureel")) if d is Dictionary else "procedureel"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wolf_model="):
+			keuze = a.get_slice("=", 1)
+	if keuze == "trellis":
+		var t: String = GLB_TRELLIS.get(soort, GLB_TRELLIS[&"wolf"])
+		if ResourceLoader.exists(t):
+			return t
+	return GLB.get(soort, GLB[&"wolf"])
+
+
 static func maak(soort: StringName = &"wolf") -> Node3D:
-	var pad: String = GLB.get(soort, GLB[&"wolf"])
+	var pad := glb_pad(soort)
 	if not ResourceLoader.exists(pad):
 		return _placeholder()
 	var n := Node3D.new()

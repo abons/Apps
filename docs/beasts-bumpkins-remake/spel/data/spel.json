@@ -1,4 +1,6 @@
 {
+  "_wolf_model": "view/wolf_model.gd: \"trellis\" = assets/wolf_trellis.glb en donkere_wolf_trellis.glb (AI-model, modellen/dieren/wolf_trellis.py), \"procedureel\" = wolf.glb en donkere_wolf.glb (wolf.py). Ontbreekt de trellis-glb, dan de procedurele; ontbreekt die ook, de placeholder.",
+  "wolf_model": "trellis",
   "tegel_m": 2.0,
   "sim_hz": 10,
   "loop_mps": 0.849,

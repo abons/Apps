@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_dood()
 	_test_kind_vlucht()
 	_test_generator()
+	_test_model()
 	var w1 := Wereld.new()
 	w1.laad()
 	_check(w1.wolven.is_empty(), "missie 1 heeft geen wolven")
@@ -434,6 +435,29 @@ func _test_generator() -> void:
 	for i in int(5.0 / w2.tik_dt):
 		w2.tik(w2.tik_dt)
 	_check(w2.wolven.size() == 3, "missie 2 zelf heeft geen wolf-generator (origineel M2.MIS): blijft 3")
+
+
+## Model (view/wolf_model.gd): spel.json wolf_model kiest de glb, met terugval; elke glb heeft de vijf clips.
+func _test_model() -> void:
+	var d = Gegevens.lees(Gegevens.SPEL)
+	var keuze := String(d.get("wolf_model", ""))
+	_check(keuze in ["trellis", "procedureel"], "spel.json wolf_model is trellis of procedureel (%s)" % keuze)
+	for soort in [&"wolf", &"donkere_wolf"]:
+		var pad := WolfModel.glb_pad(soort)
+		if keuze == "trellis" and ResourceLoader.exists(WolfModel.GLB_TRELLIS[soort]):
+			_check(pad == WolfModel.GLB_TRELLIS[soort], "%s: trellis-glb gekozen" % soort)
+		else:
+			_check(pad == WolfModel.GLB[soort], "%s: procedurele glb (terugval)" % soort)
+		if not ResourceLoader.exists(pad):
+			continue                    # assets/ staat niet in git: placeholder
+		var n := WolfModel.maak(soort)
+		var ap := WolfModel._speler(n)
+		var clips := ap.get_animation_list() if ap else PackedStringArray()
+		var alle := true
+		for c in ["idle", "lopen", "rennen", "bijten", "dood"]:
+			alle = alle and c in clips
+		_check(alle, "%s: %s heeft idle, lopen, rennen, bijten, dood" % [soort, pad.get_file()])
+		n.free()
 
 
 func _check(ok: bool, tekst: String) -> void:
