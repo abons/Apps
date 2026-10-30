@@ -65,6 +65,7 @@ var voorgebouwd: Array[Dictionary] = []  # {soort, tegel}: gebouwen die de kaart
 var _kaart_vee: Array[Dictionary] = []   # {tegel, eigen}: koeien die de kaart al heeft (klasse met "vee")
 var _ontbreekt_gemeld := {}              # klasse-id's die al een waarschuwing gaven
 var raster := Raster.new()
+var mist := Mist.new()                   # sim/mist.gd: verkend gebied (fog of war)
 var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, state, sex}
 var dorpelingen: Array[Dorpeling] = []
 var vee: Array[Vee] = []
@@ -137,6 +138,7 @@ func laad(kaart_pad := "", nr := 1) -> bool:
 	_maak_kaart_vee()
 	wolven = Wolf.uit_kaart(self, _kaart_wolven)
 	_start_generator()
+	mist.start(self)
 	tijd_s = float(spel["start_seizoen"]) * float(spel["seizoen_s"]) + float(spel["start_klok_s"])
 	return true
 
@@ -346,6 +348,7 @@ func tik(dt: float) -> void:
 			_rond_af(p)
 	Wolf.tik_alle(self, dt)
 	Voorwerpen.tik_alle(self, dt)
+	mist.tik(self)
 	_werk_generator(dt)
 	_gezin(dt)
 	_economie(dt)

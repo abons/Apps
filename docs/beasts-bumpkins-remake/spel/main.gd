@@ -1,6 +1,8 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend
+## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*-scenario's, uit in de
+## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -36,6 +38,10 @@ func _ready() -> void:
 	if opt.has("regen"):
 		w.regen_handmatig = 1
 	scenario = opt.get("scenario", "")
+	var mist_aan := scenario == "" or scenario.begins_with("mist")
+	if opt.has("mist"):
+		mist_aan = opt["mist"] != "uit"
+	w.mist.zet_aan(mist_aan)
 	if opt.has("voordraai"):
 		w.voorgebouwd_draai = int(opt["voordraai"])
 	if opt.has("camyaw"):      # alleen voor frames: --camyaw=<graden> overschrijft na het scenario de camerahoek
@@ -55,6 +61,9 @@ func _ready() -> void:
 	voorwerpen = preload("res://view/voorwerpen_view.gd").new()   # beker, kelk: op de grond en in de hand
 	add_child(voorwerpen)
 	voorwerpen.bouw(w, view)
+	var mist_view := MistView.new()   # zwart over alles wat op onverkende tegels staat (shaders/mist.gdshader)
+	add_child(mist_view)
+	mist_view.bouw(w)
 
 	cam = Camera3D.new()
 	cam.set_script(load("res://rts_camera.gd"))
@@ -155,6 +164,15 @@ func _start_scenario() -> void:
 	var vuur := view.terrein.tegel_midden(w.kampvuur)
 	var eiland_m := Vector3((w.eiland.position.x + w.eiland.size.x * 0.5) * w.tegel_m, 0, (w.eiland.position.y + w.eiland.size.y * 0.5) * w.tegel_m)
 	match scenario:
+		"mist_start":
+			# de startview met mist, iets hoger dan het gewone begin zodat de rand rondom te zien is
+			cam.zet_direct(vuur, 0.6, deg_to_rad(44), 46.0)
+		"mist_verkend":
+			# alle dorpelingen lopen 22 tegels naar het oosten en verkennen onderweg (4x); daarna van boven
+			bestuur.gekozen = w.dorpelingen.map(func(d: Dorpeling) -> int: return d.id)
+			bestuur.geef_loopbevel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(22, -4)))
+			w.tempo = 4.0
+			cam.zet_direct(vuur + Vector3(16, 0, -4), 0.6, deg_to_rad(52), 62.0)
 		"overzicht":
 			cam.zet_direct(eiland_m, 0.5, deg_to_rad(52), 125.0)
 		"kaart":

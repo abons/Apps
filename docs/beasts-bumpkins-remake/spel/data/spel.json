@@ -24,6 +24,8 @@
   "wolf": {"hp": 8, "snelheid_mps": 2.7, "zwerf_mps": 0.9, "zicht": 7.0, "verlies": 1.4, "bereik": 0.9, "slag_s": 0.9, "koe_beten": 2,
     "kijk_s": 0.5, "zwerf_straal": 6, "zwerf_wacht": [3.0, 9.0], "rust_s": 25.0, "sterf_s": 1.0, "rot_s": 30.0,
     "steen_bereik": 4.0, "steen_schade": 2, "worp_s": 1.8, "raak_s": 1.5, "verweer_straal": 6.0},
+  "_mist": "sim/mist.gd, ../mist.md. Stralen in tegels: start_straal rond eigen vlag en kampvuur bij de start, dorpeling = zicht van elke dorpeling (verkent waar hij loopt), gebouw = rond een afgebouwd gebouw (plus halve afdruk). Verkend blijft verkend; leeg nooit.",
+  "mist": {"start_straal": 8.0, "dorpeling": 4.0, "gebouw": 4.0},
   "gezin": {"bedden_per_hut": 2, "wieg_s": 12, "baby_s": 5, "opgroeien_s": 150, "ouder_rust_s": 75},
   "_missies": "Per missie (main.gd --missie=<nr>, standaard 1): kaart, start_kas, doel (alles moet: dorpelingen >=, koeien = eigen koeien >=, kas_boven = kas >), verlies (dorpelingen_onder), koe_generator (klasse 171: start, max wilde, interval_s), optioneel bos_dichtheid (anders de algemene). Optioneel voorwerpen: {klasse: {naar: objectnaam, kas}} (sim/voorwerpen.gd; origineel conditie type 12 + acties 0x16 kas, 0x17 weg). Waarden uit lokaal/missies/m<nn>.json.",
   "missies": {

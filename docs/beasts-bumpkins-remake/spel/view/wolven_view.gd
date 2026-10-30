@@ -67,6 +67,7 @@ func _process(dt: float) -> void:
 			_maak(wf)
 		var u: Dictionary = wolven[wf.id]
 		var n: Node3D = u["node"]
+		n.visible = w.mist.is_verkend(wf.tegel())   # sim/mist.gd: in onverkend gebied niet tonen
 		var nieuw := _wereld_pos(wf, a)
 		var stap := Vector2(nieuw.x - n.position.x, nieuw.z - n.position.z).length()
 		n.position = nieuw
