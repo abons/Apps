@@ -17,6 +17,8 @@ var _wachtrij: Array = []        ## brieven die nog open moeten: {kop, tekst, gr
 var _pauzeerde := false          ## de briefing zette de sim op pauze
 var prijzen: Prijzenscherm       ## view/prijzen.gd: open met het goudstukken-icoon (munt_knop) of O
 var munt_knop: Button
+var kas_toon := -1               ## getoonde kas: loopt in stappen naar w.kas (kas_stap, spel.json kas_teller)
+var _kas_t := 0.0
 
 
 func bouw(wereld: Wereld, b: Bestuur) -> void:
@@ -43,7 +45,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop"
 	pc2.add_child(hulp)
 	add_child(pc2)
 
@@ -86,7 +88,34 @@ func _stijl() -> StyleBoxFlat:
 	return sb
 
 
-func _process(_dt: float) -> void:
+## Een stap van de getoonde kas naar de echte (BEASTS.EXE 0x40cea2): de grootste stap uit `stappen`
+## ([[drempel, stap], ...], aflopend) waarvoor het verschil groter is dan de drempel; nooit voorbij het doel.
+static func kas_stap(toon: int, kas: int, stappen: Array) -> int:
+	var v := absi(kas - toon)
+	if v == 0:
+		return toon
+	for st in stappen:
+		if v > int(st[0]):
+			return toon + signi(kas - toon) * mini(int(st[1]), v)
+	return kas
+
+
+func _kas_teller(dt: float) -> void:
+	var c: Dictionary = w.spel.get("kas_teller", {})
+	if kas_toon < 0 or c.is_empty():
+		kas_toon = w.kas
+		return
+	_kas_t += dt
+	var tik := 1.0 / maxf(1.0, float(c.get("hz", 25)))
+	while _kas_t >= tik and kas_toon != w.kas:
+		_kas_t -= tik
+		kas_toon = kas_stap(kas_toon, w.kas, c["stappen"])
+	if kas_toon == w.kas:
+		_kas_t = 0.0
+
+
+func _process(dt: float) -> void:
+	_kas_teller(dt)
 	var uur := w.uur()
 	var h := int(uur)
 	var m := int(fposmod(uur, 1.0) * 60.0)
@@ -94,7 +123,7 @@ func _process(_dt: float) -> void:
 	var weer := "regen" if w.regent() else "droog"
 	var doel: Dictionary = w.missie.get("doel", {})
 	# achter het getal het missiedoel, alleen als de missie dat doel heeft (missie 1: dorpelingen en koeien, 2: kas)
-	var kas := "%d" % w.kas + (" / >%d" % int(doel["kas_boven"]) if doel.has("kas_boven") else "")
+	var kas := "%d" % kas_toon + (" / >%d" % int(doel["kas_boven"]) if doel.has("kas_boven") else "")
 	var dorp := "%d" % w.dorpelingen.size() + ("/%d" % int(doel["dorpelingen"]) if doel.has("dorpelingen") else "")
 	var koe := "%d" % w.eigen_koeien() + ("/%d" % int(doel["koeien"]) if doel.has("koeien") else "")
 	var geluk := "geluk: %d%%" % roundi(w.handel.dorp_geluk(w) * 100.0)   # sim/handel.gd, prijzen via het munt-icoon

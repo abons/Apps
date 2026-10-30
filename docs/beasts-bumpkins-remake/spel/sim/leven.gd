@@ -24,6 +24,23 @@ static func cfg(w: Wereld) -> Dictionary:
 	return w.spel["leven"]
 
 
+## Maximale gezondheid van `d` uit leven.gezondheid: een getal (iedereen gelijk) of per soort
+## {kind, oud, man, vrouw, bouwer, voetsoldaat} (origineel: per dorpelingtype, BEASTS.EXE typetabel +0xe4).
+static func max_gezondheid(w: Wereld, d: Dorpeling) -> float:
+	var g = cfg(w)["gezondheid"]
+	if not (g is Dictionary):
+		return float(g)
+	var soort := d.leeftijd if d.leeftijd != "volwassen" else (d.rol if g.has(d.rol) else ("vrouw" if d.geslacht == "vrouw" else "man"))
+	return float(g.get(soort, g.get("man", 24.0)))
+
+
+## Ander type (opgegroeid, pensioen, gilde): nieuwe max, gezondheid in dezelfde verhouding (origineel 0x43805f).
+static func pas_gezondheid_aan(w: Wereld, d: Dorpeling) -> void:
+	var deel := d.gezondheid / maxf(1.0, d.gezondheid_max)
+	d.gezondheid_max = max_gezondheid(w, d)
+	d.gezondheid = minf(d.gezondheid_max, deel * d.gezondheid_max)
+
+
 ## Elke tik vanuit Wereld.tik.
 static func tik_alle(w: Wereld, dt: float) -> void:
 	var c := cfg(w)
@@ -51,7 +68,7 @@ static func tik_alle(w: Wereld, dt: float) -> void:
 ## volwassene).
 static func _begin(w: Wereld, d: Dorpeling) -> void:
 	var c := cfg(w)
-	d.gezondheid_max = float(c["gezondheid"])
+	d.gezondheid_max = max_gezondheid(w, d)
 	d.gezondheid = d.gezondheid_max
 	var duur: Array = c["levensduur_s"]
 	d.levensduur_s = lerpf(float(duur[0]), float(duur[1]), w._hash2(d.id * 11 + 3, 57))
@@ -69,6 +86,7 @@ static func _begin(w: Wereld, d: Dorpeling) -> void:
 static func _met_pensioen(w: Wereld, d: Dorpeling) -> void:
 	d.leeftijd = "oud"
 	d.rol = ""
+	pas_gezondheid_aan(w, d)
 	d.gilde = null
 	d.lid = null
 	d.doel_wolf = null

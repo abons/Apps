@@ -192,7 +192,7 @@ dus **bereik 0..2 x basis, per pixel, start = basis (midden)**; getal naast de s
 op 0..3, byte, dus **4 standen** (duim omhoog 0 .. duim omlaag 3), start 0 in alle .MIS. Misdaadnamen in de EXE: Nowt, Swearing, Arson,
 Murder, Assault, Stealing. In het .MIS-spelerrecord staan de prijzen als `i16` vanaf `+84` (index x 2; water `+84`, ei `+92`, brood `+96`,
 cider `+100`, belasting `+104`, kerk `+106`, melk `+118`), gelijk aan de basis in alle M1..M30 en alle 5 records, behalve kerk 200 in
-M1-4/14/18/25 en belasting 0 in M2/M18. Wat de prijs in de sim doet (per verkoop, per seizoen) is niet uitgezocht.
+M1-4/14/18/25 en belasting 0 in M2/M18. Wat de prijs doet: zie "Balans uit BEASTS.EXE" hieronder (per aankoop uit de beurs van de dorpeling).
 **Remake** (`spel/sim/handel.gd`, `spel/view/prijzen.gd`, spel.json `handel`): alleen brood/melk/ei, basis en bereik zoals het origineel,
 prijs per verkoop naar de kas, - / + = 0,1 x basis (eigen keuze); geluk loopt naar 0,75 - 0,75 x prijsdruk (prijs / basis - 1, gemiddeld),
 dus 0,75 op de basis zoals voorheen, 0 als alles op max (eigen keuze), laag geluk versnelt
@@ -200,6 +200,56 @@ de ouderdom (`sim/leven.gd`); misdaad alleen met `missies.N.misdaad.aan` (nu gee
 mishandeling > moord) groeien met het ongeluk. Scherm pauzeert de sim, +/- en klikken/slepen op de balk (muis en touch), toets O.
 Eigen keuze: overige getallen, geen straf-schuiven, geen water/cider/kerk/belasting (komen met put, brouwerij, kerk, belastinginner).
 Test `spel/test/economie_test.gd`, frame `spel/screenshots/prijzen.jpg` (`--scenario=prijzen`).
+
+## Balans uit BEASTS.EXE (2026-10-30)
+
+Adressen zijn VA in `BEASTS.EXE` (lokaal, nooit in git). Klassetabel `0x663538` (0x392 bytes per klasse, init
+`0x410000`-`0x414400`, standaard `0x40ed33`); dorpeling/wezen-typetabel `0x5e5e00 + 292 x type` (init `0x40dd69`-`0x40e603`);
+wapentabel `0x6aff88` (35 bytes per wapen: +0 slagduur in tikken, +1 basisschade, +2 willekeurig erbij); spelers `0x554fbc`
+(0xd00 per speler, kas `+0x4a`, prijzen `+0x4e + 2 x waar`). Kas erbij/eraf gaat altijd via `0x41aef0` (ook inkomsten `+0xc68`,
+uitgaven `+0xc6c`). Een tik = 0,094 s in de remake (2.880 per seizoen van 270 s).
+
+| getal | origineel | bron | oude remake-waarde |
+| --- | --- | --- | --- |
+| hut (2 -> plan 113) | 300 | klasse +0x380, `0x410318`; verhuisd naar het plan door `0x40cfa0` | 40 |
+| gereedschapsloods = bouwersgilde (69 -> 123) | 1500 | `0x411825` | 50 |
+| kippenhok = kip (111; origineel koop je een kip) | 200 | `0x4134f1` | 40 |
+| molen = bakkerij (53 -> 117) | 500 | `0x410f4e` | 40 |
+| akker = tarwe (78) | 100 | `0x413527` | 16 |
+| melkerij = boerderij (51 -> 119) | 2500 | `0x410e5c` | 45 |
+| hek (129 -> 130) / poort (169 -> 170) | 80 / 160 | `0x41377d` / `0x4137f1` | 2 / 10 |
+| weg (206), per tegel (ook de weg naar de deur) | 20 | `0x41366e` | 2 |
+| put (47 -> 118) / voetvolkgilde (207 -> 208) | 750 / 1100 | `0x412f7c` / `0x41253c` | 40 / 50 |
+| (overig: kerk 1200, raadhuis 2200, brouwerij 2000, uitkijkpost 1100, tovenaarsgilde 2000, boogschuttersgilde 2000, ridders 2500, minstrelen 1100) | | zelfde tabel | - |
+| prijs wordt betaald | bij plaatsen van het plan | `0x428fa4`, `0x4290f7`; te weinig kas = tekst 275 (`0x41a83f`) | zelfde |
+| bouwer worden (man -> type 4) | 75 | `0x4404f7` (lid worden `0x454fc0`, afschrijven `0x4551ae`) | 30 |
+| voetsoldaat worden (man -> type 7) | 150 | `0x44121f` | 30 |
+| (overig lid worden: priester 150, belastinginner 300, ridder 400, tovenaar 800, wachter 150, boogschutter 200, minstreel 600, ruiter 600) | | `0x440037`-`0x440dcf` | - |
+| gildelimiet | 6 leden per gildegebouw | klasse +0x87 = 6 voor alle klassen `0x40edcc`, telling `0x45507e`, tekst 228 | 6 |
+| dorpeling betaalt | per aankoop de prijs van de waar, uit zijn eigen beurs naar de kas; geluk -round((prijs / basis - 1) x 60) | `0x441fc0`-`0x4422b1` | per verkoop naar de kas, geen beurs |
+| beurs van de dorpeling | start 1000; +100 per klus (hamerslag, hout, steen, begraven, genezen) | `0x4355f7`; `0x440b3c`, `0x440a96`, `0x440b0e`, `0x440470`, `0x4407b1` | niet in de remake |
+| eieren | dorpeling koopt bij de kip: eiprijs uit de beurs naar de kas | `0x4409ab` | via kippenhok |
+| belasting | belastinginner haalt per hut de hutbelasting (150) uit de beurs | `0x453450` (aanroep `0x449306`) | niet in de remake |
+| goudbuidel (161) | +1000 bij aanraken, object weg | `0x4494c7` | niet op te rapen |
+| kasteller HUD | getoonde kas stapt naar de echte: 4700 / 470 / 47 / 7 / 1 bij verschil > 10000 / 1000 / 100 / 10 / 0 | `0x40cea2`-`0x40cf66` | direct |
+| gezondheid man / vrouw / kind / oud | 148 / 96 / 30 / 80 | typetabel +0xe4, type 1 / 2 / 13-14 / 11-12; gezet `0x438046` | 24 voor iedereen |
+| gezondheid bouwer / voetsoldaat | 200 / 180 | type 4 / 7 | 24 |
+| wolf hp (type 23; zwarte wolf 29) | 100 (160) | typetabel +0xe4 | 8 |
+| wolfbeet | 12 + 0..7 elke 32 tikken (3,0 s) | wapen 13, `0x40d3c2`; schade `0x44f997` | 5 per 3,0 s |
+| steen man/vrouw | 14 + 0..7 elke 70 tikken (6,6 s) | wapen 12 | 2 per 1,8 s |
+| zwaard voetsoldaat | 25 + 0..19 elke 64 tikken (6 s) | wapen 9 | 6 per 0,8 s |
+| leeftijd | kind tot 12, pensioen 88, sterven kan vanaf 96; +1 met kans 1/12 per beurt | object +0xce, `0x442f40`, `0x44353c`, `0x443965`, `0x443a28` | opgroeien 150 s, oud_vanaf 0,75 |
+
+**Wat de remake nu doet** (`spel/data/spel.json`, commentaar met adres per getal): bouw-, bouwer- en voetsoldaatprijzen
+zoals het origineel; gezondheid per soort (`leven.gezondheid`, bij een typewissel in dezelfde verhouding, `sim/leven.gd`);
+wolf 100 hp, beet 15, steen 17, zwaard 34 (gemiddelden, vast); `oud_vanaf` 0,9 en `opgroeien_s` 690 uit de verhouding
+12 : 76 : 8 (`levensduur_s` blijft); herstel geschaald naar 0,6/s. Goudbuidels in elke missie oprapbaar (`voorwerpen` met
+`direct`, `sim/voorwerpen.gd`): M2 heeft er 3 (6.999 + 3.000 = 9.999, een onder het doel), M3 6. Kasteller in
+`spel/view/hud.gd` (20 stappen per s: +1000 in 1,6 s, +5000 in 2,1 s). Test `spel/test/voorwerp_test.gd`.
+**Niet gevonden, eigen keuze gebleven:** bouwtijden (vermoedelijk hamerslagen tot de levenspunten van het gebouw: hut 400,
+boerderij 600, bakkerij en gilden 800, put 500, hek/poort 200), zichtstraal (mist 4 tegels), levensduur van een koe, hoe lang
+een beurt duurt (dus `levensduur_s` in seconden), slagduur van steen en zwaard (remake sneller), pantser (typetabel +0x101/+0x102)
+en geluk op ontvangen schade (`0x4508da`), de beurs van de dorpeling en de belastinginner.
 
 ## Lokale bestanden (niet in git)
 

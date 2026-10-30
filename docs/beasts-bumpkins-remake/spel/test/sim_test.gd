@@ -283,9 +283,10 @@ func _initialize() -> void:
 	var nieuw: Dorpeling = gz.dorpelingen[6]
 	_check(nieuw.leeftijd == "kind" and gz.raster.loopbaar_v(nieuw.tegel()), "nieuwe dorpeling is een kind op een loopbare tegel")
 	_check(gz.ruimte() + gz.wiegen.size() == 1, "na de geboorte: 1 bed over of al door het tweede stel genomen")
-	for i in int(151.0 / gz.tik_dt):
+	var groei := float(gz.spel["gezin"]["opgroeien_s"])
+	for i in int((groei + 1.0) / gz.tik_dt):
 		gz.tik(gz.tik_dt)
-	_check(nieuw.leeftijd == "volwassen", "kind is na 150 s volwassen")
+	_check(nieuw.leeftijd == "volwassen", "kind is na %.0f s volwassen (gezin.opgroeien_s)" % groei)
 	var ouders := 0
 	for dl in gz.dorpelingen:
 		if dl.rust > 0.0 or not dl.wieg.is_empty():
@@ -435,7 +436,8 @@ func _initialize() -> void:
 		if man.rol == "bouwer":
 			break
 		bw.tik(bw.tik_dt)
-	_check(man.rol == "bouwer" and bw.kas == bkas - 30, "man is bouwer, kas -30 (%d)" % (bkas - bw.kas))
+	var bprijs := int(bw.spel["bouwer"]["prijs"])
+	_check(man.rol == "bouwer" and bw.kas == bkas - bprijs, "man is bouwer, kas -%d (%d)" % [bprijs, bkas - bw.kas])
 	_check(not man.kan_bevel("vecht") and man.kan_bevel("werk"), "bouwer vecht niet, werkt wel")
 	var bh: Plan = null
 	for y in range(44, 90, 3):
@@ -481,7 +483,7 @@ func _initialize() -> void:
 	om.wissel_poort(pt)
 	_check(not pt.open and om.poort_dicht(pt.tegel), "poort weer dicht")
 	var hk: Plan = _plek.call(&"hek")
-	_check(hk != null and hk.bouwtijd_s == 3.0 and om.prijs(&"hek") == 2, "hek: 2 kas, 3 s werk")
+	_check(hk != null and hk.bouwtijd_s == 3.0 and om.prijs(&"hek") == 80, "hek: 80 kas (origineel), 3 s werk")
 
 	# regressie 2026-10-29: na een afgebouwd kippenhok bleven de bouwers in de muren staan (doorbouwen naar het tweede
 	# plan sloeg het eruit zetten over); nu staan ze buiten en wordt het tweede hok ook gebouwd
@@ -659,7 +661,7 @@ func _test_wegen() -> void:
 	_check(rij.size() == 11 and bochten == 1, "weg: op open grond een L met een bocht (%d tegels, %d bochten)" % [rij.size(), bochten])
 	var kas0 := wg.kas
 	var n := BouwRij.zet(wg, &"weg", rij)
-	_check(n == 11 and wg.kas == kas0 - 22, "weg: 11 plannen voor 2 kas per tegel (kas %d -> %d)" % [kas0, wg.kas])
+	_check(n == 11 and wg.kas == kas0 - 11 * wg.prijs(&"weg"), "weg: 11 plannen voor %d kas per tegel (kas %d -> %d)" % [wg.prijs(&"weg"), kas0, wg.kas])
 	var wp := wg.plan_op(a)
 	_check(wp != null and wp.soort == &"weg" and wp.bouwtijd_s == 3.0 and wg.raster.soort_naam(a.x, a.y) != "pad",
 		"weg: plan van 3 s, nog geen pad")

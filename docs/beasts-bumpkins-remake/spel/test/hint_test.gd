@@ -74,7 +74,7 @@ func _initialize() -> void:
 		var verwacht: Array = ["2-1", "2-3"] if nr == 2 else ["3-4", "3-5"]   # M3: put en gilde staan er (3-4 op 180, 3-5 op 1080 tikken)
 		_check(g2 == verwacht, "missie %d na 5 seizoenen: %s (verwacht %s)" % [nr, g2, verwacht])
 		if nr == 3:      # kelk aanraken (dorpeling erop gezet) -> 3-1
-			var k: Dictionary = Voorwerpen.alle(w2)[0]
+			var k: Dictionary = Voorwerpen.alle(w2).filter(func(o: Dictionary) -> bool: return o["naam"] == "gouden_kelk")[0]
 			var d3: Dorpeling = w2.dorpelingen[0]
 			d3.zet_tegel(Vector2i(k["x"], k["y"]))
 			d3.route.clear()

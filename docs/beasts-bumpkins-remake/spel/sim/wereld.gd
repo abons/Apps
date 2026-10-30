@@ -795,6 +795,7 @@ func _gezin(dt: float) -> void:
 			d.groeit = maxf(0.0, d.groeit - dt)
 			if d.groeit <= 0.0:
 				d.leeftijd = "volwassen"
+				Leven.pas_gezondheid_aan(self, d)
 				d.rust = float(g["ouder_rust_s"])   # net volwassen en meteen een gezin is een sneeuwbal
 				volwassen_geworden.emit(d)
 		if d.baby > 0.0:
@@ -1721,6 +1722,7 @@ func gilde_aangekomen(d: Dorpeling) -> void:
 	kas -= int(spel[rol]["prijs"])
 	d.rol = rol
 	d.lid = g
+	Leven.pas_gezondheid_aan(self, d)
 	rol_veranderd.emit(d)
 
 

@@ -10,6 +10,8 @@ extends RefCounted
 ## Oprapen = aanraken: wie binnen `RAAK` tegels komt en nog niets draagt, pakt het op (het pakbevel is een loopbevel
 ## erheen). Afleveren = de drager komt binnen `LEVER` tegels van het doel (eigen object, eigenaar 0).
 ## Valt de drager weg (geen dorpeling meer met dat id), dan valt het voorwerp op zijn laatste tegel.
+## Regels voor elke missie staan in spel.json `voorwerpen` (de missie overschrijft per klasse). Een regel met
+## `"direct": true` wordt niet gedragen: aanraken = meteen de kas erbij en weg (goudbuidel 161, origineel +1000).
 
 const RAAK := 0.75
 const LEVER := 1.6
@@ -39,10 +41,11 @@ static func midden(ob: Dictionary) -> Vector2:
 static func geef_pakbevel(w: Wereld, ids: Array, ob: Dictionary) -> int:
 	if not ob.get("voorwerp", false) or int(ob["drager"]) >= 0:
 		return 0
+	var direct: bool = alle_regels(w).get(str(ob["cls"]), {}).get("direct", false)
 	var beste: Dorpeling = null
 	for id in ids:
 		var d := w.dorpeling(id)
-		if d == null or not d.kan_bevel("loop") or not van(w, d).is_empty():
+		if d == null or not d.kan_bevel("loop") or (not direct and not van(w, d).is_empty()):
 			continue
 		if beste == null or d.pos.distance_squared_to(midden(ob)) < beste.pos.distance_squared_to(midden(ob)):
 			beste = d
@@ -51,8 +54,14 @@ static func geef_pakbevel(w: Wereld, ids: Array, ob: Dictionary) -> int:
 	return w.geef_bevel([beste.id], "loop", Vector2i(ob["x"], ob["y"]))
 
 
+static func alle_regels(w: Wereld) -> Dictionary:
+	var r: Dictionary = w.spel.get("voorwerpen", {}).duplicate()
+	r.merge(w.missie.get("voorwerpen", {}), true)
+	return r
+
+
 static func tik_alle(w: Wereld, _dt: float) -> void:
-	var regels: Dictionary = w.missie.get("voorwerpen", {})
+	var regels := alle_regels(w)
 	for ob in alle(w):
 		var id := int(ob["drager"])
 		if id >= 0:
@@ -68,7 +77,13 @@ static func tik_alle(w: Wereld, _dt: float) -> void:
 				_lever(w, ob, d, int(regel.get("kas", 0)))
 			continue
 		for d in w.dorpelingen:
-			if not d.binnen and d.pos.distance_to(midden(ob)) <= RAAK and van(w, d).is_empty():
+			if d.binnen or d.pos.distance_to(midden(ob)) > RAAK:
+				continue
+			var r: Dictionary = regels.get(str(ob["cls"]), {})
+			if r.get("direct", false):
+				_lever(w, ob, d, int(r.get("kas", 0)))
+				break
+			if van(w, d).is_empty():
 				ob["drager"] = d.id
 				w.voorwerp_opgeraapt.emit(ob, d)
 				break
