@@ -218,10 +218,29 @@ func _teken_laag() -> void:
 			_stip(wf.pos, KLEUR_WOLF)
 	for d in w.dorpelingen:
 		_stip(d.pos, KLEUR_DORPELING)
+	_dorpsnaam()
 	var kader := _camera_kader()
 	if kader.size() == 4:
 		kader.append(kader[0])
 		_laag.draw_polyline(kader, Color(1, 1, 1, 0.9), 1.0)
+
+
+## Dorpsnaam (spel.json missies.<n>.dorp, uit de vlag in het origineel) in witte hoofdletters op de eigen vlag, zoals
+## "MOONTON" in 1_lefttop.png.
+func _dorpsnaam() -> void:
+	var naam := str(w.missie.get("dorp", "")).to_upper()
+	if naam == "":
+		return
+	for ob in w.objecten:
+		if ob["naam"] == "vlag" and int(ob.get("owner", 0)) == 0:
+			var f := ThemeDB.fallback_font
+			var maat := 11
+			var p := naar_venster(Vector2(ob["x"], ob["y"]) + Vector2(0.5, 0.5))
+			var bw := f.get_string_size(naam, HORIZONTAL_ALIGNMENT_LEFT, -1, maat).x
+			var pos := Vector2(p.x - bw * 0.5, p.y + 4).round()
+			_laag.draw_string_outline(f, pos, naam, HORIZONTAL_ALIGNMENT_LEFT, -1, maat, 3, Color(0, 0, 0, 0.85))
+			_laag.draw_string(f, pos, naam, HORIZONTAL_ALIGNMENT_LEFT, -1, maat, Color.WHITE)
+			return
 
 
 ## Stip van 3x3 px met een donkere rand, zodat hij ook op zand en gras leesbaar is.
