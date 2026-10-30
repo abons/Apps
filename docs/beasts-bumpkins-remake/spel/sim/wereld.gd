@@ -34,9 +34,17 @@ signal steen_gegooid(d: Dorpeling, wolf: Wolf)
 signal wolf_geraakt(wolf: Wolf)
 signal wolf_dood(wolf: Wolf)
 signal wolf_weg(wolf: Wolf)
+signal wolf_erbij(wolf: Wolf)              ## uit een wolf-generator (sim/wolf.gd spawn)
+signal zwaard_slag(d: Dorpeling, wolf: Wolf)   ## voetsoldaat begint een zwaardslag (view: clip aanval_zwaard)
+signal gedronken(d: Dorpeling, put: Plan)      ## water gehaald bij de put (missie 3), dorst weer 0
 signal voorwerp_opgeraapt(ob: Dictionary, d: Dorpeling)   ## sim/voorwerpen.gd: beker of kelk aangeraakt
 signal voorwerp_afgeleverd(ob: Dictionary, d: Dorpeling, kas: int)   ## bij het doel (vlag): kas erbij, object weg
 signal voorwerp_gevallen(ob: Dictionary)   ## drager weg: ligt weer op de grond
+## Leven (sim/leven.gd): schade, dood (oorzaak "wolf", "ouderdom", ...; al uit `dorpelingen`), met pensioen (oud).
+signal dorpeling_geraakt(d: Dorpeling, oorzaak: String)
+signal dorpeling_dood(d: Dorpeling, oorzaak: String)
+signal met_pensioen(d: Dorpeling)
+signal kas_beloning(id: String, kas: int)   ## sim/beloningen.gd: een kas-actie uit het missiebestand (0x16)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -46,7 +54,15 @@ signal voorwerp_gevallen(ob: Dictionary)   ## drager weg: ligt weer op de grond
 ## melkerij 7,7 x 6,6 m incl. varkenshok, op deurmaat (deur 1,84 m -> 0,86x) 6,6 x 5,6 m.
 const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2),
 	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2), &"melkerij": Vector2i(4, 4), &"hek": Vector2i(1, 1),
-	&"poort": Vector2i(1, 1), &"weg": Vector2i(1, 1)}
+	&"poort": Vector2i(1, 1), &"weg": Vector2i(1, 1), &"put": Vector2i(3, 3), &"voetvolkgilde": Vector2i(3, 3)}
+## Missie 3 (2026-10-30): put en voetvolkgilde 3x3. De put is `bron.glb` (4,9 x 5,0 m); het gilde heeft nog geen glb.
+## Maat naar de sprites ten opzichte van de hut (4x4): `well` 133 px breed = hut 134 px, `fguild` 118 px = 0,88 x hut.
+## Vanaf welke missie een soort in het bouwmenu staat (los van de keten in ONTGRENDEL): het origineel heeft een eigen
+## voortgangstabel die niet gevonden is; hint 3-4 ("putten plaatsen") en 3-5 ("bouw nog een gilde") zeggen M3.
+const VANAF_MISSIE := {&"put": 3, &"voetvolkgilde": 3}
+## Gilden: afgebouwd gebouw -> rol die een man er krijgt (prijs en de rest in spel.json onder de rol). Origineel: alleen
+## mannen, hoogstens `gilde_max_leden` (6, hint 3-5) per gilde; daarboven een tweede gilde bouwen.
+const GILDEN := {&"gereedschapsloods": "bouwer", &"voetvolkgilde": "voetsoldaat"}
 ## Bouwmenu-volgorde (besluit gebruiker 2026-10-29): eerst hut, kippenhok en loods; een afgebouwde loods opent molen
 ## en akker; een afgebouwde molen opent melkerij, hek en poort. Weg (1 tegel, slepen = rij, sim/bouwrij.gd) kan vanaf
 ## de start (2026-10-30); af wordt de tegel pad en verdwijnt het plan (_weg_af).
@@ -71,9 +87,15 @@ var dorpelingen: Array[Dorpeling] = []
 var vee: Array[Vee] = []
 var kippen: Array[Kip] = []
 var wolven: Array[Wolf] = []             # missie 2: klasse 104 (objecten.json "beest": "wolf"), sim/wolf.gd
-var _kaart_wolven: Array = []            # tegels van de wolven uit de kaart
+var _kaart_wolven: Array = []            # wolven uit de kaart: {tegel, soort} (objecten.json 104 "soorten")
 var kas := 0
 var handel: Handel                        ## sim/handel.gd: prijzen per waar, geluk, misdaad (spel.json handel)
+var doden := 0                            # dorpelingen gestorven (sim/leven.gd), origineel statistiek Deaths
+var pensioenen := 0                       # met pensioen gegaan, origineel Retirements
+var beloningen := {}                      # sim/beloningen.gd: id -> tijd_s waarop de kas-actie vuurde
+var beloning_start_s := -1.0
+var wolf_gen_t: Array[float] = []         # sim/wolf.gd: s per wolf-generator (missie.wolf_generator)
+var wolven_gemaakt := 0                   # hoogste wolf-id tot nu toe (id's worden niet hergebruikt)
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
 var _generatoren: Array[Vector2i] = []    # tegels van de koe-generators (klasse 171); missie 3 heeft er twee
 var _generator_t: Array[float] = []
@@ -195,7 +217,8 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 			_kaart_vee.append({"tegel": Vector2i(int(o["x"]), int(o["y"])), "eigen": int(o.get("owner", 4)) == 0})
 			continue
 		if d.get("beest", "") == "wolf":   # wolf uit de kaart: wordt een Wolf, geen object
-			_kaart_wolven.append(Vector2i(int(o["x"]), int(o["y"])))
+			_kaart_wolven.append({"tegel": Vector2i(int(o["x"]), int(o["y"])),
+				"soort": StringName(d.get("soorten", {}).get(str(int(o.get("sex", 23))), "wolf"))})
 			continue
 		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": d["model"], "x": int(o["x"]), "y": int(o["y"]),
 			"blokkeert": d["blokkeert"], "voetafdruk": d["voetafdruk"], "state": int(o["state"]), "sex": int(o["sex"]),
@@ -278,6 +301,7 @@ func _maak_dorpelingen() -> void:
 		var s: Dictionary = sexmap.get(str(ob["sex"]), {"geslacht": "onbekend", "leeftijd": "volwassen"})
 		d.geslacht = s["geslacht"]
 		d.leeftijd = s["leeftijd"]
+		d.rol = s.get("rol", "")          # objecten.json sex 7: krijger = voetsoldaat (missie 3, Pigsy)
 		var t := Vector2i(ob["x"], ob["y"])
 		if not raster.loopbaar_v(t):      # missie 2: een dorpeling staat op de bron; naar de dichtste vrije tegel
 			var v := dichtstbij_loopbaar(t)
@@ -350,6 +374,8 @@ func tik(dt: float) -> void:
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
 	Wolf.tik_alle(self, dt)
+	Leven.tik_alle(self, dt)
+	Beloningen.tik(self)
 	Voorwerpen.tik_alle(self, dt)
 	mist.tik(self)
 	_werk_generator(dt)
@@ -387,6 +413,7 @@ func _economie(dt: float) -> void:
 		if not d.slaapt:          # wie slaapt krijgt geen trek
 			for waar in WAREN:
 				d.trek[waar] = float(d.trek.get(waar, 0.0)) + dt
+			d.dorst += dt
 	if not is_nacht() and _was_nacht:
 		_wek()
 	_was_nacht = is_nacht()
@@ -505,7 +532,13 @@ func _kies_klus(d: Dorpeling) -> void:
 			d.klus = m
 			d.koopt = waar
 			return
-	if not d.volwassen():
+	if d.dorst >= float(e.get("dorst_s", 90.0)):     # put (missie 3): water halen, gratis
+		var put := dichtste_gebouw(&"put", d.tegel())
+		if put != null and d.geef_bevel(self, "koop", dichtstbij_loopbaar(put.deur_tegel())):
+			d.klus = put
+			d.koopt = "water"
+			return
+	if not d.volwassen() or d.rol == "voetsoldaat":    # soldaten boeren niet (origineel)
 		return
 	var plan := _open_plan(d)
 	if plan != null and geef_bouwbevel([d.id], plan) > 0:
@@ -648,7 +681,11 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 			d.bezig = float(e["melk_s"])
 			if d.melk_koe != null:
 				d.melk_koe.gemolken = true
-		"koop": d.bezig = float(e["toonbank_s"]) + 2.0 * deur_loop_s(d)
+		"koop":
+			if d.koopt == "water":
+				d.bezig = float(e.get("drink_s", 2.0))
+			else:
+				d.bezig = float(e["toonbank_s"]) + 2.0 * deur_loop_s(d)
 		"raap": d.bezig = float(e["raap_s"])
 		_: d.bezig = 0.3 + 2.0 * deur_loop_s(d)
 
@@ -656,8 +693,8 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 ## Leveren of kopen in een gebouw met een deur: de tijd voor het stukje door de deur (heen = terug); de view laat hem
 ## dat lopen (view/deur_loop.gd). 0 zonder deur.
 func deur_loop_s(d: Dorpeling) -> float:
-	if not (d.klus is Plan) or not Plan.DEUREN.has((d.klus as Plan).soort):
-		return 0.0
+	if not (d.klus is Plan) or not Plan.DEUREN.has((d.klus as Plan).soort) or (d.klus as Plan).soort == &"put":
+		return 0.0                 # bij de put drinken ze buiten
 	return (d.klus as Plan).deur_loop_m(tegel_m) / (loop_mps * looptempo)
 
 
@@ -685,6 +722,10 @@ func klus_af(d: Dorpeling) -> void:
 			k.leeg = float(e["kip_leeg_s"])
 			d.draagt = "ei"
 		d.raap_kip = null
+	elif d.klus is Plan and d.koopt == "water":
+		d.dorst = 0.0
+		gedronken.emit(d, d.klus)
+		d.koopt = ""
 	elif d.klus is Plan:
 		var m: Plan = d.klus
 		if d.draagt != "":
@@ -902,33 +943,11 @@ var voorgebouwd_draai := -1       ## >= 0: alleen deze draai proberen (frames: -
 
 func plaats_voorgebouwd() -> int:
 	var n := 0
-	var pad := raster.namen.find("pad")
+	_kies_volgorde()
 	for vg in voorgebouwd:
 		var soort: StringName = vg["soort"]
 		var t: Vector2i = vg["tegel"]
-		var m: Vector2i = BOUWSOORTEN[soort]
-		var beste: Plan = null
-		var bd := INF
-		# Draai zoals in het origineel (gebruiker 2026-10-30: de melkerij stond gedraaid): objecten.json "draai";
-		# zonder die waarde de eerste draai die past, met de deur het dichtst bij een pad.
-		for dr in 4:
-			if beste != null:
-				break
-			# draai zoals in het origineel (objecten.json "draai", gekozen naar de screenshots); --voordraai= overschrijft
-			var wil: int = voorgebouwd_draai if voorgebouwd_draai >= 0 else int(vg.get("draai", -1))
-			if wil >= 0 and dr != wil:
-				continue
-			var b := m.y if dr % 2 == 1 else m.x
-			var di := m.x if dr % 2 == 1 else m.y
-			for oy in di:
-				for ox in b:
-					var p := maak_plan(soort, t - Vector2i(ox, oy), dr)
-					if p == null:
-						continue
-					var af := _afstand_tot_soort(p.deur_tegel(), pad)
-					if af < bd:
-						bd = af
-						beste = p
+		var beste := _voorgebouwd_plan(vg)
 		if beste == null:
 			push_warning("wereld: voorgebouwd %s op %s past niet" % [soort, t])
 			continue
@@ -939,7 +958,95 @@ func plaats_voorgebouwd() -> int:
 		kas = was
 		n += 1
 	voorgebouwd.clear()
+	# een rol uit de kaart (krijger type 7 = voetsoldaat) is lid van het dichtste gilde van zijn soort, als dat er staat
+	for d in dorpelingen:
+		if d.rol != "" and d.lid == null:
+			for gs in GILDEN:
+				if GILDEN[gs] == d.rol:
+					d.lid = dichtste_gebouw(gs, d.tegel())
 	return n
+
+
+## Het plan voor voorgebouwd `vg`, of null als het niet past. Draai zoals in het origineel (gebruiker 2026-10-30: de
+## melkerij stond gedraaid): objecten.json "draai"; zonder die waarde de eerste draai die past, met de deur het dichtst
+## bij een pad; --voordraai= overschrijft.
+func _voorgebouwd_plan(vg: Dictionary) -> Plan:
+	var pad := raster.namen.find("pad")
+	var soort: StringName = vg["soort"]
+	var t: Vector2i = vg["tegel"]
+	var m: Vector2i = BOUWSOORTEN[soort]
+	var beste: Plan = null
+	var bd := INF
+	for dr in 4:
+		if beste != null:
+			break
+		var wil: int = voorgebouwd_draai if voorgebouwd_draai >= 0 else int(vg.get("draai", -1))
+		if wil >= 0 and dr != wil:
+			continue
+		var b := m.y if dr % 2 == 1 else m.x
+		var di := m.x if dr % 2 == 1 else m.y
+		for oy in di:
+			for ox in b:
+				var p := maak_plan(soort, t - Vector2i(ox, oy), dr)
+				if p == null or _raakt_ander_anker(p, vg):
+					continue
+				var af := _afstand_tot_soort(p.deur_tegel(), pad)
+				if af < bd:
+					bd = af
+					beste = p
+	return beste
+
+
+## Missie 3 heeft drie gebouwen dicht op elkaar (hut, put, gilde) en de remake-hut is groter dan in het origineel: in
+## kaartvolgorde past de put niet meer. Probeer de volgordes (hoogstens 4 gebouwen, anders kaartvolgorde) en neem de
+## eerste waarin alles past; proefplannen staan alleen even in `plannen` (geen raster, geen signalen).
+func _kies_volgorde() -> void:
+	if voorgebouwd.size() < 2 or voorgebouwd.size() > 4:
+		return
+	for perm in _permutaties(voorgebouwd.size()):
+		var proef: Array[Plan] = []
+		var volgorde: Array[Dictionary] = []
+		for i in perm:
+			volgorde.append(voorgebouwd[i])
+		var oud := voorgebouwd
+		voorgebouwd = volgorde
+		for vg in volgorde:
+			var p := _voorgebouwd_plan(vg)
+			if p == null:
+				break
+			proef.append(p)
+			plannen.append(p)
+		for p in proef:
+			plannen.erase(p)
+		voorgebouwd = oud
+		if proef.size() == volgorde.size():
+			voorgebouwd = volgorde
+			return
+
+
+static func _permutaties(n: int) -> Array:
+	if n <= 1:
+		return [[0]] if n == 1 else [[]]
+	var uit: Array = []
+	for rest in _permutaties(n - 1):
+		for pos in range(n - 1, -1, -1):     # de kaartvolgorde eerst
+			var p: Array = rest.duplicate()
+			p.insert(pos, n - 1)
+			uit.append(p)
+	return uit
+
+
+## Voorgebouwd plan `p` mag de kaarttegel van een ander voorgebouwd gebouw niet afdekken, en zijn deur ook niet: anders
+## pakt de (te grote) hut de plek van de put die drie tegels verder staat (missie 3).
+func _raakt_ander_anker(p: Plan, eigen: Dictionary) -> bool:
+	var r := p.afdruk()
+	for vg in voorgebouwd:
+		if vg == eigen:
+			continue
+		var t: Vector2i = vg["tegel"]
+		if r.has_point(t) or (Plan.DEUREN.has(p.soort) and p.deur_tegel() == t):
+			return true
+	return false
 
 
 ## Afstand (tegels, recht) van `t` tot de dichtste tegel van soort-index `s` (binnen 12), anders 99.
@@ -1355,6 +1462,8 @@ func verwijder_koe(k: Vee) -> void:
 func ontgrendeld(soort: StringName) -> bool:
 	if alles_open or soort in START_SOORTEN:
 		return true
+	if VANAF_MISSIE.has(soort):
+		return missie_nr >= int(VANAF_MISSIE[soort])
 	if not ONTGRENDEL.has(soort):
 		return false
 	for p in plannen:
@@ -1541,21 +1650,38 @@ func gebouw_op(t: Vector2i) -> Plan:
 	return null
 
 
-## Bouwersgilde (missie 1, origineel: "bouwer 2x sneller"): de eerste volwassen man uit `ids` die nog geen bouwer is,
-## loopt naar de gereedschapsloods en wordt daar tegen `bouwer.prijs` bouwer: bouwt `bouwer.tempo` keer zo snel en
-## vecht niet meer. Geeft het aantal (0 of 1).
-func geef_gildebevel(ids: Array, loods: Plan) -> int:
-	if loods == null or not loods.klaar or loods.soort != &"gereedschapsloods" or not kan_bouwer_worden():
+## Gilde (GILDEN): volwassen mannen uit `ids` zonder rol lopen naar de deur van het afgebouwde gilde en krijgen daar
+## tegen `<rol>.prijs` de rol. Bouwersgilde (missie 1, origineel "bouwer 2x sneller"): bouwt `bouwer.tempo` keer zo
+## snel en vecht niet. Voetvolkgilde (missie 3): voetsoldaat, vecht met het zwaard (sim/wolf.gd) en boert niet meer.
+## Hoogstens `gilde_max_leden` per gilde, wie onderweg is telt mee; zoveel als er plaats en kas is. Geeft het aantal.
+func geef_gildebevel(ids: Array, gilde: Plan) -> int:
+	if gilde == null or not gilde.klaar or not GILDEN.has(gilde.soort):
 		return 0
+	var rol: String = GILDEN[gilde.soort]
+	var prijs_rol := int(spel[rol]["prijs"])
+	var plaats := gilde_plaats(gilde)
+	var n := 0
 	for id in ids:
+		if plaats <= 0 or kas < prijs_rol * (n + 1):
+			break
 		var d := dorpeling(id)
 		if d != null and d.volwassen() and d.geslacht == "man" and d.rol == "" \
-				and d.geef_bevel(self, "gilde", dichtstbij_loopbaar(loods.deur_tegel())):
-			d.gilde = loods
+				and d.geef_bevel(self, "gilde", dichtstbij_loopbaar(gilde.deur_tegel())):
+			d.gilde = gilde
+			n += 1
+			plaats -= 1
 			if d.route.is_empty() and d.gilde != null:
 				gilde_aangekomen(d)
-			return 1
-	return 0
+	return n
+
+
+## Nog vrije plaatsen in `gilde`: `gilde_max_leden` min de leden (Dorpeling.lid) en wie erheen loopt.
+func gilde_plaats(gilde: Plan) -> int:
+	var n := 0
+	for d in dorpelingen:
+		if d.lid == gilde or d.gilde == gilde:
+			n += 1
+	return int(spel.get("gilde_max_leden", 6)) - n
 
 
 func kan_bouwer_worden() -> bool:
@@ -1565,11 +1691,28 @@ func kan_bouwer_worden() -> bool:
 func gilde_aangekomen(d: Dorpeling) -> void:
 	if d.gilde == null:
 		return
+	var g := d.gilde
 	d.gilde = null
-	if d.rol == "" and kan_bouwer_worden():
-		kas -= int(spel["bouwer"]["prijs"])
-		d.rol = "bouwer"
-		rol_veranderd.emit(d)
+	var rol: String = GILDEN.get(g.soort, "")
+	if rol == "" or d.rol != "" or kas < int(spel[rol]["prijs"]) or gilde_plaats(g) <= 0:
+		return
+	kas -= int(spel[rol]["prijs"])
+	d.rol = rol
+	d.lid = g
+	rol_veranderd.emit(d)
+
+
+## Het dichtste afgebouwde gebouw van `soort` bij tegel `t`, of null.
+func dichtste_gebouw(soort: StringName, t: Vector2i) -> Plan:
+	var beste: Plan = null
+	var bd := INF
+	for p in plannen:
+		if p.klaar and p.soort == soort:
+			var af := Vector2(p.deur_tegel()).distance_squared_to(Vector2(t))
+			if af < bd:
+				bd = af
+				beste = p
+	return beste
 
 
 func plan_op(t: Vector2i) -> Plan:

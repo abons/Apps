@@ -8,8 +8,11 @@ var naam := ""
 var sex_ruw := 0          ## zoals in map1.json: 1 man, 2 vrouw, 13/14 onbekend (vermoedelijk kind, niet geverifieerd)
 var geslacht := "onbekend"
 var leeftijd := "volwassen"   ## volwassen | kind | oud
-var rol := ""                ## "" gewone dorpeling, "bouwer" (bouwersgilde: bouwt sneller, vecht niet)
-var gilde: Plan = null       ## gereedschapsloods waar hij zich laat inschrijven (bevel "gilde")
+var rol := ""                ## "" gewone dorpeling, "bouwer" (bouwersgilde: bouwt sneller, vecht niet), "voetsoldaat"
+                             ## (voetvolkgilde, missie 3: zwaard, boert en bouwt niet, sticht geen gezin)
+var gilde: Plan = null       ## gilde waar hij heen loopt om zich in te schrijven (bevel "gilde", Wereld.GILDEN)
+var lid: Plan = null         ## gilde waar hij lid van is (telt voor gilde_max_leden); null bij een rol uit de kaart zonder gilde
+var dorst := 0.0             ## s sinds hij water dronk (put, missie 3); Wereld._kies_klus stuurt hem boven economie.dorst_s
 var pos := Vector2.ZERO
 var vorige := Vector2.ZERO    ## positie bij de vorige tik, voor interpolatie in de view
 var route: Array[Vector2] = []   ## te volgen punten (tegelmiddens, in tegelcoördinaten), recht getrokken door Router.glad
@@ -39,22 +42,52 @@ var snelheid_mps := 0.0       ## werkelijke loopsnelheid in deze tik, m/s incl. 
 var doel_wolf: Wolf = null    ## wolf waar hij stenen naar gooit (vechtbevel of zelf verdedigen, sim/wolf.gd vecht_tik)
 var worp_t := -1.0            ## s in de huidige worp, -1 = geen worp bezig
 var vecht_kijk := 0.0         ## s tot hij zijn route naar de wolf weer bijwerkt
+# ---- leven (sim/leven.gd): gezondheid, dood, ouderdom, vluchten. Getallen in spel.json `leven`.
+var gezondheid := 24.0        ## hp; 0 = dood (Leven.sterf). Wordt bij het laden gezet op leven.gezondheid
+var gezondheid_max := 24.0
+var geraakt_s := 99.0         ## s sinds de laatste schade (herstel begint na leven.herstel_na_s; view: hp-balkje)
+var ouderdom_s := 0.0         ## s als volwassene (of oudere); kinderen 0. Loopt sneller als `geluk` laag is
+var levensduur_s := 0.0       ## sterft van ouderdom als ouderdom_s dit haalt; oud vanaf leven.oud_vanaf x dit
+## Geluk 0..1 (haak voor de economie/prijzen, niet hier ingevuld): 1 = tevreden. Lager laat ouderdom_s sneller lopen
+## (origineel hint 2-3: "hoge prijzen maken ontevreden, en ontevreden mensen leven korter"), zie leven.ongeluk_versnelt.
+var geluk := 1.0
+
+
+## Schade (wolfbeet, later zwaard of pijl): gezondheid omlaag; bij 0 sterft hij (Leven.sterf: uit alle lijsten,
+## signaal Wereld.dorpeling_dood). `oorzaak` gaat mee in het signaal ("wolf", "ouderdom", ...).
+func raak(w: Wereld, schade: float, oorzaak := "") -> void:
+	Leven.raak(w, self, schade, oorzaak)
+
+
+## Meteen dood (ouderdom, of een missie die iemand weghaalt). Zie Leven.sterf.
+func sterf(w: Wereld, oorzaak := "") -> void:
+	Leven.sterf(w, self, oorzaak)
+
+
+func leeft() -> bool:
+	return gezondheid > 0.0
+
+
+func oud() -> bool:
+	return leeftijd == "oud"
 
 
 func volwassen() -> bool:
 	return leeftijd == "volwassen"
 
 
-## Lopen en slapen kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
+## Lopen, slapen en vluchten kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
 	if soort == "vecht" and rol == "bouwer":
 		return false
-	return soort == "loop" or soort == "slaap" or soort == "vuur" or volwassen()
+	if rol == "voetsoldaat" and soort in ["werk", "claim", "huis", "oogst", "melk", "raap", "lever"]:
+		return false                 # origineel: soldaten boeren en bouwen niet (gameplay.md "Gilden en training")
+	return soort == "loop" or soort == "slaap" or soort == "vuur" or soort == "vlucht" or volwassen()
 
 
 ## Vrij voor een gezin: volwassen, uitgerust, zonder bevel, bouwklus, koe of wieg, en geen baby op de arm.
 func vrij_voor_gezin() -> bool:
-	return volwassen() and rust <= 0.0 and ledig() and draagt == ""
+	return volwassen() and rust <= 0.0 and ledig() and draagt == "" and rol != "voetsoldaat"
 
 
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
@@ -167,6 +200,8 @@ func tick(w: Wereld, dt: float) -> void:
 		if f <= 0.0:
 			f = 1.0
 		var eff: float = w.loop_mps * w.looptempo * f   # m/s
+		if bevel.get("soort", "") == "vlucht":          # wegrennen voor een wolf (Leven._vlucht): rennen
+			eff *= float(w.spel["leven"]["vlucht_tempo"])
 		var v := eff / w.tegel_m                     # tegels per seconde
 		snelheid_mps = eff
 		var doel := route[0]

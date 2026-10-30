@@ -424,6 +424,9 @@ func _start_scenario() -> void:
 				w.geef_bouwbevel(ids2.slice(2, 4), mk2)
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(103, 62)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
+		"missie3":
+			# missie 3: dorp, voetsoldaat worden + wolf, put (test/missie3_scenario.gd, --stap=dorp|soldaat|put)
+			add_child(load("res://test/missie3_scenario.gd").new().start(self))
 		"deur":
 			# een dorpeling loopt door de voordeur naar binnen en weer naar buiten (test/deur_scenario.gd, --gebouw= --draai=)
 			add_child(load("res://test/deur_scenario.gd").new().start(self))
@@ -483,6 +486,16 @@ func _wolf_scenario() -> void:
 	wf.zet_tegel(o + Vector2i(11, 3))
 	wf.anker = wf.tegel()
 	var kt := o + Vector2i(6, 4)
+	# niet op een kaartobject: in M2 lag hier een paddenstoel (klasse 83, schaal 2,3), die stak als bruine koepel
+	# door de koe heen (screenshots/wolf_model.jpg)
+	for _i in 8:
+		var bezet := false
+		for ob in w.objecten:
+			if Vector2i(ob["x"], ob["y"]) == kt:
+				bezet = true
+		if not bezet:
+			break
+		kt.y += 1
 	var k := Vee.new()
 	k.id = w._volgende_koe_id
 	w._volgende_koe_id += 1

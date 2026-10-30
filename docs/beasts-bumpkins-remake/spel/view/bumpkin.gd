@@ -18,7 +18,8 @@ signal impact(welke: StringName)  ## bouwen (elke lus) en aanval_zwaard op impac
 const BUMPKIN_GLB := "res://assets/bumpkin_man.glb"
 ## Uiterlijk per (geslacht, leeftijd); kinderen zijn al 1,11 m (0,81x de man) in de glb. Ontbreekt er een: de man.
 const UITERLIJK := {"man": "bumpkin_man", "vrouw": "bumpkin_vrouw", "jongen": "bumpkin_jongen", "meisje": "bumpkin_meisje",
-	"oude_man": "bumpkin_oudere_man", "oude_vrouw": "bumpkin_oudere_vrouw", "bouwer": "bumpkin_bouwer"}
+	"oude_man": "bumpkin_oudere_man", "oude_vrouw": "bumpkin_oudere_vrouw", "bouwer": "bumpkin_bouwer",
+	"voetsoldaat": "bumpkin_voetsoldaat"}   # voetsoldaat: model van de asset-agent; zolang het ontbreekt de man met zwaard
 const BUMPKIN_ANIM := "res://assets/bumpkin_anim.json"
 const MODEL_YAW_OFFSET := 0.0
 const ACCEL := 6.0          # m/s^2
@@ -64,6 +65,7 @@ var _werk_rng := RandomNumberGenerator.new()
 var _draag_doel := 0.0
 var _draag := 0.0
 var _zwaard: Node3D
+var zwaard_altijd := false   ## voetsoldaat: prop_zwaard blijft in de hand (WereldView._zet_rol)
 var _steen_prop: Node3D
 var _hand_r: Node3D
 var _worpen: Array = []   # [{mi, van, naar, t, duur, hoogte}]
@@ -164,6 +166,12 @@ func draag_pos() -> Vector3:
 func werk_soort() -> StringName: return _werk_soort
 
 
+## Voetsoldaat: het zwaard (prop_zwaard) altijd in de hand, ook buiten de slag.
+func zet_zwaard(aan: bool) -> void:
+	zwaard_altijd = aan
+	if _zwaard: _zwaard.visible = aan or _aanval_t >= 0.0
+
+
 func val_aan() -> void:
 	## Eenmalige zwaardzwaai over idle of lopen; stopt werken.
 	if _aanval_t >= 0.0:
@@ -245,8 +253,8 @@ func _lees_meta() -> void:
 ## Het glb-pad voor een dorpeling, of "" als dat model niet in assets/ staat. Rol "bouwer" heeft een eigen model
 ## (concept bouwer.jpg: gele helm, blauwe tuniek), als dat er is.
 static func glb_voor(geslacht: String, leeftijd: String, rol := "") -> String:
-	if rol == "bouwer" and ResourceLoader.exists("res://assets/%s.glb" % UITERLIJK["bouwer"]):
-		return "res://assets/%s.glb" % UITERLIJK["bouwer"]
+	if rol != "" and UITERLIJK.has(rol) and ResourceLoader.exists("res://assets/%s.glb" % UITERLIJK[rol]):
+		return "res://assets/%s.glb" % UITERLIJK[rol]      # rol "bouwer" of "voetsoldaat" (Dorpeling.rol)
 	var k := geslacht
 	if leeftijd == "kind":
 		k = "meisje" if geslacht == "vrouw" else "jongen"
@@ -277,7 +285,7 @@ func _bouw_model() -> void:
 	_steen_prop = _model.find_child("prop_steen", true, false) as Node3D
 	_hand_r = _model.find_child("prop_R", true, false) as Node3D
 	if _hamer: _hamer.visible = false
-	if _zwaard: _zwaard.visible = false
+	if _zwaard: _zwaard.visible = zwaard_altijd
 	if _steen_prop: _steen_prop.visible = false
 	for n in _meta:
 		if _speler.has_animation(n):
@@ -542,7 +550,7 @@ func _aanval_stap(dt: float) -> void:
 		_steen_prop.visible = _aanval_t >= float(_meta[clip].get("pak_s", 0.0))   # pak_s: steen gepakt
 	if _aanval_t >= float(_meta[clip]["duur_s"]) + 0.1:
 		_aanval_t = -1.0
-		if _zwaard: _zwaard.visible = false
+		if _zwaard: _zwaard.visible = zwaard_altijd
 		if _steen_prop: _steen_prop.visible = false
 
 

@@ -71,7 +71,7 @@ func _initialize() -> void:
 		var g2: Array = []
 		h2.hint_getoond.connect(func(x: Dictionary) -> void: g2.append(x["id"]))
 		_loop(w2, h2, 5.0 * float(w2.spel["seizoen_s"]))
-		var verwacht: Array = ["2-1", "2-3"] if nr == 2 else []
+		var verwacht: Array = ["2-1", "2-3"] if nr == 2 else ["3-4", "3-5"]   # M3: put en gilde staan er (3-4 op 180, 3-5 op 1080 tikken)
 		_check(g2 == verwacht, "missie %d na 5 seizoenen: %s (verwacht %s)" % [nr, g2, verwacht])
 		if nr == 3:      # kelk aanraken (dorpeling erop gezet) -> 3-1
 			var k: Dictionary = Voorwerpen.alle(w2)[0]
@@ -83,7 +83,7 @@ func _initialize() -> void:
 				w2.tik(w2.tik_dt)
 				m += 1
 			h2.controleer()
-			_check(g2 == ["3-1"], "kelk opgeraapt -> 3-1 (%s)" % [g2])
+			_check(g2 == ["3-4", "3-5", "3-1"], "kelk opgeraapt -> 3-1 (%s)" % [g2])
 
 	print("ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)

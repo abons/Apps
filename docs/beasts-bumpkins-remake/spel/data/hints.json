@@ -49,9 +49,9 @@
     "3": {
       "briefing": {"bron": "M3.TXT", "titel": "De gouden kelk van Barathkar", "tekst": "De kas is lang niet vol genoeg voor een grote uitbreiding. Verzamel 25.000 goudstukken. Zoek de goed bewaakte gouden kelk van Barathkar: dan gaat het een stuk makkelijker."},
       "hints": [
-        {"id": "3-4", "bron": "MIS3-4.TXT", "open": false, "trigger": {"type": "timer", "tikken": 180}, "wacht_op": "put",
+        {"id": "3-4", "bron": "MIS3-4.TXT", "open": false, "trigger": {"type": "timer", "tikken": 180},
           "tekst": "Waterputten lessen de dorst en laten je mensen langer leven."},
-        {"id": "3-5", "bron": "MIS3-5.TXT", "open": false, "trigger": {"type": "timer", "tikken": 1080}, "wacht_op": "gildelimiet",
+        {"id": "3-5", "bron": "MIS3-5.TXT", "open": false, "trigger": {"type": "timer", "tikken": 1080},
           "tekst": "Een gilde heeft plaats voor zes leden; wil je er meer, bouw dan nog een gilde."},
         {"id": "3-1", "bron": "MIS3-1.TXT", "open": true, "trigger": {"type": "voorwerp", "klasse": 172}, "_trigger": "eigen keuze: M3.MIS noemt mis3-1 niet (vermoedelijk vast in de exe), naar het patroon van 1-8",
           "tekst": "Dat is de kelk! Breng hem terug naar je vlag."}

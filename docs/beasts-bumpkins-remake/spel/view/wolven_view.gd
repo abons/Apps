@@ -26,6 +26,7 @@ func bouw(wereld: Wereld, wereld_view: Node3D) -> void:
 			(koeien[k.id] as Node3D).queue_free()
 			koeien.erase(k.id))
 	w.steen_gegooid.connect(_gooi)
+	w.zwaard_slag.connect(_slag)
 
 
 func _maak(wf: Wolf) -> void:
@@ -56,6 +57,15 @@ func _gooi(d: Dorpeling, wf: Wolf) -> void:
 	if wf.snelheid_mps > 0.0:      # een beetje voorhouden: de steen is ~1 s onderweg
 		doel += Vector3(wf.richting.x, 0, wf.richting.y) * wf.snelheid_mps * 0.6
 	b.gooi_steen(doel)
+
+
+## Voetsoldaat (missie 3): naar de wolf draaien en de clip aanval_zwaard (Bumpkin.val_aan); de schade doet de sim.
+func _slag(d: Dorpeling, wf: Wolf) -> void:
+	if not view.units.has(d.id):
+		return
+	var b: Bumpkin = view.units[d.id]["bump"]
+	b.kijk_naar(_wereld_pos(wf, 1.0) - b.global_position)
+	b.val_aan()
 
 
 func _process(dt: float) -> void:

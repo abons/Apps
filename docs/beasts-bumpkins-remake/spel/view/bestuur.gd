@@ -3,7 +3,7 @@ extends Node
 ## Muisbesturing (besluit gebruiker 2026-10-29): selecteren met een kader of een klik op een unit,
 ## linkerklik op de grond = loopbevel, rechterklik = selectie weg. Rechts slepen draait de camera (rts_camera.gd).
 ## Klik op een poort (met of zonder selectie): open of dicht.
-## Klik op een afgebouwde gereedschapsloods met een selectie: de eerste volwassen man wordt er bouwer (kost kas).
+## Klik op een afgebouwd gilde met een selectie (Wereld.GILDEN): loods = bouwer, voetvolkgilde = voetsoldaat (mannen, kas, max 6).
 ## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
 ## Klik op een levende wolf met een selectie: vechtbevel (Wereld.geef_vechtbevel; alleen volwassenen, niet de bouwer),
 ## ze lopen erheen en gooien stenen (sim/wolf.gd). Werkbevelen hebben nog geen eigen invoer.
@@ -131,7 +131,7 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			view.markeer(p.tegel)
 			return
 		var g := w.gebouw_op(t)
-		if g != null and g.soort == &"gereedschapsloods" and w.geef_gildebevel(gekozen, g) > 0:
+		if g != null and Wereld.GILDEN.has(g.soort) and w.geef_gildebevel(gekozen, g) > 0:
 			view.markeer(g.deur_tegel())
 			return
 		geef_loopbevel(t)

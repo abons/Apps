@@ -29,6 +29,9 @@ const GEBOUWEN := {
 	&"weg": {"tekst": "Weg", "toets": KEY_T, "glb": "", "hoogte": 0.15},      # af = padtegel, view/wegen.gd (slepen = rij)
 	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
 	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 1.3},   # hek_poort.glb, vleugel draait open (klik)
+	# missie 3 (Wereld.VANAF_MISSIE): put = bron.glb (well, 4,9 x 5,0 m); gilde nog zonder glb: het blok uit Props
+	&"put": {"tekst": "Put", "toets": KEY_U, "glb": "res://assets/bron.glb", "hoogte": 2.0},
+	&"voetvolkgilde": {"tekst": "Gilde", "toets": KEY_V, "glb": "", "hoogte": 3.0, "placeholder": "gilde"},
 }
 const RIJ_SOORTEN := [&"weg", &"hek"]     ## slepen = een rij (BouwRij); draaien doet er niet toe
 const KNOP_H := 44.0                      ## knophoogte in px: met een vinger te raken
@@ -407,6 +410,20 @@ func _plan_klaar(p: Plan) -> void:
 		_bouw_hekken()
 		return
 	var ps := _scene(GEBOUWEN[p.soort]["glb"], true)
+	if ps == null and GEBOUWEN[p.soort].has("placeholder"):     # nog geen glb (voetvolkgilde): het blok uit Props
+		var ph := Props.maak({"model": "placeholder:" + String(GEBOUWEN[p.soort]["placeholder"]), "cls": 0,
+			"x": p.tegel.x, "y": p.tegel.y, "state": 0})
+		if ph != null:
+			var r := p.afdruk()
+			var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
+			if terrein != null:
+				m.y = _laagste_grond(r)
+			ph.position = m
+			ph.rotation.y = p.draai * PI * 0.5
+			ghost.get_parent().add_child(ph)
+			k.queue_free()
+			_kisten.erase(p)
+			return
 	if ps == null:
 		if not k is MeshInstance3D:      # kan niet: een stand staat er alleen als de af-glb er is
 			return

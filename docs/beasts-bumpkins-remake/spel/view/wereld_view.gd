@@ -53,12 +53,9 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 		_maak_unit(d)
 	w.dorpeling_erbij.connect(_maak_unit)
 	w.rol_veranderd.connect(func(d: Dorpeling) -> void: _zet_rol(d))
-	w.volwassen_geworden.connect(func(d: Dorpeling) -> void:   # jongen/meisje-glb wordt man/vrouw
-		var oud: Bumpkin = units[d.id]["bump"]
-		var yaw := oud.rotation.y
-		oud.queue_free()
-		_maak_unit(d)
-		(units[d.id]["bump"] as Node3D).rotation.y = yaw)
+	w.volwassen_geworden.connect(_wissel_model)    # jongen/meisje-glb wordt man/vrouw
+	w.met_pensioen.connect(_wissel_model)          # man/vrouw wordt oudere man/vrouw (sim/leven.gd)
+	w.dorpeling_dood.connect(_lijk)
 
 	_pad = MeshInstance3D.new()
 	_pad.name = "Looppad"
@@ -86,6 +83,53 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	wolven = preload("res://view/wolven_view.gd").new()
 	add_child(wolven)
 	wolven.bouw(w, self)
+
+
+func _wissel_model(d: Dorpeling) -> void:
+	if not units.has(d.id):
+		return
+	var oud: Bumpkin = units[d.id]["bump"]
+	var yaw := oud.rotation.y
+	oud.queue_free()
+	_maak_unit(d)
+	(units[d.id]["bump"] as Node3D).rotation.y = yaw
+
+
+## Een dode dorpeling (sim/leven.gd sterf) valt om en blijft `leven.lijk_s` liggen, zakt dan weg (origineel: d_*-
+## sprites, lijk op de grond; graven komen later). De Bumpkin gaat uit `units` naar `_lijken`.
+var _lijken: Array = []        # [{bump, t, x, z}]
+
+
+func _lijk(d: Dorpeling, _oorzaak: String) -> void:
+	if not units.has(d.id):
+		return
+	var u: Dictionary = units[d.id]
+	units.erase(d.id)
+	gekozen.erase(d.id)            # zelfde Array als Bestuur.gekozen: een dode is niet meer gekozen
+	for k in ["ring", "baby", "zak", "slaapzak"]:
+		(u[k] as Node3D).visible = false
+	var b: Bumpkin = u["bump"]
+	b.name = "Lijk_%d" % d.id
+	b.volg(b.position, 0.0)
+	b.visible = true
+	_lijken.append({"bump": b, "t": 0.0, "y": b.position.y})
+
+
+func _werk_lijken(dt: float) -> void:
+	var duur := float(w.spel["leven"]["lijk_s"])
+	for l in _lijken.duplicate():
+		var b: Bumpkin = l["bump"]
+		var tempo := 0.0 if w.gepauzeerd else w.tempo
+		l["t"] = float(l["t"]) + dt * tempo
+		var t: float = l["t"]
+		var val := clampf(t / 0.6, 0.0, 1.0)          # omvallen in 0,6 s, op de zij zoals bij het kampvuur
+		b.rotation.z = -PI * 0.5 * val * val
+		b.position.y = float(l["y"]) + 0.16 * val - 0.5 * clampf((t - duur) / 3.0, 0.0, 1.0)
+		if val >= 1.0 and b.process_mode != Node.PROCESS_MODE_DISABLED:
+			b.process_mode = Node.PROCESS_MODE_DISABLED   # pose bevriest (AnimationTree staat stil)
+		if t >= duur + 3.0:
+			b.queue_free()
+			_lijken.erase(l)
 
 
 func _maak_unit(d: Dorpeling) -> void:
@@ -179,6 +223,7 @@ func _zet_rol(d: Dorpeling) -> void:
 		_maak_unit(d)
 		(units[d.id]["bump"] as Node3D).rotation.y = yaw
 		return
+	b.zet_zwaard(d.rol == "voetsoldaat")     # voetsoldaat: zwaard in de hand (eigen model: Bumpkin.glb_voor)
 	var oud := b.find_child("Bouwerhelm", true, false)
 	if oud != null:
 		oud.queue_free()
@@ -363,6 +408,7 @@ func _process(dt: float) -> void:
 			else:
 				zak.position = Vector3(0, 1.0, -0.2)
 				zak.scale = Vector3.ONE * (0.45 if d.draagt == "ei" else 1.0)
+	_werk_lijken(dt)
 	_werk_koeien(a, dt)
 	_werk_kippen(a, dt)
 	_werk_pad()

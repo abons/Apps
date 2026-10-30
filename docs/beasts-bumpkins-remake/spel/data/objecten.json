@@ -12,11 +12,11 @@
     "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "natuur:zilveren_beker", "schaal": 1.6, "voetafdruk": [1, 1], "blokkeert": false, "voorwerp": true},
     "171": {"naam": "koe_generator","origineel": "generator",   "model": "geen",              "voetafdruk": [1, 1], "blokkeert": false},
     "2":   {"naam": "hut_voorgebouwd", "origineel": "peasant hut", "model": "geen", "gebouw": "hut", "voetafdruk": [1, 1], "blokkeert": false},
-    "47":  {"naam": "put",          "origineel": "well",        "model": "placeholder:put", "voetafdruk": [1, 1], "blokkeert": true, "ontbreekt": "missie 3: voorgebouwde put; geen glb en geen gedrag (water halen), alleen een blok"},
-    "207": {"naam": "voetvolkgilde", "origineel": "footmans guild", "model": "placeholder:gilde", "voetafdruk": [2, 2], "blokkeert": true, "ontbreekt": "missie 3: voorgebouwd gilde; geen glb, geen gildeleden of training, niet in het bouwmenu (gildelimiet 6 nog niet)"},
+    "47":  {"naam": "put",          "origineel": "well",        "model": "geen", "gebouw": "put", "voetafdruk": [1, 1], "blokkeert": false},
+    "207": {"naam": "voetvolkgilde", "origineel": "footmans guild", "model": "geen", "gebouw": "voetvolkgilde", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "missie 3: voorgebouwd gilde (Plan, 3x3, Wereld.BOUWSOORTEN); nog geen glb: blok uit view/props.gd (_gilde) via Bouwmenu"},
     "172": {"naam": "gouden_kelk",  "origineel": "gold goblet", "model": "placeholder:gouden_kelk", "voetafdruk": [1, 1], "blokkeert": false, "voorwerp": true, "ontbreekt": "missie 3: bewaakte kelk (96,18), op te rapen en naar de vlag (sim/voorwerpen.gd, spel.json missies.3.voorwerpen); geen glb, gouden blokbeker"},
     "51":  {"naam": "boerderij",    "origineel": "farm",        "model": "geen", "gebouw": "melkerij", "draai": 3, "voetafdruk": [1, 1], "blokkeert": false},
-    "104": {"naam": "wolf",         "origineel": "creature",    "model": "placeholder:wolf", "voetafdruk": [1, 1], "blokkeert": false, "vijand": true, "beest": "wolf", "ontbreekt": "wezen (missie 2: groep 13, type 23 = wolf; missie 3 ook 13/29 en 14/24, nog als dezelfde wolf); gedrag in sim/wolf.gd; glb wolf.glb + donkere_wolf.glb (view/wolf_model.gd), maar de sim zet nog geen Wolf.soort voor de donkere wolf"},
+    "104": {"naam": "wolf",         "origineel": "creature",    "model": "placeholder:wolf", "voetafdruk": [1, 1], "blokkeert": false, "vijand": true, "beest": "wolf", "soorten": {"23": "wolf", "29": "donkere_wolf", "24": "wolf"}, "_soorten": "sex van het wezen -> Wolf.soort (glb in view/wolf_model.gd). hover_names.json (BBTools): 23 wolf, 29 dark wolf, 24 wasp. De wesp (M3 127,78) heeft nog geen model of vlieggedrag: tot dan een gewone wolf", "ontbreekt": "wezen (klasse 104): wolf en donkere wolf (sim/wolf.gd, zelfde gedrag); sex 24 = wesp, nog als wolf"},
     "110": {"naam": "koe",          "origineel": "cow",         "model": "koe", "vee": true, "voetafdruk": [1, 1], "blokkeert": false},
     "160": {"naam": "drankje",      "origineel": "potion",      "model": "placeholder:drankje", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen"},
     "161": {"naam": "goud",         "origineel": "gold",        "model": "placeholder:goud", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen (origineel: goudbuidel = kas)"},
@@ -31,5 +31,5 @@
   },
   "sex": {"1": {"geslacht": "man", "leeftijd": "volwassen"}, "2": {"geslacht": "vrouw", "leeftijd": "volwassen"},
           "13": {"geslacht": "man", "leeftijd": "kind"}, "14": {"geslacht": "vrouw", "leeftijd": "kind"},
-          "7": {"geslacht": "man", "leeftijd": "volwassen", "_notitie": "missie 3: krijger (type 7, Pigsy); nog zonder krijgersgedrag, een gewone man"}}
+          "7": {"geslacht": "man", "leeftijd": "volwassen", "rol": "voetsoldaat", "_notitie": "missie 3: krijger (type 7, Pigsy) = voetsoldaat (lid van het voorgebouwde voetvolkgilde). In M5 is type 7 het type van de zombies (eigenaar 4): als die als dorpeling gaan spawnen, hier per eigenaar scheiden"}}
 }

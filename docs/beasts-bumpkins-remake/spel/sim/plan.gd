@@ -23,6 +23,10 @@ const DEUREN := {
 	&"melkerij": {"plek": Vector2(-2.9, 0.16), "richting": Vector2i(-1, 0)},
 	&"kippenhok": {"plek": Vector2(-0.45, -0.7), "richting": Vector2i(0, -1)},
 	&"gereedschapsloods": {"plek": Vector2(0.6, 1.44), "richting": Vector2i(0, 1)},
+	# Missie 3, eigen keuze (geen ankers: het gilde heeft nog geen glb, bron.glb geen deur): midden van de voorkant.
+	# Put: de plek waar ze water halen (geen binnenloop, Wereld.deur_loop_s); gilde: de deur (sprite `footdoor`).
+	&"put": {"plek": Vector2(0.0, 2.5), "richting": Vector2i(0, 1)},
+	&"voetvolkgilde": {"plek": Vector2(0.0, 2.3), "richting": Vector2i(0, 1)},
 }
 
 

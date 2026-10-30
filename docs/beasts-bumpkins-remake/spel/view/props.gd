@@ -336,26 +336,55 @@ static func _put(n: Node3D) -> void:
 	n.add_child(dak)
 
 
-## Missie 3, nog zonder glb: voetvolkgilde = grijs stenen blok met een rood dak en een schild op de gevel.
+## Missie 3, nog zonder glb (Bouwmenu, voetafdruk 3x3 = 6 m): voetvolkgilde naar de sprite `fguild`: ronde grijze
+## toren met paarse kantelen, een houten deur aan de voorkant (+Z, Plan.DEUREN) en rechts een bijgebouwtje met strodak.
+## Blijft binnen 2,6 m van het midden, dus binnen de voetafdruk (niet over de vlag).
 static func _gilde(n: Node3D) -> void:
-	var muur := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(3.4, 2.4, 3.4)
-	muur.mesh = bm
-	muur.material_override = _steen()
-	muur.position.y = 1.2
-	n.add_child(muur)
-	var dak := MeshInstance3D.new()
-	dak.mesh = _kegel(2.7, 1.6, 4)
-	dak.material_override = _mat(Color(0.6, 0.15, 0.12))
-	dak.rotation.y = PI * 0.25
-	dak.position.y = 3.2
-	n.add_child(dak)
+	var toren := MeshInstance3D.new()
+	toren.mesh = _cyl(1.75, 1.9, 4.2, 14)
+	toren.material_override = _steen()
+	toren.position = Vector3(-0.3, 2.1, -0.3)
+	n.add_child(toren)
+	var paars := _mat(Color(0.45, 0.12, 0.5))
+	var rand := MeshInstance3D.new()
+	rand.mesh = _cyl(1.95, 1.95, 0.35, 14)
+	rand.material_override = paars
+	rand.position = Vector3(-0.3, 4.35, -0.3)
+	n.add_child(rand)
+	for i in 8:
+		var a := TAU * i / 8.0
+		var kantel := MeshInstance3D.new()
+		var km := BoxMesh.new()
+		km.size = Vector3(0.5, 0.45, 0.35)
+		kantel.mesh = km
+		kantel.material_override = _steen()
+		kantel.position = Vector3(-0.3 + cos(a) * 1.8, 4.75, -0.3 + sin(a) * 1.8)
+		kantel.rotation.y = -a
+		n.add_child(kantel)
+	var deur := MeshInstance3D.new()
+	var dm := BoxMesh.new()
+	dm.size = Vector3(0.9, 1.6, 0.15)
+	deur.mesh = dm
+	deur.material_override = _mat(Color(0.45, 0.28, 0.15))
+	deur.position = Vector3(-0.3, 0.8, 1.55)
+	n.add_child(deur)
+	var schuur := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(1.4, 1.3, 1.6)
+	schuur.mesh = sm
+	schuur.material_override = _mat(Color(0.55, 0.42, 0.28))
+	schuur.position = Vector3(1.75, 0.65, 0.9)
+	n.add_child(schuur)
+	var stro := MeshInstance3D.new()
+	stro.mesh = _kegel(1.2, 0.9, 6)
+	stro.material_override = _mat(Color(0.85, 0.65, 0.3))
+	stro.position = Vector3(1.75, 1.75, 0.9)
+	n.add_child(stro)
 	var schild := MeshInstance3D.new()
 	schild.mesh = _cyl(0.35, 0.35, 0.06, 10)
-	schild.material_override = _mat(Color(0.75, 0.65, 0.2), 0.4)
+	schild.material_override = _mat(Color(0.95, 0.95, 0.95), 0.6)
 	schild.rotation.x = PI * 0.5
-	schild.position = Vector3(0, 1.5, 1.72)
+	schild.position = Vector3(-0.3, 2.6, 1.6)
 	n.add_child(schild)
 
 
