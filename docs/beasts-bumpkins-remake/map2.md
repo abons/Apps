@@ -111,6 +111,8 @@ het origineel niet is. Hetzelfde gebeurt bij elke missie waar land of water dire
 
 ## 4. Voorstel (plan, geen code)
 
+**Besluit 2026-10-30 (gebruiker):** niet apart bouwen. Met mist van oorlog (fog of war) zie je het zwarte gebied niet meer, dus void wordt "nooit verkend" in de mist-laag (punt 7). Wel blijft: void niet als zee tekenen. Onderstaande stappen dienen als naslag voor die mist-laag.
+
 Uitgangspunt: **void is land dat je niet ziet**, zoals in het origineel. Water komt alleen van watertegels. Daarmee
 klopt missie 1 nog steeds (de zee-ring zijn echte watertegels) en wordt het meer van missie 2 weer een meer.
 
