@@ -119,13 +119,13 @@ Conditie-record (gevonden met regex `type 0xCD a b c id 0xCD 01 00 00 00`, `type
 | 1-6 | timer 288 | ja | na 1-5 | boerderij (melk) plus wei met hek en poort, poort klikken = open/dicht |
 | 1-7 | aantal poort (169) > 0 | ja | na 1-6 | wilde koeien claimen, paarse halsband |
 | 1-11 | timer 360 | nee | timer | koeien kalven in de lente, houd ze bij elkaar |
-| 1-10 | timer 360 | nee | `wacht_op` prijsscherm | prijzen via het goudicoon |
+| 1-10 | timer 360 | nee | timer (view/prijzen.gd) | prijzen via het goudicoon |
 | 1-9 | aantal kip (111) > 1 | nee | `wacht_op` ouderdom | hutten gespreid bouwen voor de levensduur |
 | 1-8 | type 12: dorpeling raakt beker (object 6) | ja | `voorwerp` 159 | dat lijkt kostbaar, naar de vlag |
 | M2 briefing | start | | brief, pauze | terug op het vasteland; kas boven 10.000; gevaarlijke beesten |
 | 2-1 | geen conditie (start) | nee | start | wolven jagen op kinderen en koeien |
 | 2-4 | timer 360 | nee | `wacht_op` stilstaan-knop | doet iemand niets: stilstaan-knop |
-| 2-3 | timer 720 | nee | `wacht_op` prijsscherm | hoge prijzen = ontevreden = korter leven |
+| 2-3 | timer 720 | nee | timer (sim/handel.gd) | hoge prijzen = ontevreden = korter leven |
 | 2-5 | timer 4.320 | nee | `wacht_op` pensioen | ouderen kunnen met pensioen |
 | 2-2, 2-6 | geen regel in M2.MIS | | `geen` | hek tegen wolven; verkennen loont |
 | M3 briefing | start | | brief, pauze | 25.000 nodig; zoek de bewaakte gouden kelk |
@@ -172,6 +172,17 @@ de kleine "vlekken" in het gras zijn bosjes met overgangsranden (tex 115-130).
 Wolven (2026-10-30, `spel/sim/wolf.gd`): zwerven rond hun startplek, jagen op koeien (wild of eigen) en eten ze op; een koe in een weide
 achter een dichte poort halen ze niet ("omheining helpt"). Volwassenen (niet de bouwer) gooien stenen op bevel (klik op de wolf) of zelf
 als een wolf vlakbij jaagt. Kinderen en baby's pakken (origineel) komt later (gameplay.md 7: "baby's als moeilijkheid later").
+
+**Prijzen, geluk en misdaad (2026-10-30).** Origineel: goudicoon in de bovenbalk (MIS1-10) opent `STATS.MFB` (`lokaal/bb_original/stats.png`):
+een schuif per waar (eieren, water, brood, melk, cider, kerk, belasting) van weinig munten naar een stapel goud, daaronder per misdaad
+(vloeken, diefstal, mishandeling, moord) de straf van duim omhoog tot duim omlaag. MIS2-3: hoge prijzen = ontevreden = korter leven.
+Statistiekreeksen in elke .MIS: Happiness, Crimes, Convictions, Trade, Tax. Misdaad en gevangenis (pikenier) pas in M13. Bedragen,
+kansen en de straf-schuiven staan niet in de data. **Remake** (`spel/sim/handel.gd`, `spel/view/prijzen.gd`, spel.json `handel`): alleen
+brood/melk/ei, prijs 1-9 per verkoop (start 3 = beasts-src `VISIT_PRICE`); geluk loopt langzaam naar 1 - prijsdruk, laag geluk versnelt
+de ouderdom (`sim/leven.gd`); misdaad alleen met `missies.N.misdaad.aan` (nu geen missie), kans en zwaarte (vloeken > diefstal >
+mishandeling > moord) groeien met het ongeluk. Scherm pauzeert de sim, +/- en klikken/slepen op de balk (muis en touch), toets O.
+Eigen keuze: alle getallen, geen straf-schuiven, geen water/cider/kerk/belasting (komen met put, brouwerij, kerk, belastinginner).
+Test `spel/test/economie_test.gd`, frame `spel/screenshots/prijzen.jpg` (`--scenario=prijzen`).
 
 ## Lokale bestanden (niet in git)
 

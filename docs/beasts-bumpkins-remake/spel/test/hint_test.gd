@@ -1,7 +1,7 @@
 extends SceneTree
 ## Headless test hints (sim/hints.gd, data/hints.json): godot --headless --path . --script res://test/hint_test.gd
 ## Missie 1: keten 1-12 (start) -> 1-2 (timer 108 tikken) -> 1-3 (hut af) -> 1-4 (loods af) -> 1-5 (molen af) ->
-## 1-6 (timer 288, na 1-5) -> 1-7 (poort af), 1-11 op 360 tikken, 1-8 bij het oprapen van de beker; hints met
+## 1-6 (timer 288, na 1-5) -> 1-7 (poort af), 1-11 en 1-10 op 360 tikken, 1-8 bij het oprapen van de beker; hints met
 ## wacht_op vuren niet. Missie 2 en 3: briefing en de hints die de remake kan tonen.
 
 var fouten := 0
@@ -42,7 +42,8 @@ func _initialize() -> void:
 	_check(gevuurd.back() == "1-7", "poort af -> 1-7 (%s)" % [gevuurd])
 	_loop(w, h, 80 * tik_s)
 	_check("1-11" in gevuurd, "1-11 op 360 tikken")
-	_check(not "1-10" in gevuurd and not "1-9" in gevuurd, "1-10 en 1-9 (wacht_op) vuren niet")
+	_check("1-10" in gevuurd, "1-10 (prijzen) op 360 tikken")
+	_check(not "1-9" in gevuurd, "1-9 (wacht_op) vuurt niet")
 	_check(not "1-8" in gevuurd, "1-8 nog niet")
 	var b: Dictionary = Voorwerpen.alle(w)[0]
 	var man: Dorpeling = null
@@ -60,7 +61,7 @@ func _initialize() -> void:
 	var dubbel := gevuurd.duplicate()
 	_loop(w, h, 30.0)
 	_check(gevuurd == dubbel, "geen hint twee keer")
-	_check(gevuurd == ["1-12", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-11", "1-8"], "volgorde %s" % [gevuurd])
+	_check(gevuurd == ["1-12", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-11", "1-10", "1-8"], "volgorde %s" % [gevuurd])
 
 	for nr in [2, 3]:
 		var w2 := Wereld.new()
@@ -70,7 +71,7 @@ func _initialize() -> void:
 		var g2: Array = []
 		h2.hint_getoond.connect(func(x: Dictionary) -> void: g2.append(x["id"]))
 		_loop(w2, h2, 5.0 * float(w2.spel["seizoen_s"]))
-		var verwacht: Array = ["2-1"] if nr == 2 else []
+		var verwacht: Array = ["2-1", "2-3"] if nr == 2 else []
 		_check(g2 == verwacht, "missie %d na 5 seizoenen: %s (verwacht %s)" % [nr, g2, verwacht])
 		if nr == 3:      # kelk aanraken (dorpeling erop gezet) -> 3-1
 			var k: Dictionary = Voorwerpen.alle(w2)[0]

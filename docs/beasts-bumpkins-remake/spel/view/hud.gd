@@ -15,6 +15,8 @@ var brief: Brief                 ## view/brief.gd: briefing en geopende hints
 var rollen: VBoxContainer        ## ongelezen hints als rolletje rechts (origineel MAIL: opgerolde brief met zegel)
 var _wachtrij: Array = []        ## brieven die nog open moeten: {kop, tekst, groot, pauze}
 var _pauzeerde := false          ## de briefing zette de sim op pauze
+var prijzen: Prijzenscherm       ## view/prijzen.gd: open met het goudstukken-icoon (munt_knop) of O
+var munt_knop: Button
 
 
 func bouw(wereld: Wereld, b: Bestuur) -> void:
@@ -41,7 +43,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   1 2 4 tempo   K regen   N seizoen   Esc stop"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop"
 	pc2.add_child(hulp)
 	add_child(pc2)
 
@@ -65,6 +67,16 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	kader.set_script(load("res://view/kader.gd"))
 	add_child(kader)
 
+	# goudstukken-icoon rechts naast de minikaart (origineel: eerste knop in de bovenbalk, hint 1-10) -> prijzenscherm
+	munt_knop = MuntKnop.new()
+	munt_knop.position = Vector2(minikaart.position.x + minikaart.size.x + 10, minikaart.position.y)
+	munt_knop.tooltip_text = "prijzen (O)"
+	add_child(munt_knop)
+	prijzen = Prijzenscherm.new()
+	add_child(prijzen)
+	prijzen.bouw(w)
+	munt_knop.pressed.connect(prijzen.wissel)
+
 
 func _stijl() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -85,12 +97,15 @@ func _process(_dt: float) -> void:
 	var kas := "%d" % w.kas + (" / >%d" % int(doel["kas_boven"]) if doel.has("kas_boven") else "")
 	var dorp := "%d" % w.dorpelingen.size() + ("/%d" % int(doel["dorpelingen"]) if doel.has("dorpelingen") else "")
 	var koe := "%d" % w.eigen_koeien() + ("/%d" % int(doel["koeien"]) if doel.has("koeien") else "")
+	var geluk := "geluk: %d%%" % roundi(w.handel.dorp_geluk(w) * 100.0)   # sim/handel.gd, prijzen via het munt-icoon
+	if w.handel.misdaad_aan(w):
+		geluk += "   misdaden: %d" % w.handel.totaal_misdaden()
 	label.text = "%02d:%02d%s  dag %d  %s  %s
 kas: %s   dorpelingen: %s   koeien: %s   bedden: %d   brood: %d   melk: %d   eieren: %d
-geselecteerd: %d   tempo: %s" % [
+%s   geselecteerd: %d   tempo: %s" % [
 		h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer,
 		kas, dorp, koe, w.bedden(), w.brood(), w.melk(), w.eieren(),
-		bestuur.gekozen.size(), tempo]
+		geluk, bestuur.gekozen.size(), tempo]
 
 
 # ---------------------------------------------------------------- briefing en hints (sim/hints.gd, data/hints.json)
@@ -145,6 +160,36 @@ func _brief_dicht() -> void:
 		w.gepauzeerd = false
 		_pauzeerde = false
 	_volgende_brief()
+
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_O and prijzen != null:
+		prijzen.wissel()
+		get_viewport().set_input_as_handled()
+
+
+## Goudstukken-icoon (eigen tekening naar de knop in de bovenbalk van het origineel): steenknop met een stapel munten.
+class MuntKnop extends Button:
+	func _init() -> void:
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		custom_minimum_size = Vector2(52, 52)
+		size = custom_minimum_size
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color8(74, 80, 101))
+		draw_rect(Rect2(0, 0, r.size.x, 3), Color8(128, 136, 160))
+		draw_rect(Rect2(0, 0, 3, r.size.y), Color8(128, 136, 160))
+		draw_rect(Rect2(0, r.size.y - 3, r.size.x, 3), Color8(36, 39, 52))
+		draw_rect(Rect2(r.size.x - 3, 0, 3, r.size.y), Color8(36, 39, 52))
+		if is_hovered():
+			draw_rect(r.grow(-3), Color(1, 1, 1, 0.08))
+		for m in [Vector2(17, 34), Vector2(27, 34), Vector2(37, 34), Vector2(22, 26), Vector2(32, 26), Vector2(27, 18)]:
+			draw_circle(m + Vector2(0, 1.5), 7.0, Color8(150, 105, 25))
+			draw_circle(m, 7.0, Color8(236, 190, 60))
+			draw_circle(m, 3.2, Color8(250, 222, 120))
 
 
 ## Rolletje: opgerolde brief met rode zegel (naar MAIL uit het origineel), knippert zachtjes tot je erop klikt.

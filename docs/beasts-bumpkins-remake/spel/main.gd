@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -183,6 +183,12 @@ func _start_scenario() -> void:
 			bestuur.geef_loopbevel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(22, -4)))
 			w.tempo = 4.0
 			cam.zet_direct(vuur, 0.6, deg_to_rad(40), 26.0)
+		"prijzen":
+			# het prijzenscherm (view/prijzen.gd) open boven het dorp: brood duurder, eieren goedkoper (sim op pauze)
+			cam.zet_direct(vuur, 0.6, deg_to_rad(40), 26.0)
+			w.handel.zet_prijs("brood", 7)
+			w.handel.zet_prijs("ei", 2)
+			hud.prijzen.open()
 		"mist_rand":
 			# de camera in de hoek van het raster (grens met mist: raster + RAND_M), van ver: alleen zwart
 			cam.zet_direct(Vector3(-RAND_M, 0, -RAND_M), 0.6, deg_to_rad(30), 125.0)

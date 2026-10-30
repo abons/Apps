@@ -73,6 +73,7 @@ var kippen: Array[Kip] = []
 var wolven: Array[Wolf] = []             # missie 2: klasse 104 (objecten.json "beest": "wolf"), sim/wolf.gd
 var _kaart_wolven: Array = []            # tegels van de wolven uit de kaart
 var kas := 0
+var handel: Handel                        ## sim/handel.gd: prijzen per waar, geluk, misdaad (spel.json handel)
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
 var _generatoren: Array[Vector2i] = []    # tegels van de koe-generators (klasse 171); missie 3 heeft er twee
 var _generator_t: Array[float] = []
@@ -139,6 +140,8 @@ func laad(kaart_pad := "", nr := 1) -> bool:
 	wolven = Wolf.uit_kaart(self, _kaart_wolven)
 	_start_generator()
 	mist.start(self)
+	handel = Handel.new(self)
+	handel.start(self)
 	tijd_s = float(spel["start_seizoen"]) * float(spel["seizoen_s"]) + float(spel["start_klok_s"])
 	return true
 
@@ -352,6 +355,7 @@ func tik(dt: float) -> void:
 	_werk_generator(dt)
 	_gezin(dt)
 	_economie(dt)
+	handel.tik(self, dt)
 	_check_missie()
 
 
@@ -689,8 +693,9 @@ func klus_af(d: Dorpeling) -> void:
 			d.draagt = ""
 		elif m.voorraad > 0:
 			m.voorraad -= 1         # beasts-src visit: de kas krijgt de prijs
-			kas += int(e["prijs_per_stuk"])
-			verkocht.emit(m, d.koopt, int(e["prijs_per_stuk"]))
+			var p := handel.verkoop(d.koopt)   # prijs per waar uit het prijzenscherm (sim/handel.gd)
+			kas += p
+			verkocht.emit(m, d.koopt, p)
 			d.trek[d.koopt] = 0.0
 		d.koopt = ""
 	d.klus = null
