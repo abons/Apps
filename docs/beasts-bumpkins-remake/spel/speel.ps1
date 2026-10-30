@@ -1,6 +1,6 @@
 # Start het spel: kaart en modellen syncen, importeren, spelen.
-# Rechtermuisknop > Run with PowerShell. Extra opties mogen erachter, bv. -Seizoen winter -Uur 22.
-param([string]$Seizoen = "", [int]$Uur = -1)
+# Rechtermuisknop > Run with PowerShell. Extra opties mogen erachter, bv. -Seizoen winter -Uur 22 -Missie 2.
+param([string]$Seizoen = "", [int]$Uur = -1, [int]$Missie = 1)
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -25,6 +25,7 @@ try {
     $extra = @()
     if ($Seizoen) { $extra += "--seizoen=$Seizoen" }
     if ($Uur -ge 0) { $extra += "--uur=$Uur" }
+    if ($Missie -ne 1) { $extra += "--missie=$Missie" }
 
     Write-Host "== spelen" -ForegroundColor Cyan
     if ($extra.Count -gt 0) { & $G --path . -- @extra } else { & $G --path . }

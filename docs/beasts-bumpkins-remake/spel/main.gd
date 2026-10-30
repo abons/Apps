@@ -1,6 +1,6 @@
 extends Node3D
-## Beasts & Bumpkins remake, missie 1 (Aorta): zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|dorp|selectie|pad|vlag|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|nacht
+## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
+## Opties na `--`:  --missie=1|2 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -18,7 +18,7 @@ var _stap := 0
 func _ready() -> void:
 	var opt := _opties()
 	w = Wereld.new()
-	if not w.laad():
+	if not w.laad("", int(opt.get("missie", "1"))):
 		push_error("main: wereld laden mislukt (draai sync.ps1 en --import)")
 		get_tree().quit(1)
 		return
@@ -34,6 +34,10 @@ func _ready() -> void:
 	if opt.has("regen"):
 		w.regen_handmatig = 1
 	scenario = opt.get("scenario", "")
+	if opt.has("voordraai"):
+		w.voorgebouwd_draai = int(opt["voordraai"])
+	if opt.has("camyaw"):      # alleen voor frames: --camyaw=<graden> overschrijft na het scenario de camerahoek
+		call_deferred("_camyaw", deg_to_rad(float(opt["camyaw"])))
 	_fps_aan = opt.has("fps")
 	_trace = opt.has("trace")
 	if opt.has("gang"):
@@ -74,10 +78,14 @@ func _ready() -> void:
 	bouwmenu.terrein = view.terrein
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
+	var geluid: Node3D = preload("res://view/geluid.gd").new()   # stemmen, werk, dieren, omgeving (view/geluid.gd)
+	add_child(geluid)
+	geluid.bouw(w, view, cam, bestuur)
+	w.plaats_voorgebouwd()          # na view en bouwmenu: die tekenen het via plan_gezet/plan_klaar
 	if scenario != "":
 		cam.invoer_aan = false
 		_start_scenario()
-	print("[spel] eiland ", w.eiland, " dorpelingen ", w.dorpelingen.size(), " objecten ", w.objecten.size(), " seizoen ", w.seizoen_naam())
+	print("[spel] missie ", w.missie_nr, " (", w.missie.get("naam", "?"), ") eiland ", w.eiland, " dorpelingen ", w.dorpelingen.size(), " objecten ", w.objecten.size(), " seizoen ", w.seizoen_naam())
 
 
 func _opties() -> Dictionary:
@@ -137,6 +145,9 @@ func _start_scenario() -> void:
 	match scenario:
 		"overzicht":
 			cam.zet_direct(eiland_m, 0.5, deg_to_rad(52), 125.0)
+		"kaart":
+			# bijna recht van boven, noord (kleine y) boven: naast lokaal/missies/m<nn>_layout.png te leggen
+			cam.zet_direct(eiland_m, 0.0, deg_to_rad(82), 1.25 * maxf(w.eiland.size.x, w.eiland.size.y) * w.tegel_m)
 		"dorp":
 			cam.zet_direct(vuur + Vector3(0, 0, 0), 0.5, deg_to_rad(26), 9.0)
 		"selectie":
@@ -144,7 +155,10 @@ func _start_scenario() -> void:
 		"loop":
 			cam.zet_direct(vuur + Vector3(4, 0, -2), 1.0, deg_to_rad(22), 8.0)
 		"vlag":
-			cam.zet_direct(view.terrein.tegel_midden(Vector2i(104, 65)) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
+			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("vlag", Vector2i(104, 65))) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
+		"wolf":
+			# missie 2: de eerste wolf (placeholder, staat stil) met goud en drankjes in de buurt
+			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("wolf", Vector2i(111, 55))) + Vector3(0, 0.4, 0), 0.7, deg_to_rad(26), 7.0)
 		"bos":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(114, 50)), 0.8, deg_to_rad(24), 16.0)
 		"koe":
@@ -270,11 +284,22 @@ func _start_scenario() -> void:
 				w.geef_bouwbevel(ids.slice(3, 4), h)
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(105, 64)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
+		"sleep":
+			# een weg en een hek slepen door het bouwmenu, met echte muisinvoer (test/sleep_scenario.gd)
+			add_child(load("res://test/sleep_scenario.gd").new().start(self))
 		"pad":
 			# unit 3 in de noordoostelijke rotsboog zetten; het directe pad naar (118,58) loopt door rots
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
 			w.dorpeling(3).anker = Vector2i(108, 47)
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(113, 52)), 0.3, deg_to_rad(60), 34.0)
+
+
+## Tegel van het eerste kaartobject met `naam` (voor scenario's op elke kaart), anders `anders`.
+func _object_tegel(naam: String, anders: Vector2i) -> Vector2i:
+	for ob in w.objecten:
+		if ob["naam"] == naam:
+			return Vector2i(ob["x"], ob["y"])
+	return anders
 
 
 ## Eerste plan van `soort` dat kan, in ringen rond `bij` (voor scenario's).
@@ -287,6 +312,10 @@ func _vrij_plan(soort: StringName, bij: Vector2i) -> Plan:
 					if p != null:
 						return p
 	return null
+
+
+func _camyaw(y: float) -> void:
+	cam.zet_direct(cam.focus, y, cam.pitch, cam.afstand)
 
 
 func _scenario_stap() -> void:

@@ -33,6 +33,10 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	wegen = Wegen.new()
 	add_child(wegen)
 	wegen.bouw(w, terrein)
+	# winkelvoorraad op de kraam bij de deur, verkoop en levering als melding (view/voorraad.gd)
+	var voorraad: Node3D = preload("res://view/voorraad.gd").new()
+	add_child(voorraad)
+	voorraad.bouw(w, terrein)
 
 	_ring_mesh = TorusMesh.new()
 	_ring_mesh.inner_radius = 0.50

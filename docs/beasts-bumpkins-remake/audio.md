@@ -1,6 +1,6 @@
 # Audioplan Beasts & Bumpkins-remake (Godot 4.7.2)
 
-Stand 2026-10-29. Alleen analyse en inventaris, het spel is niet aangepast. **Niets beluisterd**: alles over de originele klanken is afgeleid uit bestandsnamen, groottes, kanalen en een eenvoudige signaalmeting (duur, RMS, nuldoorgangen). Zo gemerkt met **[?]**. Het originele audiomateriaal is auteursrechtelijk beschermd, alleen voor eigen gebruik en **gaat nooit in git**; dit bestand bevat alleen tekst.
+Stand 2026-10-29: analyse en inventaris (sectie 1 tot 5). **2026-10-30: missie 1 heeft geluid, zie sectie 6.** **Niets beluisterd**: alles over de originele klanken is afgeleid uit bestandsnamen, groottes, kanalen en een eenvoudige signaalmeting (duur, RMS, nuldoorgangen). Zo gemerkt met **[?]**. Het originele audiomateriaal is auteursrechtelijk beschermd, alleen voor eigen gebruik en **gaat nooit in git**; dit bestand bevat alleen tekst.
 
 Lokale kopie (niet in git): `SC/audio_origineel/{BBRBANK,BBSPRAUT,BBSUMMER,BBWINTER,SPEECH0}/` met `SC` = `C:/Users/Axel/AppData/Local/Temp/claude/E--werk-androidApps-Apps/16e99493-ac86-47c7-921f-1d215c266f51/scratchpad/` (416 wav, ca. 9,5 MB). Bron: `\\axel-laptop\Users\axelb\beasts\beastnbump\extracted_audio\`.
 
@@ -280,3 +280,36 @@ Eenmalige klanken (uil, vogelroep, donder) via een **scheduler** (random interva
 | Muziek | Origineel had muziek, vooral in het menu; **volgende fase** |
 | Woorden | Originele stemmen hebben herkenbare Engelse woorden; beasts-src heeft woordloze gegenereerde klanken |
 | Bron per geluid | **Schakelbaar tussen origineel en gegenereerd** (instelling), zodat het origineel later volledig uit te sluiten is. AudioManager kiest per geluids-id uit `origineel/` of `eigen/`; ontbreekt een eigen variant, dan valt hij terug op het origineel (alleen in de lokale build) |
+
+## 6. Wat er nu in zit (2026-10-30, missie 1)
+
+`spel/view/geluid.gd`: een Node, in `main.gd` aangehaakt; leest sim en view, wijzigt niets. Geen autoload (de plan-`AudioManager` uit 4a is dit bestand). Bussen worden in code gemaakt (`Geluid.BUSSEN`: Master 0, Effecten -2, Stemmen 0, Omgeving -6 dB; limiter -1 dB op Master). Pool 24 x `AudioStreamPlayer3D` + 8 x 2D, oudste wordt verdrongen; buiten `max_distance` start niets. `AudioListener3D` op het camerabrandpunt + 1,5 m. Werk op Effecten -3 dB per 10 m camera-afstand boven 20 m. Pauze zet Effecten en Stemmen stil (`stream_paused`); dierengeluid volgt `tempo`. Met `--write-movie` stil (lek bij afsluiten). `--geluid-log` print elke klank.
+
+| geluid | trigger | bron |
+| --- | --- | --- |
+| Selectie m/f/b/g (4 elk) | nieuwe id in `Bestuur.gekozen`, alleen de leider (dichtst bij brandpunt) | B `voice_select_*` |
+| Bevel m/f/b/g (4 elk) | nieuw `bevel` (`loop/werk/claim/gilde/vecht`) bij een gekozen dorpeling binnen 0,35 s na linkerklik | B `voice_order_*` |
+| Ouderen | m/f met pitch 0,9 (noodoplossing 4c) | B |
+| Lokroep koe | `koe_geclaimd` (eigen), dichtste volwassene | B `voice_cattle_*` |
+| Hamer / zaag (20 %, hout) / houweel (akker) | `Bumpkin.impact(&"bouwen")` | B `voice_build_0/1`; G zaag_0/1, houweel_0..2 |
+| Sikkel, oogst | `bezig` start met `klus_tegel`; `draagt` wordt graan | G sikkel_0..2; B `voice_crop_0` |
+| Melken, eieren rapen | `bezig` start met `melk_koe` / `raap_kip` | B `voice_milk_0`, `voice_eggs_0` (+ G tok) |
+| Munt | `verkocht` (3D bij de deur) | B `voice_coin_0` |
+| Levering | `geleverd`, zacht | G plaats |
+| Plan geplaatst / gebouw klaar | `plan_gezet` (2D) / `plan_klaar` (2D klokje, hek en weg alleen een tik) | G plaats, klaar |
+| Poort open/dicht | `poort_gewisseld` (3D) | G poort_open/dicht |
+| Missie geslaagd/verloren | `missie_einde` | G missie_geslaagd/verloren |
+| UI-klik | `pressed` van elke `BaseButton` (via `node_added`, geen wijziging in bouwmenu/hud) | G klik |
+| Koe loeit (3D) | per koe elke 35 tot 90 s sim-tijd | B `voice_moo_0/1` |
+| Kip tokt (3D) | per kip elke 10 tot 30 s; 12 % de lange mp3 | G tok_0..3; B `voice_cluck_0/1` |
+| Kampvuur (3D-lus, 4/30 m) | altijd | G vuur |
+| Golven (3D-lus) | 5 spelers op de dichtste kustpunten (zee-tegel met landbuur, 1 per 6x6), elke 0,5 s; zachter bij ijs | G golven |
+| Wind (2D-lus) | altijd; harder in herfst/winter, bij regen en uitgezoomd; winter pitch 1,12 | G wind |
+| Regen (2D-lus) | `regent()` | G regen |
+| Krekels (2D-lus) | nacht, niet bij regen; lente 0,35 zomer 1 herfst 0,6 winter 0 | G krekels |
+| Vogels (3D one-shot, 10 tot 25 m) | dag, niet bij regen; dichtheid 1 / 0,8 / 0,35 / 0 | G vogel_0..5 |
+| Uil (3D, 20 tot 35 m) | nacht, niet bij regen, elke 20 tot 60 s | G uil_0/1 |
+
+Bron **B** = beasts-src `app/src/main/res/raw/` (privé repo; ElevenLabs-mp3, licentie open, zie 2; de 7 wav eigen werk). Gekopieerd door `spel/audio/haal_beasts.ps1` (vanuit `sync.ps1`) naar `spel/assets/audio/beasts/`, **niet in git** omdat het Apps-repo publiek is. **Geen ffmpeg op dit systeem**: mp3 blijft mp3 (Godot importeert het), geen ogg. Bron **G** = eigen synthese, `spel/audio/maak_geluid.py` (numpy, `py -3.10`; Python 3.12 heeft geen numpy), 32 wav, 22050 Hz mono, 3,1 MB, deterministisch, lussen naadloos (circulair gefilterd), in git in `spel/audio/eigen/`. Rechtenvrij, eigen werk. **Niets uit het origineel** (niet beluisterd, niet gekopieerd). Fallback: een niet-geïmporteerd bestand laadt via `load_from_file`; een ontbrekend bestand blijft stil met één melding. Test: `test/audio_test.gd` (82 klanken).
+
+**Nog niet:** voetstappen (3b), koebel, kauwen, donder, wind door dennen, bron/waterput, schaap, baby/geboorte, eigen oudere stemmen, muziek, instellingen (volume per bus in `user://`, schakelaar origineel/eigen uit de besluiten), sidechain-ducking, mislukte plaatsing. Synthese is plaatshouder-kwaliteit; vervangen door CC0 zodra downloaden mag (5, vraag 6).

@@ -1,4 +1,4 @@
-# Beasts & Bumpkins remake: fundament (missie 1, Aorta)
+# Beasts & Bumpkins remake: fundament (missie 1 Aorta, missie 2 Terug op het vasteland)
 
 Godot 4.7.2 (Forward+, GDScript, pc eerst). Het eiland Aorta uit de originele kaartdata, zes dorpelingen onder
 spelersbesturing, dag/nacht, seizoenen en weer, bouwen (hut, loods, kippenhok; prijs uit de kas), koeien claimen en het
@@ -10,7 +10,7 @@ wordt). Nog geen vijanden.
 ## Draaien
 
 Snelst: rechtermuisknop op `speel.ps1` > **Run with PowerShell** (sync, import en spelen in een keer;
-`speel.ps1 -Seizoen winter -Uur 22` voor een ander begin).
+`speel.ps1 -Seizoen winter -Uur 22` voor een ander begin, `speel.ps1 -Missie 2` voor missie 2).
 
 ```
 G=$LOCALAPPDATA/Microsoft/WinGet/Packages/GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe/Godot_v4.7.2-stable_win64_console.exe
@@ -18,13 +18,40 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --import               # eerste keer en na elke sync
 "$G" --path .                                   # spelen
 "$G" --headless --path . --script res://test/sim_test.gd    # simtest (zonder GPU)
+"$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2
+"$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 
-Opties na `--`: `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, `--regen`, `--fps` (frametijden loggen),
-`--gang=0|1|2` (loopanimatie, zie onder), `--scenario=overzicht|dorp|selectie|pad|loop` (gescripte camera/invoer voor frames).
+Opties na `--`: `--missie=1|2` (standaard 1), `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, `--regen`, `--fps` (frametijden loggen),
+`--gang=0|1|2` (loopanimatie, zie onder), `--scenario=overzicht|kaart|dorp|selectie|pad|loop` (gescripte camera/invoer voor frames),
+`--geluid-log` (elke klank die start in de uitvoer).
 
-`data/origineel/map1.json` komt uit de gedecodeerde originele spelbestanden (auteursrecht): staat in `.gitignore`, net als `assets/`.
+## Geluid
+
+`view/geluid.gd` (een Node, in `main.gd` aangehaakt) leest sim en view en speelt: stem bij selectie en bevel (alleen de
+leider; man/vrouw/jongen/meisje, ouderen pitch 0,9), hamer/zaag/houweel op `Bumpkin.impact`, sikkel en oogst, melken,
+eieren, munt bij `verkocht`, klokje bij `plan_klaar`, poort, missie-stinger, UI-klik op elke knop; 3D: kampvuur, golven langs
+de kust (5 lussen naar de dichtste kustpunten), koeien loeien, kippen tokken; 2D-lagen: wind (seizoen, regen, zoom), regen,
+krekels 's nachts, vogels overdag, uil. Bussen Master/Effecten/Stemmen/Omgeving, volumes in `Geluid.BUSSEN`. Pauze zet
+werkgeluid stil; met `--write-movie` is alles stil. Bronnen: `audio/eigen/` (eigen synthese, `py -3.10 audio/maak_geluid.py`,
+in git) en `assets/audio/beasts/` (beasts-src, via `audio/haal_beasts.ps1` uit sync.ps1, niet in git). Details: `../audio.md` sectie 6.
+
+`data/origineel/map1.json` en `map2.json` komen uit de gedecodeerde originele spelbestanden (auteursrecht): staan in `.gitignore`, net als `assets/`.
+
+## Missies
+
+`data/spel.json` `missies.<nr>`: kaart, `start_kas`, `doel` (alles moet: `dorpelingen` >=, `koeien` eigen >=, `kas_boven` = kas >,
+origineel `cash>`), `verlies` (`dorpelingen_onder`), `koe_generator` (klasse 171) en optioneel `bos_dichtheid`. `Wereld.laad("", nr)`,
+`main.gd --missie=nr`. Missie 1 (Aorta) ongewijzigd. **Missie 2** (Terug op het vasteland, `--missie=2`): kaart
+`lokaal/map2/map2.json` (`python lokaal/map2/maak_map.py 2`, zelfde decoder als kaart 1; die geeft op kaart 1 dezelfde tex, wegen en
+objecten), 10 dorpelingen (4 m, 4 v, 2 jongens), kas 6.999, doel kas > 10.000, verlies onder 2; kampvuur (90,76), vlag (92,73),
+4 eigen koeien (klasse 110), voorgebouwde boerderij (klasse 51) als afgebouwde melkerij (`Wereld.plaats_voorgebouwd`, gratis, na de view),
+bos 0,6. Scenario's `kaart` (van boven, noord boven, naast `lokaal/missies/m02_layout.png`) en `wolf`; frames `screenshots/missie2_*.jpg`.
+Nog niet: wolven (klasse 104, 3x) staan stil als blokjes-placeholder, zonder gedrag; goud (161) en drankjes (160) zijn placeholders, niet
+op te rapen; klasse 226 (betekenis onbekend) is `geen`; prijzen/geluk, pensioen en de hints van missie 2 ontbreken; het leeg buiten de
+kaart (zwart in het origineel) wordt water, zodat het meer in het NW in de zee overloopt. `ontbreekt` in objecten.json geeft per klasse
+een waarschuwing in de log.
 
 ## Zelfstandig werk en de nacht
 
@@ -51,6 +78,13 @@ komt geen weg; de stroken lopen eromheen, en nieuwe wegen zoeken er een omweg la
 loods) krijgt meteen een weg van zijn deur naar het dichtste pad of het kampvuur (`Wereld.leg_weg`, BFS; beasts-src
 `World.aim` bestelt die weg mee), `weg_per_tegel` (2) kas per nieuwe tegel, zonder bouwtijd. De laatste meters, van de
 deurtegel tot de echte deur binnen de voetafdruk, tekent `Wegen` als stoep naar `Plan.deur_punt`.
+Zelf wegen leggen (2026-10-30): bouwsoort **weg** (vanaf de start, `prijzen.weg` 2 kas en `bouwtijd_s.weg` 3 s per tegel,
+beasts-src). Slepen legt een rij (`sim/bouwrij.gd`, ook voor hek): A* over 4 richtingen met een strafje per bocht, dus op
+open grond een L met een bocht en anders om gebouwen, bomen en water heen; tegels die al pad (of al hek) zijn tellen mee en
+kosten niets; lukt geen route dan de rechte L (eerst x, dan z) en wat daarvan niet kan wordt rood en niet geplaatst.
+Dorpelingen bouwen een weg-plan zelf (`_open_plan`) en bouwen door naar het volgende stuk (`_volgend_plan`, zoals hek);
+af wordt de tegel pad, gaat het plan uit de lijst (`Wereld._weg_af`) en tekent `Wegen` hem (`wegen_veranderd`). Een weg
+mag niet onder een gebouw of plan, en op een (geplande) weg komt geen plan; voor een deur mag een weg wel.
 Bouwen kan niet op pad (zoals het origineel), niet op andermans deurtegel, en alleen als de eigen deurtegel loopbaar en
 bereikbaar is (een boompje voor de deur liet de weg eerst ernaast uitkomen). `test/deur_check.gd` legt `Plan.DEUREN` naast
 de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebouw-glb opnieuw draaien.
@@ -69,21 +103,32 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | WASD/pijlen, schermrand | pannen (begrensd tot het eiland) |
 | wiel | zoomen (2 m tot eilandoverzicht) |
 | Spatie, 1 / 2 / 4 | pauze, tempo 1x/2x/4x |
-| B / L / H / M / J / G / F / P, R, Esc | bouwen: hut / loods / kippenhok / molen / melkerij / akker / hek (slepen = rij) / poort, draaien, stoppen. Het menu groeit: eerst hut, kippenhok, loods; na een loods molen en akker; na een molen melkerij, hek en poort |
+| knop rechtsboven (of B / L / H / M / J / G / T / F / P) | bouwmodus: hut / loods / kippenhok / molen / melkerij / akker / weg / hek / poort. Het menu groeit: eerst hut, kippenhok, loods, weg; na een loods molen en akker; na een molen melkerij, hek en poort |
+| in de bouwmodus: links indrukken, slepen, loslaten | indrukken toont de ghost onder de wijzer, slepen schuift hem, loslaten plaatst (groen = kan, rood = kan niet of te duur). Weg en hek: slepen legt een rij met een ghost per tegel (grijs = is er al). De modus **blijft aan** na het plaatsen |
+| in de bouwmodus: knop Draai, wiel, R | een kwartslag draaien (wiel: omlaag verder, omhoog terug; het wiel zoomt dan niet). Weg en hek draaien niet, daar blijft het wiel zoomen |
+| in de bouwmodus: knop Stop, nog eens op de bouwknop, rechts klikken, Esc | bouwmodus uit (rechts slepen draait gewoon de camera) |
 | links klikken op een poort | open of dicht: dicht houdt koeien tegen, dorpelingen lopen er altijd door |
 | K, N | regen automatisch/aan/uit, volgend seizoen (debug) |
+
+Alles van het bouwen kan met alleen een linkerknop of een vinger (besluit gebruiker 2026-10-30): kiezen, Draai en Stop
+zijn knoppen (44 px hoog), plaatsen is indrukken-slepen-loslaten, en de ghost volgt de laatste wijzerpositie uit de invoer
+(`Bouwmenu._input`), dus zonder hover. Wiel, rechterklik en toetsen zijn alleen sneltoetsen. Voor touch nog nodig:
+`emulate_mouse_from_touch` staat standaard aan (een vinger = linkerknop, zo werkt het bouwen al); daarnaast camera pannen,
+zoomen en draaien met twee vingers (`InputEventScreenDrag`/`InputEventMagnifyGesture` in `rts_camera.gd`, nu muis en
+toetsen), een selectie wissen zonder rechterklik (knop), en het kader (links slepen) naast slepen-om-te-pannen.
 
 Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`, nog zonder invoer en zonder gedrag).
 
 ## Structuur
 
 - `data/` `spel.json` (tegelmaat 2 m, 10 Hz, looptempo, klok), `tegels.json` (kleur, loopbaar, snelheidsfactor: pad 1,15, gras 1, zand 0,9; water en rots niet loopbaar), `objecten.json` (klasse-id naar naam, model, voetafdruk, blokkeert).
-- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Vee` (koe: zwerft rond generator of, eigen, rond het kampvuur), `Plan`, `Gegevens`.
-  Missie 1 in `Wereld`: kas (`spel.json` `start_kas`, `prijzen`, betaald bij `plan_zet`), koe-generator (klasse 171, `koe_generator`: start 1, max 3 wilde, elke 45 s; uit `m01.json` p5=1/p6=3, betekenis aangenomen), `geef_claimbevel`, `uitslag` + signaal `missie_einde`.
+- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Vee` (koe: zwerft rond generator of, eigen, rond het kampvuur), `Plan`, `BouwRij` (rij weg of hek uit een sleepbeweging), `Gegevens`.
+  Missie 1 in `Wereld`: kas (`spel.json` `missies.1.start_kas`, `prijzen`, betaald bij `plan_zet`), koe-generator (klasse 171, `missies.1.koe_generator`: start 1, max 3 wilde, elke 45 s; uit `m01.json` p5=1/p6=3, betekenis aangenomen), `geef_claimbevel`, `uitslag` + signaal `missie_einde`.
   Gezin (`Wereld._gezin`, port van beasts-src `family`, waarden in `spel.json` `gezin`): bedden = 2 per afgebouwde hut; `ruimte()` = bedden - iedereen - wiegen - baby's. Een vrije man + vrouw lopen naar de deurtegel (`Plan.deur_tegel`, voordeur aan -x bij draai 0) en verdwijnen naar binnen; 12 s later komt zij met de baby op de arm (5 s), dan staat er een jongen of meisje (hash, geen rng), 150 s later volwassen (glb wisselt). Ouders rusten 75 s. Een bevel van de speler breekt het af. ⚠️ Met 6 startbewoners zijn er 4 hutten nodig voor het eerste kind.
   Graan en brood (`Wereld._economie`, beasts-src-lus, `spel.json` `economie`): molen (= bakkerij, 4x3, deur aan +z, wieken draaien) begint met 8 brood; akker (2x2, 16 kas, 16 s werk, loopbaar) rijpt in 60 s in lente en zomer, rijp sterft bij het begin van de winter. Wie niets omhanden heeft kiest elke 0,5 s een klus: graan naar de dichtste molen, brood kopen na 30 s trek (ook kinderen; 3 kas per brood, 1,2 s aan de toonbank), of (volwassen) een rijpe akkertegel oogsten (2 s, zak op de rug). Een bevel van de speler gaat voor.
   Melk (zelfde lus, `Wereld.WINKELS`): melkerij (4x4, 45 kas, deur aan -x, begint met 8 melk); een volwassene melkt een koe die niet leeg is en binnen `melk_straal` (14) tegels van het kampvuur staat, wild of eigen (besluit gebruiker), 2,2 s, daarna is ze 90 s leeg (beasts-src Herd.again). Trek houdt per waar bij (brood, melk, ei), elk na 30 s.
   Eieren: een afgebouwd kippenhok (`Kip` in `sim/kip.gd`) krijgt `kippen_per_hok` (3) kippen die binnen 3 tegels van de deur scharrelen en pikken; na `kip_leeg_s` (55, beasts-src) legt een kip en blijft zitten; een volwassene raapt (1,6 s) en brengt het ei naar het hok (start 8), bewoners kopen het voor 3. Model: `view/kip_model.gd` (assets/kip.glb, clips idle/lopen/pikken/zitten; zonder glb een placeholder).
+  Voorraad op het scherm (`view/voorraad.gd`, beasts-src `HudArt.stock` + `GameView.buying`/`drawSales`): elke winkel krijgt een kraam naast de deur (luifel geel/blauw/rood voor molen/melkerij/kippenhok) met zoveel broden, melkkannen of eieren als `Plan.voorraad`, tot 8 (2 rijen van 4), daarboven een getal. Leeg = lege toonbank met een deinend rood `!`. Een verkoop laat een gouden `+3` met munt 1,6 s boven de kraam opdrijven (vervaagt de laatste 0,5 s, twee stapelen, hoogstens 6), een levering een korte `+1` in de kleur van de waar en het nieuwe stuk springt op. De sim meldt dat met de signalen `Wereld.verkocht`/`geleverd` (in `klus_af`, geen gedragsverandering).
 - `view/` `WereldView` spiegelt de sim, `TerreinView` (een mesh met vertexkleur en hoogte, water, MultiMesh-bomen en -rotsen), `Props` (placeholders), `Bumpkin` (geanimeerde man, `volg()`-modus voor de sim), `Licht`, `Regen`, `Bestuur`, `Hud`.
 - `shaders/` terrein (vijf texturensets, seizoenstint, sneeuw, nat), natuur_wind (gesynct uit modellen/natuur), natuur_steen (rotsen met sneeuw) en water (diepte, schuim).
 - `main.gd` zet alles in elkaar en bevat de scenario's. `test/` simtest, routetijd en glad_test. `screenshots/` verificatieframes.
@@ -102,7 +147,7 @@ stronken) is ALLEEN weergave: de sim leest het niet en geen tegel wordt erdoor g
 texturensets (Texture2DArray, 2,8 m per herhaling) uit de hoekgewichten van `TerreinView._splat()`. De koe (klasse 171) komt uit `view/koe.gd`
 (pad, verborgen onderdelen en animatienaam staan alleen daar; nieuwe glb = sync + import). Seizoen: `Natuur.werk_seizoen()` (tint, rotssneeuw) en
 `TerreinView.zet_sneeuwlaag()` (winter), aangeroepen vanuit `WereldView.werk_seizoen()`.
-Scenario's voor frames: overzicht, dorp, selectie, pad, loop, vlag, bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat), nacht (hut + slaapzakken bij het vuur, --uur=20.6). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
+Scenario's voor frames: overzicht, kaart, dorp, selectie, pad, loop, vlag, wolf (missie 2), bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat), sleep (een weg en een hek door het bouwmenu gesleept met echte muisinvoer, `test/sleep_scenario.gd`; frame in `screenshots/bouwmenu_sleep_weg_hek.jpg`), nacht (hut + slaapzakken bij het vuur, --uur=20.6). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
 Uiterlijk per dorpeling: `Bumpkin.glb_voor(geslacht, leeftijd)` kiest een van de zes glb's (man, vrouw, jongen, meisje, oudere man/vrouw; kinderen zijn al 1,11 m in de glb). `sex` 13 = jongen, 14 = meisje is een aanname (niet geverifieerd). Ontbreekt een glb: de man (kind op 0,81x).
-Bouwplaats: houtstapel en steenhoop naast het plan slinken tot 35 % met de voortgang; bouwmenu: hut (B), gereedschapsloods (L, 5x2) en kippenhok (H, 2x2), `Bouwmenu.GEBOUWEN` + `Wereld.BOUWSOORTEN`; glb's op ware grootte, een mensendeur schaalt. Hut klaar = `peasant_hut_rt.glb`, geschaald op de voordeur: 1,15x de langste volwassene (1,37 m) = 1,58 m, dat is de glb op ware grootte; voetafdruk dus 4x4 tegels (7,6 x 7,1 m incl. hek). Die glb (25 MB) staat niet in git: `blender -b -P ../modellen/peasant_hut_realtime.py`, anders blijft het een bruine kist.
+Bouwplaats: houtstapel en steenhoop naast het plan slinken tot 35 % met de voortgang; bouwmenu: hut (B), gereedschapsloods (L, 5x2), kippenhok (H, 2x2), weg (T, 1x1) en de rest (zie Besturing), `Bouwmenu.GEBOUWEN` + `Wereld.BOUWSOORTEN`; glb's op ware grootte, een mensendeur schaalt. Hut klaar = `peasant_hut_rt.glb`, geschaald op de voordeur: 1,15x de langste volwassene (1,37 m) = 1,58 m, dat is de glb op ware grootte; voetafdruk dus 4x4 tegels (7,6 x 7,1 m incl. hek). Die glb (25 MB) staat niet in git: `blender -b -P ../modellen/peasant_hut_realtime.py`, anders blijft het een bruine kist.
 Hoogte (rotsboog, strand) is alleen weergave; de sim is plat.

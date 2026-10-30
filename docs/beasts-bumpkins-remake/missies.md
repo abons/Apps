@@ -122,6 +122,16 @@ Conditie-record (gevonden met regex `type 0xCD a b c id 0xCD 01 00 00 00`, `type
 - De 22 kB staart is geen opgeblazen script: het is het spelerrecord (kas) plus een condities- en hintgebied; hints in M1 zijn een keten (hut -> bouwersgilde -> bakkerij -> boerderij -> poort -> koeien) plus timers van 108-360 ticks, en de keuze "begin met kippenhokken" (tekst 1-12) komt zonder conditie bij de start.
 - M1 heeft geen eigen gebouwen bij de start (net als de bevinding "geen gebouwen" in `map1.md`), wel een zilveren beker (index 6, (110,53)) die via conditie `type 12` naar de vlag (index 1) moet.
 
+## M2 in de remake
+
+Speelbaar met `--missie=2` (zie `spel/README.md`, "Missies"). Kaart: `lokaal/map2/map2.json` uit `lokaal/map2/maak_map.py`. Uit het
+bestand: dorp **Goatton**, vlag (92,73), kampvuur (90,76), bron (89,78; een dorpeling staat erop en schuift een tegel op), 10
+dorpelingen (4 x type 1, 4 x type 2, 2 x type 13: geen meisje), **4 eigen koeien** (klasse 110, eigenaar 0, (83..88, 77..82)), een
+**boerderij** (klasse 51, (90,68), eigenaar 0: in de remake een afgebouwde melkerij), koe-generator (111,101) met p5=1/p6=2 (start 1, max 2),
+3 wolven (klasse 104, groep 13, type 23) op (111,55), (125,88), (116,100), 3 goudbuidels (161), 3 drankjes (160), 10 paddenstoelen,
+52 bomen, klasse 226 (123,69) onbekend. Wegtypes 1-5 (14 tegels, van de boerderij langs de vlag naar de bron). Bos: 1.090 tegels 225/226;
+de kleine "vlekken" in het gras zijn bosjes met overgangsranden (tex 115-130).
+
 ## Lokale bestanden (niet in git)
 
 | pad | inhoud |

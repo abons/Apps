@@ -1,8 +1,11 @@
 class_name Bouwmenu
 extends Node
 ## Bouwmenu (stap 5, gameplay.md §7): een knop per gebouw in GEBOUWEN (of zijn toets), alleen voor wat Wereld.ontgrendeld
-## al toelaat (hut/kippenhok/loods; loods -> molen, akker; molen -> melkerij, hek, poort). Hek: slepen = een rij. Ghost volgt de muis over de tegels (groen = kan, rood = kan niet),
-## R draait, linkerklik plaatst een Plan in Wereld, rechterklik of Esc stopt. Shift bij het plaatsen houdt de modus aan.
+## al toelaat (hut/kippenhok/loods/weg; loods -> molen, akker; molen -> melkerij, hek, poort).
+## Alles kan met een wijzer alleen (besluit gebruiker 2026-10-30, ook voor touch later): indrukken toont de ghost, slepen
+## schuift hem (groen = kan, rood = kan niet), loslaten plaatst een Plan. Weg en hek: slepen legt een rij (BouwRij: hoekige
+## route om obstakels, een ghost per tegel). De modus blijft aan na het plaatsen; stoppen met de Stop-knop, nog eens op
+## de bouwknop, rechterklik of Esc. Draaien met de Draai-knop, het wiel (dan zoomt het wiel niet) of R.
 ## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
 ## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de glb van het gebouw. De glb's
 ## zijn op ware grootte (dorpeling 1,37 m); een mensendeur ("voordeur", anders "deur", >= 1 m) schaalt ze op DEUR_M,
@@ -19,9 +22,16 @@ const GEBOUWEN := {
 	&"molen": {"tekst": "Molen", "toets": KEY_M, "glb": "res://assets/molen_rt.glb", "hoogte": 3.0},
 	&"melkerij": {"tekst": "Melkerij", "toets": KEY_J, "glb": "res://assets/melkerij_boerderij_rt.glb", "hoogte": 2.6},
 	&"akker": {"tekst": "Akker", "toets": KEY_G, "glb": "", "hoogte": 0.3},   # geen glb: per tegel akker_kaal + akker_rijp
+	&"weg": {"tekst": "Weg", "toets": KEY_T, "glb": "", "hoogte": 0.15},      # af = padtegel, view/wegen.gd (slepen = rij)
 	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
 	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 1.3},   # hek_poort.glb, vleugel draait open (klik)
 }
+const RIJ_SOORTEN := [&"weg", &"hek"]     ## slepen = een rij (BouwRij); draaien doet er niet toe
+const KNOP_H := 44.0                      ## knophoogte in px: met een vinger te raken
+const MENU_LINKS := 760.0                 ## px: het menu begint rechts van de stand linksboven (Hud)
+const KLEUR_KAN := Color(0.3, 1.0, 0.3, 0.45)
+const KLEUR_NIET := Color(1.0, 0.1, 0.1, 0.55)
+const KLEUR_BESTAAT := Color(0.85, 0.85, 0.85, 0.25)
 const POORT_OPEN_RAD := deg_to_rad(100.0)
 const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
 
@@ -47,7 +57,15 @@ var _wieken: Array[Node3D] = []
 var _gewas := {}           ## akkertegel -> Node3D (akker_rijp, groeit mee met Wereld.akkers)
 var _hekken: Node3D        ## alle hekpalen en -segmenten, opnieuw opgebouwd bij elk afgebouwd hek of poort
 var _poorten := {}         ## Plan -> Node3D (poort_deur)
-var _sleep_start := Vector2i(-1, -1)   ## hek: tegel waar het slepen begon
+var _sleep_start := Vector2i(-1, -1)   ## weg/hek: tegel waar het slepen begon
+var _drukt := false        ## linkerknop (of vinger) ingedrukt in de bouwmodus: loslaten plaatst
+var _wijzer := Vector2(-1, -1)          ## laatste wijzerpositie uit de invoer (muis of geemuleerde touch)
+var _rij: Array[Vector2i] = []          ## weg/hek: de route van het slepen
+var _rij_sleutel := []                  ## wanneer de route opnieuw moet (begin, eind, plannen, kas)
+var _rij_ghosts: Array[MeshInstance3D] = []
+var knop_draai: Button
+var knop_stop: Button
+var hint: Label
 
 
 func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
@@ -64,21 +82,26 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 
 	var laag := CanvasLayer.new()
 	add_child(laag)
-	var rij := HBoxContainer.new()
-	rij.add_theme_constant_override("separation", 8)
-	rij.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	rij.alignment = BoxContainer.ALIGNMENT_END      # rechtsboven: onder staat de hulptekst, linksboven de stand
-	rij.offset_top = 12
-	rij.offset_bottom = 52
-	rij.offset_right = -16
-	laag.add_child(rij)
+	# rechtsboven, rechts van de stand (linksboven): de knoppen lopen door op een tweede regel als het niet past,
+	# daaronder hint, Draai en Stop. Onder staat de hulptekst.
+	var kolom := VBoxContainer.new()
+	kolom.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	kolom.offset_left = MENU_LINKS
+	kolom.offset_top = 12
+	kolom.offset_right = -16
+	kolom.add_theme_constant_override("separation", 8)
+	kolom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	laag.add_child(kolom)
+	var rij := HFlowContainer.new()
+	rij.add_theme_constant_override("h_separation", 8)
+	rij.add_theme_constant_override("v_separation", 8)
+	rij.alignment = FlowContainer.ALIGNMENT_END
+	rij.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kolom.add_child(rij)
 	for s: StringName in GEBOUWEN:
 		var g: Dictionary = GEBOUWEN[s]
-		var k := Button.new()
-		k.text = "%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])]
+		var k := _knop("%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])])
 		k.toggle_mode = true
-		k.add_theme_font_size_override("font_size", 18)
-		k.focus_mode = Control.FOCUS_NONE
 		k.toggled.connect(func(aan: bool) -> void: kies(s, aan))
 		rij.add_child(k)
 		knoppen[s] = k
@@ -86,6 +109,43 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	w.plan_klaar.connect(func(_p: Plan) -> void:       # nieuwe knoppen na een loods of molen
 		for s2 in knoppen:
 			(knoppen[s2] as Button).visible = w.ontgrendeld(s2))
+	# draaien en stoppen ook zonder toets, wiel of rechterknop (touch): twee knoppen onder het menu, alleen in de modus
+	var rij2 := HBoxContainer.new()
+	rij2.add_theme_constant_override("separation", 8)
+	rij2.alignment = BoxContainer.ALIGNMENT_END
+	rij2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kolom.add_child(rij2)
+	hint = Label.new()
+	hint.add_theme_font_size_override("font_size", 15)
+	hint.add_theme_color_override("font_outline_color", Color.BLACK)
+	hint.add_theme_constant_override("outline_size", 5)
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rij2.add_child(hint)
+	knop_draai = _knop("Draai (R / wiel)")
+	knop_draai.custom_minimum_size.x = 150
+	knop_draai.pressed.connect(draai_verder)
+	rij2.add_child(knop_draai)
+	knop_stop = _knop("X  Stop (Esc)")
+	knop_stop.custom_minimum_size.x = 130
+	knop_stop.pressed.connect(func() -> void: zet_actief(false))
+	rij2.add_child(knop_stop)
+	zet_actief(false)
+
+
+func _knop(tekst: String) -> Button:
+	var k := Button.new()
+	k.text = tekst
+	k.custom_minimum_size = Vector2(0, KNOP_H)
+	k.add_theme_font_size_override("font_size", 18)
+	k.focus_mode = Control.FOCUS_NONE
+	return k
+
+
+## Een kwartslag verder (Draai-knop, wiel omlaag, R); -1 = terug (wiel omhoog). Niet voor weg en hek.
+func draai_verder(stap := 1) -> void:
+	if actief and not soort in RIJ_SOORTEN:
+		draai = posmod(draai + stap, 4)
 
 
 ## Zet de bouwmodus aan voor `s`, of uit.
@@ -104,11 +164,23 @@ func kies(s: StringName, aan := true) -> void:
 func zet_actief(aan: bool) -> void:
 	actief = aan
 	ghost.visible = aan
+	_drukt = false
+	_sleep_start = Vector2i(-1, -1)
+	_toon_rij([], [])
 	for s in knoppen:
 		var k: Button = knoppen[s]
 		var moet: bool = aan and s == soort
 		if k.button_pressed != moet:
 			k.set_pressed_no_signal(moet)
+	if knop_stop != null:
+		knop_stop.visible = aan
+		knop_draai.visible = aan
+		knop_draai.disabled = soort in RIJ_SOORTEN
+		hint.visible = aan
+		var g: String = GEBOUWEN[soort]["tekst"]
+		hint.text = ("%s: slepen = rij, loslaten = plaatsen" % g) if soort in RIJ_SOORTEN \
+				else ("%s: loslaten = plaatsen" % g)
+		hint.text += "   rechts = stop"
 	if aan:
 		bestuur.wis_selectie()
 
@@ -163,22 +235,69 @@ func _process(_dt: float) -> void:
 		if p.klaar:
 			continue
 		var f: float = float(p.stand()) / Plan.STANDEN
-		k.scale.y = f
-		k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
+		if p.soort != &"weg":      # een weg is plat: alleen de kleur loopt mee
+			k.scale.y = f
+			k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
 	for pt in _poorten:
 		var dr: Node3D = _poorten[pt]
 		dr.rotation.y = lerp_angle(dr.rotation.y, POORT_OPEN_RAD if pt.open else 0.0, minf(1.0, _dt * 5.0))
 	if not actief:
 		return
-	var p := _plan_onder(get_viewport().get_mouse_position())
+	if soort in RIJ_SOORTEN and _drukt and _sleep_start.x >= 0:
+		ghost.visible = false
+		var eind := bestuur.tegel_onder(_wijzer)
+		if eind.x < 0:
+			return
+		var sleutel := [_sleep_start, eind, w.plannen.size(), w.kas]
+		if sleutel != _rij_sleutel:       # A* alleen als er iets veranderd is
+			_rij_sleutel = sleutel
+			_rij = BouwRij.route(w, soort, _sleep_start, eind)
+			_toon_rij(_rij, BouwRij.statussen(w, soort, _rij))
+		return
+	var p := _plan_onder(_wijzer)
 	ghost.visible = p != null
 	if p == null:
 		return
 	ghost.position = _midden(p)
+	if soort == &"weg":
+		ghost.position.y = _grond(p.tegel).y + _hoogte(soort) * 0.5
 	ghost.rotation.y = draai * PI * 0.5
 	var kan := w.kan_bouwen(p) and w.kan_betalen(p.soort)
-	(ghost.material_override as StandardMaterial3D).albedo_color = Color(0.3, 1.0, 0.3, 0.45) if kan else Color(1.0, 0.25, 0.2, 0.45)
+	if soort in RIJ_SOORTEN:
+		kan = BouwRij.statussen(w, soort, [p.tegel])[0] == BouwRij.KAN
+	(ghost.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if kan else KLEUR_NIET
+
+
+## Een ghost-tegel per tegel van de rij, gekleurd naar BouwRij-status (groen kan, rood kan niet of te duur, grijs al
+## weg of al hek). Lege lijst = alles weg.
+func _toon_rij(tegels: Array[Vector2i], st: Array[int]) -> void:
+	if ghost == null:
+		return
+	while _rij_ghosts.size() < tegels.size():
+		var m := BoxMesh.new()
+		m.size = Vector3(w.tegel_m * 0.9, 1.0, w.tegel_m * 0.9)
+		var mat := StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var mi := MeshInstance3D.new()
+		mi.mesh = m
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ghost.get_parent().add_child(mi)
+		_rij_ghosts.append(mi)
+	var h := _hoogte(soort)
+	for i in _rij_ghosts.size():
+		var mi := _rij_ghosts[i]
+		mi.visible = i < tegels.size()
+		if not mi.visible:
+			continue
+		var s: int = st[i]
+		var hh := h if s != BouwRij.BESTAAT else 0.05
+		mi.scale = Vector3(1.0, hh, 1.0)
+		mi.position = _grond(tegels[i]) + Vector3(0, hh * 0.5, 0)
+		(mi.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if s == BouwRij.KAN \
+				else (KLEUR_BESTAAT if s == BouwRij.BESTAAT else KLEUR_NIET)
 
 
 func _toon_plan(p: Plan) -> void:
@@ -188,7 +307,7 @@ func _toon_plan(p: Plan) -> void:
 	_kisten[p] = mi
 	ghost.get_parent().add_child(mi)
 	var lijst: Array[Node3D] = []
-	var plekken := _stapelplekken(p, STAPELS.size() if not p.soort in [&"akker", &"hek", &"poort"] else 0)
+	var plekken := _stapelplekken(p, STAPELS.size() if not p.soort in [&"akker", &"hek", &"poort", &"weg"] else 0)
 	for i in plekken.size():
 		var n := Natuur.instantie(STAPELS[i])
 		if n == null:
@@ -236,6 +355,10 @@ func _plan_klaar(p: Plan) -> void:
 		return
 	if p.soort == &"akker":
 		_maak_akker(p)
+		k.queue_free()
+		_kisten.erase(p)
+		return
+	if p.soort == &"weg":       # de padtegel tekent view/wegen.gd (Wereld.wegen_veranderd)
 		k.queue_free()
 		_kisten.erase(p)
 		return
@@ -401,27 +524,17 @@ static func _omhulsel(n: Node, t: Transform3D) -> AABB:
 	return uit
 
 
-## Tegels van a naar b in een rechte (of schuine) lijn (Bresenham).
-static func _lijn(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
-	var uit: Array[Vector2i] = []
-	var d := (b - a).abs()
-	var s := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
-	var fout := d.x - d.y
-	var t := a
-	for _i in d.x + d.y + 2:
-		uit.append(t)
-		if t == b:
-			break
-		var e2 := 2 * fout
-		if e2 > -d.y:
-			fout -= d.y
-			t.x += s.x
-		if e2 < d.x:
-			fout += d.x
-			t.y += s.y
-	return uit
 
 
+## Wijzerpositie bijhouden (ook boven knoppen en met touch-emulatie, waar viewport.get_mouse_position de echte muis geeft).
+func _input(e: InputEvent) -> void:
+	if e is InputEventMouse:
+		_wijzer = (e as InputEventMouse).position
+
+
+## Neemt in de bouwmodus de linkerknop over (indrukken = ghost, slepen = schuiven of een rij, loslaten = plaatsen),
+## het wiel bij een draaibare soort (draaien in plaats van zoomen) en een rechterklik (stoppen; rechts slepen blijft
+## de camera draaien). Werkt ook met een vinger (emulate_mouse_from_touch, standaard aan).
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
 		for s: StringName in GEBOUWEN:
@@ -430,37 +543,51 @@ func _unhandled_input(e: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		if actief and e.keycode == KEY_R:
-			draai = (draai + 1) % 4
+			draai_verder()
 			get_viewport().set_input_as_handled()
 		elif actief and e.keycode == KEY_ESCAPE:
 			zet_actief(false)
 			get_viewport().set_input_as_handled()
-	elif actief and e is InputEventMouseButton:
-		if e.button_index == MOUSE_BUTTON_LEFT and soort == &"hek":
-			# hek: indrukken = begin, loslaten = een rechte rij plannen tot daar (elk betaalt zijn eigen prijs)
-			var t := bestuur.tegel_onder(e.position)
-			if e.pressed:
-				_sleep_start = t
-			elif _sleep_start.x >= 0 and t.x >= 0:
-				var n := 0
-				for tt in _lijn(_sleep_start, t):
-					var hp := Plan.new(&"hek", tt, 0, 1, 1)
-					if w.plan_zet(hp):
-						n += 1
-				_sleep_start = Vector2i(-1, -1)
-				if n > 0 and not Input.is_key_pressed(KEY_SHIFT):
-					zet_actief(false)
+		return
+	if not actief or not e is InputEventMouseButton:
+		return
+	var mb := e as InputEventMouseButton
+	_wijzer = mb.position
+	match mb.button_index:
+		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
+			if soort in RIJ_SOORTEN:
+				return                  # niets te draaien: het wiel blijft zoomen
+			if mb.pressed:
+				draai_verder(1 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 			get_viewport().set_input_as_handled()
-		elif e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
-			var p := _plan_onder(e.position)
-			if p != null and w.plan_zet(p) and not Input.is_key_pressed(KEY_SHIFT):
-				zet_actief(false)
+		MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				_drukt = true
+				_sleep_start = bestuur.tegel_onder(mb.position)
+				_rij_sleutel = []
+			elif _drukt:
+				_plaats(mb.position)
 			get_viewport().set_input_as_handled()
-		elif e.button_index == MOUSE_BUTTON_RIGHT:
-			if e.pressed:
+		MOUSE_BUTTON_RIGHT:
+			if mb.pressed:
 				_rechts = true
-				_rechts_start = e.position
+				_rechts_start = mb.position
 			elif _rechts:
 				_rechts = false
-				if e.position.distance_to(_rechts_start) < KLIK_DREMPEL:
+				if mb.position.distance_to(_rechts_start) < KLIK_DREMPEL:
 					zet_actief(false)
+
+
+## Loslaten: de rij (weg/hek) of het ene plan onder de wijzer neerzetten. De modus blijft aan.
+func _plaats(pos: Vector2) -> void:
+	_drukt = false
+	if soort in RIJ_SOORTEN:
+		var eind := bestuur.tegel_onder(pos)
+		if _sleep_start.x >= 0 and eind.x >= 0:
+			BouwRij.zet(w, soort, BouwRij.route(w, soort, _sleep_start, eind))
+		_sleep_start = Vector2i(-1, -1)
+		_toon_rij([], [])
+		return
+	var p := _plan_onder(pos)
+	if p != null:
+		w.plan_zet(p)

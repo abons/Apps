@@ -16,5 +16,5 @@
     "void": "leeg", "water": "water", "grass": "gras", "dirt": "aarde", "sand": "zand",
     "special": "bosgrond", "other": "overig", "rockrim": "rotsrand", "rock": "rots"
   },
-  "weg_naar_tegel": {"1": "pad", "2": "pad", "6": "pad"}
+  "weg_naar_tegel": {"1": "pad", "2": "pad", "3": "pad", "4": "pad", "5": "pad", "6": "pad"}
 }

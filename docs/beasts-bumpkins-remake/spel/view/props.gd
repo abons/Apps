@@ -80,8 +80,66 @@ static func _placeholder(naam: String, ob: Dictionary) -> Node3D:
 		"kampvuur": _kampvuur(n)
 		"bron": _bron(n)
 		"beker", "zilveren_beker": _beker(n)
+		"wolf": _wolf(n)
+		"goud": _goud(n)
+		"drankje": _drankje(n)
 		_: return null
 	return n
+
+
+## Missie 2, nog zonder glb: grijze wolf uit blokken (lijf, kop, snuit, oren, poten, staart), kijkt langs +Z.
+static func _wolf(n: Node3D) -> void:
+	var m := _mat(Color(0.42, 0.40, 0.38), 0.95)
+	var delen := [[Vector3(0.32, 0.30, 0.85), Vector3(0, 0.55, 0)], [Vector3(0.28, 0.26, 0.30), Vector3(0, 0.72, 0.52)],
+		[Vector3(0.14, 0.12, 0.20), Vector3(0, 0.66, 0.74)], [Vector3(0.07, 0.12, 0.05), Vector3(-0.09, 0.90, 0.50)],
+		[Vector3(0.07, 0.12, 0.05), Vector3(0.09, 0.90, 0.50)], [Vector3(0.08, 0.40, 0.08), Vector3(-0.11, 0.2, 0.3)],
+		[Vector3(0.08, 0.40, 0.08), Vector3(0.11, 0.2, 0.3)], [Vector3(0.08, 0.40, 0.08), Vector3(-0.11, 0.2, -0.3)],
+		[Vector3(0.08, 0.40, 0.08), Vector3(0.11, 0.2, -0.3)], [Vector3(0.08, 0.08, 0.40), Vector3(0, 0.62, -0.58)]]
+	for dl in delen:
+		var b := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = dl[0]
+		b.mesh = bm
+		b.material_override = m
+		b.position = dl[1]
+		n.add_child(b)
+
+
+## Goudbuidel (origineel `gold`): bruine zak met een paar munten.
+static func _goud(n: Node3D) -> void:
+	var zak := MeshInstance3D.new()
+	zak.mesh = _bol(0.2, 10)
+	zak.material_override = _mat(Color(0.5, 0.36, 0.2), 0.95)
+	zak.scale = Vector3(1.0, 0.85, 1.0)
+	zak.position.y = 0.17
+	n.add_child(zak)
+	var gm := _mat(Color(1.0, 0.8, 0.25), 0.3, 0.4)
+	gm.metallic = 0.9
+	for i in 3:
+		var munt := MeshInstance3D.new()
+		munt.mesh = _cyl(0.07, 0.07, 0.02, 10)
+		munt.material_override = gm
+		munt.position = Vector3(0.22 + i * 0.05, 0.01 + i * 0.02, 0.05 * i)
+		n.add_child(munt)
+
+
+## Drankje (origineel `potion`): flesje met een blauwe vloeistof en een kurk.
+static func _drankje(n: Node3D) -> void:
+	var fles := MeshInstance3D.new()
+	fles.mesh = _bol(0.1, 10)
+	fles.material_override = _mat(Color(0.3, 0.45, 0.95), 0.15, 0.6)
+	fles.position.y = 0.1
+	n.add_child(fles)
+	var hals := MeshInstance3D.new()
+	hals.mesh = _cyl(0.03, 0.03, 0.1)
+	hals.material_override = _mat(Color(0.75, 0.85, 0.9), 0.1)
+	hals.position.y = 0.23
+	n.add_child(hals)
+	var kurk := MeshInstance3D.new()
+	kurk.mesh = _cyl(0.035, 0.035, 0.04)
+	kurk.material_override = _mat(Color(0.6, 0.45, 0.3), 0.9)
+	kurk.position.y = 0.3
+	n.add_child(kurk)
 
 
 ## Kampvuur uit de glb: deeltjes voor vlammen en rook op `vuur_bron`, een OmniLight3D (flikkert in WereldView).

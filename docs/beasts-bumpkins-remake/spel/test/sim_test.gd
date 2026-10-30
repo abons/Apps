@@ -192,7 +192,7 @@ func _initialize() -> void:
 	_check(in_hut == 0, "niemand staat in de afgebouwde hut (%d)" % in_hut)
 
 	# kas: de hut is betaald; te duur kan niet
-	var wegtegels := int(w.spel["start_kas"]) - w.prijs(&"hut") - w.kas
+	var wegtegels := int(w.missie["start_kas"]) - w.prijs(&"hut") - w.kas
 	_check(wegtegels >= 0 and wegtegels % int(w.spel["weg_per_tegel"]) == 0, "hut kostte %d, plus %d voor de weg naar de deur (kas %d)" % [w.prijs(&"hut"), wegtegels, w.kas])
 	var dt2 := bp.deur_tegel()
 	_check(w.raster.soort_naam(dt2.x, dt2.y) == "pad" or not w.raster.loopbaar(dt2.x, dt2.y), "voor de hutdeur ligt pad")
@@ -601,8 +601,81 @@ func _initialize() -> void:
 			bleef = false
 	_check(bleef, "poort dicht: koe blijft in de weide")
 
+	_test_wegen()
+
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
+
+
+## Weg als bouwsoort (bouwmenu 2026-10-30): slepen = rij (BouwRij, hoekig, om gebouwen heen), 2 kas en 3 s per tegel,
+## dorpelingen bouwen hem zelf en bouwen door, af = padtegel en het plan verdwijnt; niet op een gebouw, geen plan erop.
+func _test_wegen() -> void:
+	var wg := Wereld.new()
+	wg.laad()
+	_check(wg.ontgrendeld(&"weg"), "weg: vanaf de start in het bouwmenu")
+	var veranderd := [0]
+	wg.wegen_veranderd.connect(func() -> void: veranderd[0] += 1)
+	# een vrij stuk van 12x9 tegels dicht bij het kampvuur, bereikbaar
+	var o := Vector2i(-1, -1)
+	for r in range(2, 20):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if o.x >= 0 or maxi(absi(dx), absi(dy)) != r:
+					continue
+				var c := wg.kampvuur + Vector2i(dx, dy)
+				var vrij := true
+				for x in 12:
+					for y in 9:
+						var t := c + Vector2i(x, y)
+						if BouwRij.status(wg, &"weg", t) != BouwRij.KAN or wg.bereik[wg.raster.idx(t.x, t.y)] == 0:
+							vrij = false
+				if vrij:
+					o = c
+	_check(o.x >= 0, "weg: vrij stuk van 12x9 gevonden (%s)" % o)
+	if o.x < 0:
+		return
+	var hut := wg.maak_plan(&"hut", o + Vector2i(4, 2), 0)
+	_check(hut != null and wg.plan_zet(hut), "weg: hut als obstakel geplaatst")
+	_check(BouwRij.status(wg, &"weg", o + Vector2i(5, 3)) == BouwRij.KAN_NIET and wg.maak_plan(&"weg", o + Vector2i(5, 3), 0) == null,
+		"weg: niet onder een gebouw")
+	var om := BouwRij.route(wg, &"weg", o + Vector2i(0, 4), o + Vector2i(11, 4))
+	var langs := om.size() > 0 and om[0] == o + Vector2i(0, 4) and om[-1] == o + Vector2i(11, 4)
+	for i in om.size():
+		if hut.afdruk().has_point(om[i]) or (i > 0 and absi(om[i].x - om[i - 1].x) + absi(om[i].y - om[i - 1].y) != 1):
+			langs = false
+	_check(langs, "weg: rij loopt recht-aansluitend om de hut heen (%d tegels)" % om.size())
+	var a := o
+	var b := o + Vector2i(3, 7)
+	var rij := BouwRij.route(wg, &"weg", a, b)
+	var bochten := 0
+	for i in range(2, rij.size()):
+		if (rij[i] - rij[i - 1]) != (rij[i - 1] - rij[i - 2]):
+			bochten += 1
+	_check(rij.size() == 11 and bochten == 1, "weg: op open grond een L met een bocht (%d tegels, %d bochten)" % [rij.size(), bochten])
+	var kas0 := wg.kas
+	var n := BouwRij.zet(wg, &"weg", rij)
+	_check(n == 11 and wg.kas == kas0 - 22, "weg: 11 plannen voor 2 kas per tegel (kas %d -> %d)" % [kas0, wg.kas])
+	var wp := wg.plan_op(a)
+	_check(wp != null and wp.soort == &"weg" and wp.bouwtijd_s == 3.0 and wg.raster.soort_naam(a.x, a.y) != "pad",
+		"weg: plan van 3 s, nog geen pad")
+	_check(wg.maak_plan(&"kippenhok", b - Vector2i(1, 1), 0) == null, "weg: geen plan op een geplande weg")
+	_check(BouwRij.status(wg, &"weg", b) == BouwRij.BESTAAT and BouwRij.zet(wg, &"weg", [b]) == 0, "weg: een geplande tegel nog eens = overgeslagen")
+	var open := 11
+	for i in int(240.0 / wg.tik_dt):
+		wg.tik(wg.tik_dt)
+		open = 0
+		for q in wg.plannen:
+			if q.soort == &"weg":
+				open += 1
+		if open == 0:
+			break
+	var alles_pad := true
+	for t in rij:
+		if wg.raster.soort_naam(t.x, t.y) != "pad":
+			alles_pad = false
+	_check(open == 0 and alles_pad, "weg: dorpelingen bouwen de hele rij zelf, alle tegels pad (%d open)" % open)
+	_check(veranderd[0] >= 11, "weg: wegen_veranderd per afgebouwde tegel (%d)" % veranderd[0])
+	_check(wg.maak_plan(&"kippenhok", a, 0) == null and BouwRij.status(wg, &"weg", a) == BouwRij.BESTAAT, "weg: niet bouwen op de nieuwe weg")
 
 
 func _check(ok: bool, tekst: String) -> void:

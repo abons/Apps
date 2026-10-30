@@ -22,6 +22,11 @@ signal rol_veranderd(d: Dorpeling)
 signal wegen_veranderd
 signal poort_gewisseld(p: Plan)
 signal volwassen_geworden(d: Dorpeling)
+## Melding voor de view (beasts-src `Building.sold`, een pulsje): een klant rekende af aan de toonbank van `winkel`.
+## De kas en `Plan.voorraad` blijven de waarheid; dit verandert niets aan de sim.
+signal verkocht(winkel: Plan, waar: String, prijs: int)
+## Melding voor de view (beasts-src `World.restock`): er kwam een stuk graan/melk/ei op het schap van `winkel`.
+signal geleverd(winkel: Plan, brengt: String)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -31,10 +36,11 @@ signal volwassen_geworden(d: Dorpeling)
 ## melkerij 7,7 x 6,6 m incl. varkenshok, op deurmaat (deur 1,84 m -> 0,86x) 6,6 x 5,6 m.
 const BOUWSOORTEN := {&"hut": Vector2i(4, 4), &"gereedschapsloods": Vector2i(5, 2), &"kippenhok": Vector2i(2, 2),
 	&"molen": Vector2i(4, 3), &"akker": Vector2i(2, 2), &"melkerij": Vector2i(4, 4), &"hek": Vector2i(1, 1),
-	&"poort": Vector2i(1, 1)}
+	&"poort": Vector2i(1, 1), &"weg": Vector2i(1, 1)}
 ## Bouwmenu-volgorde (besluit gebruiker 2026-10-29): eerst hut, kippenhok en loods; een afgebouwde loods opent molen
-## en akker; een afgebouwde molen opent melkerij, hek en poort.
-const START_SOORTEN := [&"hut", &"kippenhok", &"gereedschapsloods"]
+## en akker; een afgebouwde molen opent melkerij, hek en poort. Weg (1 tegel, slepen = rij, sim/bouwrij.gd) kan vanaf
+## de start (2026-10-30); af wordt de tegel pad en verdwijnt het plan (_weg_af).
+const START_SOORTEN := [&"hut", &"kippenhok", &"gereedschapsloods", &"weg"]
 var alles_open := false                  ## tests en scenario's: het hele bouwmenu meteen
 const ONTGRENDEL := {&"molen": &"gereedschapsloods", &"akker": &"gereedschapsloods", &"melkerij": &"molen",
 	&"hek": &"molen", &"poort": &"molen"}
@@ -42,6 +48,12 @@ const NIET_BLOKKEREND := [&"akker"]       ## loopbaar na de bouw (beasts-src Gro
 var plannen: Array[Plan] = []
 
 var spel: Dictionary
+var missie_nr := 1
+## De missie uit spel.json `missies.<nr>`: kaart, start_kas, doel, verlies, koe_generator (zie laad()).
+var missie: Dictionary = {}
+var voorgebouwd: Array[Dictionary] = []  # {soort, tegel}: gebouwen die de kaart al heeft (plaats_voorgebouwd)
+var _kaart_vee: Array[Dictionary] = []   # {tegel, eigen}: koeien die de kaart al heeft (klasse met "vee")
+var _ontbreekt_gemeld := {}              # klasse-id's die al een waarschuwing gaven
 var raster := Raster.new()
 var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, state, sex}
 var dorpelingen: Array[Dorpeling] = []
@@ -76,20 +88,27 @@ var _acc := 0.0
 var _obj_def: Dictionary
 
 
-## Laadt de data en de kaart. Geeft false als iets ontbreekt (dan staat er een fout in de log).
-func laad(kaart_pad := "") -> bool:
+## Laadt de data en de kaart van missie `nr` (spel.json `missies`). Geeft false als iets ontbreekt (dan staat er een
+## fout in de log). `kaart_pad` overschrijft de kaart van de missie.
+func laad(kaart_pad := "", nr := 1) -> bool:
 	spel = Gegevens.lees(Gegevens.SPEL)
 	var tegels = Gegevens.lees(Gegevens.TEGELS)
 	_obj_def = Gegevens.lees(Gegevens.OBJECTEN)
 	if spel == null or tegels == null or _obj_def == null:
 		return false
+	var missies: Dictionary = spel.get("missies", {})
+	if not missies.has(str(nr)):
+		push_error("wereld: missie %d staat niet in spel.json (missies)" % nr)
+		return false
+	missie_nr = nr
+	missie = missies[str(nr)]
 	tegel_m = float(spel["tegel_m"])
 	tik_dt = 1.0 / float(spel["sim_hz"])
 	loop_mps = Gegevens.loop_mps(spel)
 	looptempo = float(spel.get("looptempo", 1.0))
 	rng.seed = 1
 	raster.laad_tegels(tegels)
-	var pad: String = kaart_pad if kaart_pad != "" else spel["kaart"]
+	var pad: String = kaart_pad if kaart_pad != "" else missie["kaart"]
 	var kaart = Gegevens.lees(pad)
 	if kaart == null:
 		push_error("wereld: kaart ontbreekt, draai sync.ps1 (" + pad + ")")
@@ -102,7 +121,8 @@ func laad(kaart_pad := "") -> bool:
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))
 	_bepaal_eiland()
 	_maak_dorpelingen()
-	kas = int(spel.get("start_kas", 0))
+	kas = int(missie.get("start_kas", 0))
+	_maak_kaart_vee()
 	_start_generator()
 	tijd_s = float(spel["start_seizoen"]) * float(spel["seizoen_s"]) + float(spel["start_klok_s"])
 	return true
@@ -145,16 +165,27 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 			push_warning("wereld: onbekend object %s (%s)" % [cls, o.get("name", "?")])
 			continue
 		var d: Dictionary = defs[cls]
+		if d.has("ontbreekt") and not _ontbreekt_gemeld.has(cls):
+			_ontbreekt_gemeld[cls] = true
+			push_warning("wereld: klasse %s (%s) nog zonder eigen model of gedrag: %s" % [cls, d["naam"], d["ontbreekt"]])
+		if d.has("gebouw"):          # voorgebouwd (eigenaar 0): wordt een afgebouwd Plan, zie plaats_voorgebouwd()
+			if int(o.get("owner", 0)) == 0:
+				voorgebouwd.append({"soort": StringName(d["gebouw"]), "tegel": Vector2i(int(o["x"]), int(o["y"])),
+					"draai": int(d.get("draai", -1))})
+			continue
+		if d.get("vee", false):      # koe uit de kaart: wordt een Vee, zie _maak_kaart_vee()
+			_kaart_vee.append({"tegel": Vector2i(int(o["x"]), int(o["y"])), "eigen": int(o.get("owner", 4)) == 0})
+			continue
 		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": d["model"], "x": int(o["x"]), "y": int(o["y"]),
 			"blokkeert": d["blokkeert"], "voetafdruk": d["voetafdruk"], "state": int(o["state"]), "sex": int(o["sex"]),
-			"spawn": d.get("spawn", false)}
+			"spawn": d.get("spawn", false), "owner": int(o.get("owner", 0))}
 		objecten.append(ob)
 		if int(o["cls"]) == int(spel["kampvuur_id"]):
 			kampvuur = Vector2i(ob["x"], ob["y"])
 		elif int(o["cls"]) == int(spel.get("koe_generator_id", -1)):
 			_generator = Vector2i(ob["x"], ob["y"])
 	# Gegenereerde bomen op bosgrond (kaart heeft maar 42 bomen; de originele dennen zijn onbekend, zie map1.md).
-	var dichtheid: float = spel["bos_dichtheid"]
+	var dichtheid: float = float(missie.get("bos_dichtheid", spel["bos_dichtheid"]))   # per missie te overschrijven
 	for y in raster.rijen:
 		for x in raster.kolommen:
 			if raster.soort_naam(x, y) != "bosgrond":
@@ -186,7 +217,12 @@ func _maak_dorpelingen() -> void:
 		var s: Dictionary = sexmap.get(str(ob["sex"]), {"geslacht": "onbekend", "leeftijd": "volwassen"})
 		d.geslacht = s["geslacht"]
 		d.leeftijd = s["leeftijd"]
-		d.zet_tegel(Vector2i(ob["x"], ob["y"]))
+		var t := Vector2i(ob["x"], ob["y"])
+		if not raster.loopbaar_v(t):      # missie 2: een dorpeling staat op de bron; naar de dichtste vrije tegel
+			var v := dichtstbij_loopbaar(t)
+			if v.x >= 0:
+				t = v
+		d.zet_tegel(t)
 		d.anker = kampvuur
 		d.wacht = rng.randf_range(1.0, 6.0)
 		dorpelingen.append(d)
@@ -249,7 +285,7 @@ func tik(dt: float) -> void:
 		k.tick(self, dt)
 	for k in kippen:
 		k.tick(self, dt)
-	for p in plannen:
+	for p in plannen.duplicate():       # kopie: een afgebouwde weg haalt zijn plan uit de lijst
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
 	_werk_generator(dt)
@@ -579,10 +615,12 @@ func klus_af(d: Dorpeling) -> void:
 		var m: Plan = d.klus
 		if d.draagt != "":
 			m.voorraad += 1         # beasts-src restock
+			geleverd.emit(m, d.draagt)
 			d.draagt = ""
 		elif m.voorraad > 0:
 			m.voorraad -= 1         # beasts-src visit: de kas krijgt de prijs
 			kas += int(e["prijs_per_stuk"])
+			verkocht.emit(m, d.koopt, int(e["prijs_per_stuk"]))
 			d.trek[d.koopt] = 0.0
 		d.koopt = ""
 	d.klus = null
@@ -739,7 +777,7 @@ func _geboren(moeder: Dorpeling) -> void:
 func _start_generator() -> void:
 	if _generator.x < 0:
 		return
-	var g: Dictionary = spel.get("koe_generator", {})
+	var g: Dictionary = missie.get("koe_generator", {})
 	for _i in int(g.get("start", 1)):
 		_spawn_koe()
 
@@ -747,7 +785,7 @@ func _start_generator() -> void:
 func _werk_generator(dt: float) -> void:
 	if _generator.x < 0:
 		return
-	var g: Dictionary = spel.get("koe_generator", {})
+	var g: Dictionary = missie.get("koe_generator", {})
 	var wild := 0
 	for k in vee:
 		if k.van_generator and k.eigenaar < 0:
@@ -759,6 +797,81 @@ func _werk_generator(dt: float) -> void:
 	if _generator_t >= float(g.get("interval_s", 45.0)):
 		_generator_t = 0.0
 		_spawn_koe()
+
+
+## Koeien die al op de kaart staan (missie 2: 4 eigen koeien bij het dorp). Eigen: zwerft rond het kampvuur.
+func _maak_kaart_vee() -> void:
+	for kv in _kaart_vee:
+		var t := dichtstbij_loopbaar(kv["tegel"])
+		if t.x < 0:
+			continue
+		var k := Vee.new()
+		k.id = _volgende_koe_id
+		_volgende_koe_id += 1
+		k.zet_tegel(t)
+		k.eigenaar = 0 if kv["eigen"] else -1
+		k.anker = kampvuur if kv["eigen"] else t
+		k.wacht = rng.randf_range(0.5, 4.0)
+		vee.append(k)
+
+
+## Zet de voorgebouwde gebouwen van de kaart (missie 2: de boerderij = melkerij) als afgebouwd Plan neer, gratis
+## (ook de weg naar de deur). Na de view aanroepen: Bouwmenu en Wegen tekenen ze via plan_gezet/plan_klaar.
+## De tegel uit de kaart ligt in de voetafdruk; draai en plek kiezen we zo dat de deur het dichtst bij een pad uitkomt.
+var voorgebouwd_draai := -1       ## >= 0: alleen deze draai proberen (frames: --voordraai=)
+
+
+func plaats_voorgebouwd() -> int:
+	var n := 0
+	var pad := raster.namen.find("pad")
+	for vg in voorgebouwd:
+		var soort: StringName = vg["soort"]
+		var t: Vector2i = vg["tegel"]
+		var m: Vector2i = BOUWSOORTEN[soort]
+		var beste: Plan = null
+		var bd := INF
+		# Draai zoals in het origineel (gebruiker 2026-10-30: de melkerij stond gedraaid): objecten.json "draai";
+		# zonder die waarde de eerste draai die past, met de deur het dichtst bij een pad.
+		for dr in 4:
+			if beste != null:
+				break
+			# draai zoals in het origineel (objecten.json "draai", gekozen naar de screenshots); --voordraai= overschrijft
+			var wil: int = voorgebouwd_draai if voorgebouwd_draai >= 0 else int(vg.get("draai", -1))
+			if wil >= 0 and dr != wil:
+				continue
+			var b := m.y if dr % 2 == 1 else m.x
+			var di := m.x if dr % 2 == 1 else m.y
+			for oy in di:
+				for ox in b:
+					var p := maak_plan(soort, t - Vector2i(ox, oy), dr)
+					if p == null:
+						continue
+					var af := _afstand_tot_soort(p.deur_tegel(), pad)
+					if af < bd:
+						bd = af
+						beste = p
+		if beste == null:
+			push_warning("wereld: voorgebouwd %s op %s past niet" % [soort, t])
+			continue
+		var was := kas
+		plannen.append(beste)
+		plan_gezet.emit(beste)
+		_rond_af(beste)
+		kas = was
+		n += 1
+	voorgebouwd.clear()
+	return n
+
+
+## Afstand (tegels, recht) van `t` tot de dichtste tegel van soort-index `s` (binnen 12), anders 99.
+func _afstand_tot_soort(t: Vector2i, s: int) -> float:
+	var beste := 99.0
+	for dy in range(-12, 13):
+		for dx in range(-12, 13):
+			var c := t + Vector2i(dx, dy)
+			if raster.in_kaart(c.x, c.y) and raster.soort[raster.idx(c.x, c.y)] == s:
+				beste = minf(beste, Vector2(dx, dy).length())
+	return beste
 
 
 func _spawn_koe() -> Vee:
@@ -839,19 +952,32 @@ func claim_aangekomen(d: Dorpeling) -> void:
 	koe_geclaimd.emit(k)
 
 
-## Missie 1: winst bij >= missie.dorpelingen en >= missie.koeien eigen koeien, verlies onder missie.minimum.
+## Missie uit spel.json: verloren bij minder dan `verlies.dorpelingen_onder` dorpelingen; gewonnen als elk doel
+## gehaald is: `doel.dorpelingen` (>=), `doel.koeien` eigen koeien (>=), `doel.kas_boven` (kas >, origineel `cash>`).
 func _check_missie() -> void:
 	if uitslag != "":
 		return
-	var m: Dictionary = spel.get("missie", {})
-	if m.is_empty():
+	var doel: Dictionary = missie.get("doel", {})
+	var verlies: Dictionary = missie.get("verlies", {})
+	if doel.is_empty() and verlies.is_empty():
 		return
-	if dorpelingen.size() < int(m["minimum"]):
+	if verlies.has("dorpelingen_onder") and dorpelingen.size() < int(verlies["dorpelingen_onder"]):
 		uitslag = "verloren"
-	elif dorpelingen.size() >= int(m["dorpelingen"]) and eigen_koeien() >= int(m["koeien"]):
+	elif not doel.is_empty() and doel_gehaald():
 		uitslag = "gewonnen"
 	if uitslag != "":
 		missie_einde.emit(uitslag)
+
+
+func doel_gehaald() -> bool:
+	var doel: Dictionary = missie.get("doel", {})
+	if doel.has("dorpelingen") and dorpelingen.size() < int(doel["dorpelingen"]):
+		return false
+	if doel.has("koeien") and eigen_koeien() < int(doel["koeien"]):
+		return false
+	if doel.has("kas_boven") and kas <= int(doel["kas_boven"]):
+		return false
+	return true
 
 
 func prijs(soort: StringName) -> int:
@@ -1127,14 +1253,14 @@ func kan_bouwen(p: Plan) -> bool:
 	for q in plannen:
 		if q.afdruk().intersects(r):
 			return false
-		if Plan.DEUREN.has(q.soort) and r.has_point(q.deur_tegel()):    # niet voor andermans deur
+		if Plan.DEUREN.has(q.soort) and r.has_point(q.deur_tegel()) and p.soort != &"weg":    # niet voor andermans deur (een weg wel)
 			return false
 	if Plan.DEUREN.has(p.soort):        # de eigen deur moet bereikbaar zijn: daar begint de weg en daar gaan ze naar binnen
 		var dt := p.deur_tegel()
 		if not raster.loopbaar_v(dt) or bereik[raster.idx(dt.x, dt.y)] == 0:
 			return false
 		for q in plannen:
-			if q.afdruk().has_point(dt):
+			if q.afdruk().has_point(dt) and q.soort != &"weg":     # een geplande weg voor de deur mag
 				return false
 	return true
 
@@ -1268,9 +1394,30 @@ func _volgend_plan(p: Plan) -> Plan:
 	return beste
 
 
+## Weg af: de tegel wordt pad (view/wegen.gd tekent hem bij wegen_veranderd), het plan gaat uit de lijst (een weg
+## is grond, geen gebouw) en de werkers bouwen door aan het volgende stuk weg, zoals bij hek.
+func _weg_af(p: Plan) -> void:
+	var pad := raster.namen.find("pad")
+	if pad >= 0:
+		raster.soort[raster.idx(p.tegel.x, p.tegel.y)] = pad
+	plannen.erase(p)
+	var volgende := _volgend_plan(p)
+	for d in dorpelingen:
+		if d.werk_plan == p:
+			d.werk_plan = null
+			d.bouwt = false
+			if volgende != null:
+				geef_bouwbevel([d.id], volgende)
+	wegen_veranderd.emit()
+	plan_klaar.emit(p)
+
+
 ## Plan af: de voetafdruk wordt blokkerend en de werkers lopen weg van de nieuwe muren.
 func _rond_af(p: Plan) -> void:
 	p.klaar = true
+	if p.soort == &"weg":
+		_weg_af(p)
+		return
 	var r := p.afdruk()
 	if WINKELS.has(p.soort):
 		p.voorraad = int(spel["economie"]["winkel_start"])

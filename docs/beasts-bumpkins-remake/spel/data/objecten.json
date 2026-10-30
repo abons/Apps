@@ -1,5 +1,5 @@
 {
-  "_uitleg": "Sleutel = klasse-id uit de kaart (bb_original/objects_list.txt). model = 'natuur:<glb>' (assets/<glb>.glb, view/natuur.gd), 'koe' (view/koe.gd), 'placeholder:<naam>' (view/props.gd) of 'geen'. varianten = [[glb, gewicht], ...]: per object een vaste (gehashte) keuze, model blijft de hoofdvorm. schaal = vaste vergroting van het model (de glb's zijn echte maten, de kaart is 2 m per tegel). voetafdruk = [breed, diep] tegels vanaf (x,y). blokkeert = blokkeert de tegels voor looproutes.",
+  "_uitleg": "Sleutel = klasse-id uit de kaart (bb_original/objects_list.txt). model = 'natuur:<glb>' (assets/<glb>.glb, view/natuur.gd), 'koe' (view/koe.gd), 'placeholder:<naam>' (view/props.gd) of 'geen'. varianten = [[glb, gewicht], ...]: per object een vaste (gehashte) keuze, model blijft de hoofdvorm. schaal = vaste vergroting van het model (de glb's zijn echte maten, de kaart is 2 m per tegel). voetafdruk = [breed, diep] tegels vanaf (x,y). blokkeert = blokkeert de tegels voor looproutes. gebouw = voorgebouwd (eigenaar 0) wordt een afgebouwd Plan van die soort (Wereld.plaats_voorgebouwd). vee = wordt een koe (Vee; eigenaar 0 = eigen). vijand = alleen neergezet, nog geen gedrag. ontbreekt = nog geen eigen model of gedrag: waarschuwing in de log bij het laden.",
   "objecten": {
     "0":   {"naam": "boom_den",     "origineel": "tree",        "model": "natuur:den_groot", "varianten": [["den_groot", 0.78], ["jonge_den", 0.22]], "voetafdruk": [1, 1], "blokkeert": true},
     "5":   {"naam": "boom_rond",    "origineel": "tree",        "model": "natuur:loofboom",  "varianten": [["loofboom", 0.65], ["loofboom_jong", 0.35]], "voetafdruk": [1, 1], "blokkeert": true},
@@ -11,6 +11,12 @@
     "144": {"naam": "bron",         "origineel": "spring",      "model": "natuur:bronplas",  "schaal": 1.0, "voetafdruk": [1, 1], "blokkeert": true},
     "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "natuur:zilveren_beker", "schaal": 1.6, "voetafdruk": [1, 1], "blokkeert": false},
     "171": {"naam": "koe_generator","origineel": "generator",   "model": "geen",              "voetafdruk": [1, 1], "blokkeert": false},
+    "51":  {"naam": "boerderij",    "origineel": "farm",        "model": "geen", "gebouw": "melkerij", "draai": 3, "voetafdruk": [1, 1], "blokkeert": false},
+    "104": {"naam": "wolf",         "origineel": "creature",    "model": "placeholder:wolf", "voetafdruk": [1, 1], "blokkeert": false, "vijand": true, "ontbreekt": "wezen (missie 2: groep 13, type 23 = wolf); geen glb en nog geen gedrag, staat stil"},
+    "110": {"naam": "koe",          "origineel": "cow",         "model": "koe", "vee": true, "voetafdruk": [1, 1], "blokkeert": false},
+    "160": {"naam": "drankje",      "origineel": "potion",      "model": "placeholder:drankje", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen"},
+    "161": {"naam": "goud",         "origineel": "gold",        "model": "placeholder:goud", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen (origineel: goudbuidel = kas)"},
+    "226": {"naam": "onbekend_226", "origineel": "None_226",    "model": "geen", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "betekenis onbekend (eigenaar 4, sex 24, gen 4; ook in M5, M9, M12, M16-M18, M22)"},
     "1000":{"naam": "boom_bos",     "origineel": "(gegenereerd op bosgrond)", "model": "natuur:den_groot", "varianten": [["den_groot", 0.4], ["spar", 0.3], ["jonge_den", 0.3]], "voetafdruk": [1, 1], "blokkeert": true}
   },
   "decoratie": {

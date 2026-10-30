@@ -1,14 +1,18 @@
 # Kopieert de kaartdata en de glb's het project in (assets/ en data/origineel/ staan in .gitignore).
-# map1.json komt uit de gedecodeerde originele spelbestanden (auteursrecht) en blijft dus lokaal.
-param([string]$Map = (Join-Path $PSScriptRoot '..\lokaal\map1\map1.json'))  # lokaal/ staat in .gitignore
+# map1.json en map2.json komen uit de gedecodeerde originele spelbestanden (auteursrecht) en blijven dus lokaal.
+# map2.json maken: python ..\lokaal\map2\maak_map.py 2
+param([string]$Map = (Join-Path $PSScriptRoot '..\lokaal\map1\map1.json'),   # lokaal/ staat in .gitignore
+      [string]$Map2 = (Join-Path $PSScriptRoot '..\lokaal\map2\map2.json'))
 
 $ErrorActionPreference = 'Stop'
 $orig = Join-Path $PSScriptRoot 'data\origineel'
 New-Item -ItemType Directory -Force $orig | Out-Null
-if (Test-Path $Map) {
-    Copy-Item $Map (Join-Path $orig 'map1.json') -Force
-    Write-Host "gekopieerd: data/origineel/map1.json"
-} else { Write-Host "ONTBREEKT: $Map (geef -Map <pad>)" }
+foreach ($k in @(@($Map, 'map1.json'), @($Map2, 'map2.json'))) {
+    if (Test-Path $k[0]) {
+        Copy-Item $k[0] (Join-Path $orig $k[1]) -Force
+        Write-Host "gekopieerd: data/origineel/$($k[1])"
+    } else { Write-Host "ONTBREEKT: $($k[0])" }
+}
 
 $assets = Join-Path $PSScriptRoot 'assets'
 New-Item -ItemType Directory -Force $assets | Out-Null
@@ -53,4 +57,6 @@ foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json
     if (Test-Path $src) { Copy-Item $src (Join-Path $assets (Split-Path $src -Leaf)) -Force; Write-Host "gekopieerd: assets/$(Split-Path $src -Leaf)" }
     else { Write-Host "ontbreekt (overgeslagen): $b" }
 }
+# stemmen en klanken uit beasts-src naar assets/audio/beasts/ (prive, niet in git; audio.md sectie 6)
+& (Join-Path $PSScriptRoot 'audio\haal_beasts.ps1')
 Write-Host "Daarna: Godot --headless --path . --import"

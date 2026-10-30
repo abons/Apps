@@ -27,11 +27,11 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	pc2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc2.add_theme_stylebox_override("panel", _stijl())
 	pc2.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	pc2.position = Vector2(12, -64)
+	pc2.position = Vector2(12, -82)
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nWASD/rand = pannen   wiel = zoom   Spatie pauze   1 2 4 tempo   K regen   N seizoen   Esc stop"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (30)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   1 2 4 tempo   K regen   N seizoen   Esc stop"
 	pc2.add_child(hulp)
 	add_child(pc2)
 
@@ -70,10 +70,14 @@ func _process(_dt: float) -> void:
 	var m := int(fposmod(uur, 1.0) * 60.0)
 	var tempo := "PAUZE" if w.gepauzeerd else "%dx" % int(w.tempo)
 	var weer := "regen" if w.regent() else "droog"
-	var doel: Dictionary = w.spel.get("missie", {})
+	var doel: Dictionary = w.missie.get("doel", {})
+	# achter het getal het missiedoel, alleen als de missie dat doel heeft (missie 1: dorpelingen en koeien, 2: kas)
+	var kas := "%d" % w.kas + (" / >%d" % int(doel["kas_boven"]) if doel.has("kas_boven") else "")
+	var dorp := "%d" % w.dorpelingen.size() + ("/%d" % int(doel["dorpelingen"]) if doel.has("dorpelingen") else "")
+	var koe := "%d" % w.eigen_koeien() + ("/%d" % int(doel["koeien"]) if doel.has("koeien") else "")
 	label.text = "%02d:%02d%s  dag %d  %s  %s
-kas: %d   dorpelingen: %d/%d   koeien: %d/%d   bedden: %d   brood: %d   melk: %d   eieren: %d
+kas: %s   dorpelingen: %s   koeien: %s   bedden: %d   brood: %d   melk: %d   eieren: %d
 geselecteerd: %d   tempo: %s" % [
 		h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer,
-		w.kas, w.dorpelingen.size(), int(doel.get("dorpelingen", 0)), w.eigen_koeien(), int(doel.get("koeien", 0)), w.bedden(), w.brood(), w.melk(), w.eieren(),
+		kas, dorp, koe, w.bedden(), w.brood(), w.melk(), w.eieren(),
 		bestuur.gekozen.size(), tempo]

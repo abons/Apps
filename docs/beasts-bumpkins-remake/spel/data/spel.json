@@ -8,21 +8,26 @@
   "seizoen_s": 270,
   "start_seizoen": 0,
   "start_klok_s": 60,
-  "kaart": "res://data/origineel/map1.json",
   "kampvuur_id": 143,
   "zwerf_straal": 4,
   "zwerf_wacht": [3.0, 8.0],
   "bos_dichtheid": 0.35,
-  "start_kas": 10000,
-  "prijzen": {"hut": 40, "gereedschapsloods": 50, "kippenhok": 40, "molen": 40, "akker": 16, "melkerij": 45, "hek": 2, "poort": 10},
-  "bouwtijd_s": {"hut": 60, "gereedschapsloods": 60, "kippenhok": 60, "molen": 60, "akker": 16, "melkerij": 60, "hek": 3, "poort": 6},
+  "prijzen": {"hut": 40, "gereedschapsloods": 50, "kippenhok": 40, "molen": 40, "akker": 16, "melkerij": 45, "hek": 2, "poort": 10, "weg": 2},
+  "bouwtijd_s": {"hut": 60, "gereedschapsloods": 60, "kippenhok": 60, "molen": 60, "akker": 16, "melkerij": 60, "hek": 3, "poort": 6, "weg": 3},
   "economie": {"rijp_s": 60, "oogst_s": 2.0, "winkel_start": 8, "prijs_per_stuk": 3, "trek_s": 30, "toonbank_s": 1.2,
     "melk_s": 2.2, "koe_leeg_s": 90, "melk_straal": 14, "kippen_per_hok": 3, "kip_leeg_s": 55, "raap_s": 1.6},
   "koe_generator_id": 171,
-  "koe_generator": {"start": 1, "max": 3, "interval_s": 45},
   "weg_per_tegel": 2,
   "zelf_bouwen_per_plan": 2,
   "bouwer": {"prijs": 30, "tempo": 2.0},
   "gezin": {"bedden_per_hut": 2, "wieg_s": 12, "baby_s": 5, "opgroeien_s": 150, "ouder_rust_s": 75},
-  "missie": {"dorpelingen": 6, "koeien": 4, "minimum": 2}
+  "_missies": "Per missie (main.gd --missie=<nr>, standaard 1): kaart, start_kas, doel (alles moet: dorpelingen >=, koeien = eigen koeien >=, kas_boven = kas >), verlies (dorpelingen_onder), koe_generator (klasse 171: start, max wilde, interval_s), optioneel bos_dichtheid (anders de algemene). Waarden uit lokaal/missies/m<nn>.json.",
+  "missies": {
+    "1": {"naam": "Aorta", "kaart": "res://data/origineel/map1.json", "start_kas": 10000,
+      "doel": {"dorpelingen": 6, "koeien": 4}, "verlies": {"dorpelingen_onder": 2},
+      "koe_generator": {"start": 1, "max": 3, "interval_s": 45}},
+    "2": {"naam": "Terug op het vasteland", "kaart": "res://data/origineel/map2.json", "start_kas": 6999, "bos_dichtheid": 0.6,
+      "doel": {"kas_boven": 10000}, "verlies": {"dorpelingen_onder": 2},
+      "koe_generator": {"start": 1, "max": 2, "interval_s": 45}}
+  }
 }
