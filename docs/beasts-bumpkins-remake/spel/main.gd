@@ -12,6 +12,7 @@ var hud: Hud
 var bouwmenu: Bouwmenu
 var scenario := ""
 var voorwerpen: Node3D            # view/voorwerpen_view.gd
+var hints: Hints                  # sim/hints.gd, alleen in gewoon spel en --scenario=hints
 var szt := 0.0
 var _stap := 0
 
@@ -78,6 +79,9 @@ func _ready() -> void:
 	bestuur.voorwerpen = voorwerpen
 	hud.bouw(w, bestuur)
 	bestuur.kader = hud.kader
+	if scenario == "" or scenario == "hints":   # briefing en hints (sim/hints.gd); andere scenario's houden hun frames
+		hints = Hints.new().bouw(w)
+		hud.zet_hints(hints)
 	bouwmenu = Bouwmenu.new()
 	bouwmenu.name = "Bouwmenu"
 	bouwmenu.terrein = view.terrein
@@ -122,6 +126,8 @@ func _process(dt: float) -> void:
 			print("[fps] gem %.1f  langste frame %.1f ms  frames >25 ms: %d van %d" % [_fps_n / _fps_som, _fps_max * 1000.0, _fps_trage, _fps_n])
 			_fps_n = 0; _fps_som = 0.0; _fps_max = 0.0; _fps_trage = 0
 	w.vooruit(dt)
+	if hints != null and not w.gepauzeerd:   # niet tijdens de briefing: 1-12 komt pas daarna
+		hints.controleer()
 	if _trace:
 		var u: Bumpkin = view.units[3]["bump"]
 		print("[trace] t=%.3f tik=%d alpha=%.2f pos=(%.3f, %.3f) yaw=%.3f" % [szt, w.tik_nr, w.alpha(), u.global_position.x, u.global_position.z, u.rotation.y])
@@ -162,6 +168,11 @@ func _start_scenario() -> void:
 			cam.zet_direct(vuur + Vector3(4, 0, -2), 1.0, deg_to_rad(22), 8.0)
 		"vlag":
 			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("vlag", Vector2i(104, 65))) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
+		"hints":
+			# --scenario=hints, missie 1: briefing (na 1,5 s weggeklikt), rolletje 1-12, op 4x tempo brief 1-2; na het wegklikken staat er
+			# meteen een afgebouwde hut en opent brief 1-3 (frame screenshots/missie1_hint.jpg)
+			w.tempo = 4.0
+			cam.zet_direct(vuur, 0.6, deg_to_rad(40), 26.0)
 		"beker":
 			# missie 1: een man staat bij de zilveren beker, raapt hem op (pakbevel) en loopt ermee naar de vlag
 			_beker_scenario()
@@ -417,12 +428,30 @@ func _vrij_plan(soort: StringName, bij: Vector2i) -> Plan:
 	return null
 
 
+func _hints_stap() -> void:
+	if _stap == 0 and szt >= 1.5:
+		hud.brief.sluit()
+		_stap = 1
+	elif _stap == 1 and "1-2" in hints.getoond and szt >= 5.0:
+		print("[scenario] 1-2 op %.1f s sim" % hints.sinds_start_s())
+		hud.brief.sluit()
+		var p := _vrij_plan(&"hut", w.kampvuur + Vector2i(5, 3))
+		if p != null and w.plan_zet(p):
+			p.voortgang = 1.0
+		_stap = 2
+	elif _stap == 2 and "1-3" in hints.getoond:
+		print("[scenario] getoond: ", hints.getoond)
+		_stap = 3
+
+
 func _camyaw(y: float) -> void:
 	cam.zet_direct(cam.focus, y, cam.pitch, cam.afstand)
 
 
 func _scenario_stap() -> void:
 	match scenario:
+		"hints":
+			_hints_stap()
 		"beker":
 			if _wolf_man == null or Voorwerpen.alle(w).is_empty():
 				return

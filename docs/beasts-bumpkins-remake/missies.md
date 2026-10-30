@@ -100,6 +100,41 @@ Conditie-record (gevonden met regex `type 0xCD a b c id 0xCD 01 00 00 00`, `type
 
 `id` (0-30) is het regelnummer van de regel waartoe de conditie hoort; de uitkomst (win of verlies) van een regel is niet in een herkenbaar veld gevonden. Win en verlies zijn afgeleid uit briefing plus conditie (bv. `<2` eigen dorpelingen in bijna elke missie = verlies). Tekst-acties en `type 4`/`2` zitten niet altijd aan elkaar: de eerste hints (M1: tekst 1-2 .. 1-12) volgen een keten (hut -> bouwersgilde -> bakkerij -> boerderij -> hek en poort -> kippen) plus timers.
 
+## Hints en briefing (M1-M3, 2026-10-30)
+
+**Bron.** Briefing = `Mn.TXT`, hints = `MISn-k.TXT` (MISTEXT0.BOX). Een hint is een regel in het scriptgebied van `Mn.MIS`: conditie-record, dan `01 00 00 00 00 00 00 00 01 00 00 00 01 cd`, een pointer, en de actie `f6 00 06 00 f6 00 00` + `open[misN-k.txt]` of `[misN-k.txt]`. Andere acties in dezelfde vorm: `0x16` kas erbij (M2: 4x timer 6480 -> +1.000), `0x17` object weg, `0x14` met 1 of 2 (vermoedelijk missie gewonnen/verloren: staat bij de win- en verliesregels). Een regel zonder conditie (alleen nullen) vuurt bij de start (M1 `1-12`, M2 `2-1`).
+**Keten.** In de data is geen koppeling tussen regels gevonden: elke hint vuurt een keer zodra zijn conditie waar is, timers tellen vanaf de start (aanname). De keten ontstaat doordat elke hint wacht op het gebouw waar de vorige om vroeg. De remake legt hem vast met `na` (melkerij en poort gaan pas open na de molen, dus de 288-tikken-timer van 1-6 mag niet eerder komen dan 1-5).
+**Vorm.** Geen screenshot van een hint gevonden; de exe ontbreekt (share axel-laptop niet bereikbaar). Wel in de UI-sprites: `LETSCR` (briefscherm 640x480: bruin perkament, gerafelde rand, paarse lakzegel, links een paal met vastgeprikte brieven) en `MAIL` (opgerold briefje met rood zegel). Remake: briefing en `open`-hints als perkamentbrief midden in beeld (kleuren uit LETSCR), hints zonder `open` als rolletje rechts dat bij een klik opent. Briefing pauzeert de sim, hints niet (eigen keuze). Een `*` voor veel teksten (betekenis onbekend, niet gekoppeld aan `open`).
+**Tikken.** 2.880 tikken = 1 seizoen (M28), in de remake omgerekend met `seizoen_s` (270 s): 108 tikken = 10 s.
+
+| hint | trigger (M.MIS) | open | remake | inhoud (eigen woorden) |
+| --- | --- | --- | --- | --- |
+| M1 briefing | start | | brief, pauze | verbannen naar Aorta; 6 dorpelingen en 4 koeien; eerst kippenhokken, meer hutten = meer kinderen |
+| 1-12 | geen conditie (start) | nee | start | twee kippenhokken bouwen |
+| 1-2 | timer 108 | ja | timer | boerenhut bouwen |
+| 1-3 | aantal hut (2) > 0 | ja | na 1-2 | bouwersgilde; man erheen = bouwer 2x sneller |
+| 1-4 | aantal bouwersgilde (69) > 0 | ja | `gereedschapsloods`, na 1-3 | bakkerij voor brood |
+| 1-5 | aantal bakkerij (53) > 0 | ja | `molen`, na 1-4 | tarwe zaaien in de lente, oogsten in de herfst; activiteit zelf kiezen |
+| 1-6 | timer 288 | ja | na 1-5 | boerderij (melk) plus wei met hek en poort, poort klikken = open/dicht |
+| 1-7 | aantal poort (169) > 0 | ja | na 1-6 | wilde koeien claimen, paarse halsband |
+| 1-11 | timer 360 | nee | timer | koeien kalven in de lente, houd ze bij elkaar |
+| 1-10 | timer 360 | nee | `wacht_op` prijsscherm | prijzen via het goudicoon |
+| 1-9 | aantal kip (111) > 1 | nee | `wacht_op` ouderdom | hutten gespreid bouwen voor de levensduur |
+| 1-8 | type 12: dorpeling raakt beker (object 6) | ja | `voorwerp` 159 | dat lijkt kostbaar, naar de vlag |
+| M2 briefing | start | | brief, pauze | terug op het vasteland; kas boven 10.000; gevaarlijke beesten |
+| 2-1 | geen conditie (start) | nee | start | wolven jagen op kinderen en koeien |
+| 2-4 | timer 360 | nee | `wacht_op` stilstaan-knop | doet iemand niets: stilstaan-knop |
+| 2-3 | timer 720 | nee | `wacht_op` prijsscherm | hoge prijzen = ontevreden = korter leven |
+| 2-5 | timer 4.320 | nee | `wacht_op` pensioen | ouderen kunnen met pensioen |
+| 2-2, 2-6 | geen regel in M2.MIS | | `geen` | hek tegen wolven; verkennen loont |
+| M3 briefing | start | | brief, pauze | 25.000 nodig; zoek de bewaakte gouden kelk |
+| 3-4 | timer 180 | nee | `wacht_op` put | putten tegen dorst |
+| 3-5 | timer 1.080 | nee | `wacht_op` gildelimiet | gilde max 6 leden |
+| 3-1 | geen regel in M3.MIS | | `voorwerp` 172 (eigen keuze, patroon 1-8) | dat is de kelk, naar de vlag |
+| 3-2 | geen regel | | weggelaten | dubbel van 3-5 |
+
+**Remake:** `spel/data/hints.json` (trigger, `na`, `open`, `wacht_op`, eigen tekst), `spel/sim/hints.gd` (`Hints`, signaal `hint_getoond`, `controleer()` per frame in `main.gd`, niet tijdens pauze), `spel/view/brief.gd` + `view/hud.gd` `zet_hints`. Alleen in gewoon spel en `--scenario=hints`. Test `test/hint_test.gd`, frame `spel/screenshots/missie1_hint.jpg`.
+
 ## Antwoorden op de open vragen
 
 | vraag | antwoord |

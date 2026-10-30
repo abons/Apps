@@ -1,0 +1,61 @@
+{
+  "_uitleg": "Briefing en hints per missie (sim/hints.gd, view/hud.gd). Bron: MISTEXT0.BOX (Mn.TXT briefing, MISn-k.TXT hints) en de conditie-records in Mn.MIS, zie ../missies.md 'Hints'. Teksten zijn eigen samenvattingen, nooit de originele tekst. Elke hint vuurt een keer. trigger.type: start (meteen na de briefing), timer (tikken sinds de start; 2880 tikken = 1 seizoen, omgerekend met spel.json seizoen_s), aantal (wat: gebouwsoort = afgebouwde plannen, of kippen/koeien/dorpelingen; meer_dan), kas_boven, voorwerp (klasse opgeraapt, signaal voorwerp_opgeraapt), geen (staat in MISTEXT0 maar geen regel in de .MIS). na: deze hint wacht tot die al getoond is (eigen keten, niet uit de data). open: true = brief gaat meteen open (origineel 'open[...]'), false = rolletje rechtsboven, klik om te lezen (origineel '[...]', eigen aanname). wacht_op: de remake mist dat onderdeel nog, hint wordt overgeslagen.",
+  "seizoen_tikken": 2880,
+  "missies": {
+    "1": {
+      "briefing": {"bron": "M1.TXT", "titel": "Verbannen naar Aorta", "tekst": "Koning Roland heeft u, Lord Mildew, met uw laatste boeren naar het eiland Aorta gestuurd. Laat het dorp groeien tot 6 dorpelingen en een kudde van 4 koeien. Uw mensen hebben honger: zet eerst een paar kippenhokken neer. En hoe meer hutten, hoe meer kinderen."},
+      "hints": [
+        {"id": "1-12", "bron": "MIS1-12.TXT", "open": false, "trigger": {"type": "start"},
+          "tekst": "Begin met twee kippenhokken. Kies het kippenhok in het bouwmenu en zet het op vrije grond."},
+        {"id": "1-2", "bron": "MIS1-2.TXT", "open": true, "trigger": {"type": "timer", "tikken": 108},
+          "tekst": "Tijd om een boerenhut te bouwen."},
+        {"id": "1-3", "bron": "MIS1-3.TXT", "open": true, "na": "1-2", "trigger": {"type": "aantal", "wat": "hut", "meer_dan": 0},
+          "tekst": "Bouw nu een bouwersgilde (de gereedschapsloods). Stuur er een man heen: als bouwer werkt hij twee keer zo snel."},
+        {"id": "1-4", "bron": "MIS1-4.TXT", "open": true, "na": "1-3", "trigger": {"type": "aantal", "wat": "gereedschapsloods", "meer_dan": 0},
+          "tekst": "Nu een bakkerij (de molen). Dan wordt de tarwe brood en rammelen de magen niet meer."},
+        {"id": "1-5", "bron": "MIS1-5.TXT", "open": true, "na": "1-4", "trigger": {"type": "aantal", "wat": "molen", "meer_dan": 0},
+          "tekst": "Tarwe zaai je in de lente en oogst je in de herfst. Wil je dat iemand iets anders doet, geef hem zelf een bevel."},
+        {"id": "1-6", "bron": "MIS1-6.TXT", "open": true, "na": "1-5", "trigger": {"type": "timer", "tikken": 288},
+          "tekst": "Bouw een boerderij (de melkerij): daar wordt melk voor het dorp gebotteld. Zet ook een wei met hek en poort voor de koeien; klik op de poort om hem open of dicht te doen."},
+        {"id": "1-7", "bron": "MIS1-7.TXT", "open": true, "na": "1-6", "trigger": {"type": "aantal", "wat": "poort", "meer_dan": 0},
+          "tekst": "Er zwerven koeien over het eiland. Kies een dorpeling en klik op een koe om haar te claimen, zoveel als je wilt. Je eigen koeien dragen een paarse halsband."},
+        {"id": "1-11", "bron": "MIS1-11.TXT", "open": false, "trigger": {"type": "timer", "tikken": 360},
+          "tekst": "Elke lente krijgen de koeien kalfjes. Houd ze bij elkaar, het liefst in een omheinde wei."},
+        {"id": "1-10", "bron": "MIS1-10.TXT", "open": false, "trigger": {"type": "timer", "tikken": 360}, "wacht_op": "prijsscherm",
+          "tekst": "Met het goudstukken-icoon bovenaan stel je de prijzen in."},
+        {"id": "1-9", "bron": "MIS1-9.TXT", "open": false, "trigger": {"type": "aantal", "wat": "kippen", "meer_dan": 1}, "wacht_op": "ouderdom",
+          "tekst": "Bouw je hutten niet allemaal tegelijk, dan worden ook niet alle bewoners tegelijk oud."},
+        {"id": "1-8", "bron": "MIS1-8.TXT", "open": true, "trigger": {"type": "voorwerp", "klasse": 159},
+          "tekst": "Hm, dat ziet er kostbaar uit. Breng het eens naar je vlag."}
+      ]
+    },
+    "2": {
+      "briefing": {"bron": "M2.TXT", "titel": "Terug op het vasteland", "tekst": "U bent terug op het vasteland, in een uithoek van Lokyadore waar niemand u aan de koning verraadt. Om uw oude land terug te winnen is geld nodig: breng de kas boven de 10.000 goudstukken. Pas op, hier lopen gevaarlijke beesten rond."},
+      "hints": [
+        {"id": "2-1", "bron": "MIS2-1.TXT", "open": false, "trigger": {"type": "start"},
+          "tekst": "Let op de wolven: ze jagen vooral op kinderen en koeien."},
+        {"id": "2-4", "bron": "MIS2-4.TXT", "open": false, "trigger": {"type": "timer", "tikken": 360}, "wacht_op": "stilstaan-knop",
+          "tekst": "Doet een dorpeling niets? Kijk of zijn stilstaan-knop niet ingedrukt is."},
+        {"id": "2-3", "bron": "MIS2-3.TXT", "open": false, "trigger": {"type": "timer", "tikken": 720}, "wacht_op": "prijsscherm",
+          "tekst": "Hoge prijzen maken het dorp ontevreden, en ontevreden mensen leven korter."},
+        {"id": "2-5", "bron": "MIS2-5.TXT", "open": false, "trigger": {"type": "timer", "tikken": 4320}, "wacht_op": "pensioen",
+          "tekst": "Oude dorpelingen mogen met pensioen en rustig oud worden."},
+        {"id": "2-2", "bron": "MIS2-2.TXT", "open": false, "trigger": {"type": "geen"},
+          "tekst": "Een hek houdt domme beesten als wolven buiten."},
+        {"id": "2-6", "bron": "MIS2-6.TXT", "open": false, "trigger": {"type": "geen"},
+          "tekst": "Verken het land: er liggen nuttige dingen te vinden."}
+      ]
+    },
+    "3": {
+      "briefing": {"bron": "M3.TXT", "titel": "De gouden kelk van Barathkar", "tekst": "De kas is lang niet vol genoeg voor een grote uitbreiding. Verzamel 25.000 goudstukken. Zoek de goed bewaakte gouden kelk van Barathkar: dan gaat het een stuk makkelijker."},
+      "hints": [
+        {"id": "3-4", "bron": "MIS3-4.TXT", "open": false, "trigger": {"type": "timer", "tikken": 180}, "wacht_op": "put",
+          "tekst": "Waterputten lessen de dorst en laten je mensen langer leven."},
+        {"id": "3-5", "bron": "MIS3-5.TXT", "open": false, "trigger": {"type": "timer", "tikken": 1080}, "wacht_op": "gildelimiet",
+          "tekst": "Een gilde heeft plaats voor zes leden; wil je er meer, bouw dan nog een gilde."},
+        {"id": "3-1", "bron": "MIS3-1.TXT", "open": true, "trigger": {"type": "voorwerp", "klasse": 172}, "_trigger": "eigen keuze: M3.MIS noemt mis3-1 niet (vermoedelijk vast in de exe), naar het patroon van 1-8",
+          "tekst": "Dat is de kelk! Breng hem terug naar je vlag."}
+      ]
+    }
+  }
+}
