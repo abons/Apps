@@ -12,7 +12,7 @@
     "159": {"naam": "zilveren_beker","origineel": "silver goblet","model": "natuur:zilveren_beker", "schaal": 1.6, "voetafdruk": [1, 1], "blokkeert": false},
     "171": {"naam": "koe_generator","origineel": "generator",   "model": "geen",              "voetafdruk": [1, 1], "blokkeert": false},
     "51":  {"naam": "boerderij",    "origineel": "farm",        "model": "geen", "gebouw": "melkerij", "draai": 3, "voetafdruk": [1, 1], "blokkeert": false},
-    "104": {"naam": "wolf",         "origineel": "creature",    "model": "placeholder:wolf", "voetafdruk": [1, 1], "blokkeert": false, "vijand": true, "ontbreekt": "wezen (missie 2: groep 13, type 23 = wolf); geen glb en nog geen gedrag, staat stil"},
+    "104": {"naam": "wolf",         "origineel": "creature",    "model": "placeholder:wolf", "voetafdruk": [1, 1], "blokkeert": false, "vijand": true, "beest": "wolf", "ontbreekt": "wezen (missie 2: groep 13, type 23 = wolf); gedrag in sim/wolf.gd, nog geen glb (view/wolf_model.gd is een placeholder)"},
     "110": {"naam": "koe",          "origineel": "cow",         "model": "koe", "vee": true, "voetafdruk": [1, 1], "blokkeert": false},
     "160": {"naam": "drankje",      "origineel": "potion",      "model": "placeholder:drankje", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen"},
     "161": {"naam": "goud",         "origineel": "gold",        "model": "placeholder:goud", "voetafdruk": [1, 1], "blokkeert": false, "ontbreekt": "geen glb, niet op te rapen (origineel: goudbuidel = kas)"},

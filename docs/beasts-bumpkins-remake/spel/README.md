@@ -5,7 +5,7 @@ spelersbesturing, dag/nacht, seizoenen en weer, bouwen (hut, loods, kippenhok; p
 missiedoel (6 dorpelingen + 4 eigen koeien, verlies onder 2), gezinnen (stel in een hut met een vrij bed krijgt een kind).
 graan en brood (akker rijpt, oogsten naar de molen, bewoners kopen brood = kas), melk (koe bij het dorp melken, naar de
 melkerij, bewoners kopen melk), eieren (kippenhok met 3 kippen, die leggen en op het ei blijven zitten tot het geraapt
-wordt). Nog geen vijanden.
+wordt). Vijanden: de wolven van missie 2 (zie Missies).
 
 ## Draaien
 
@@ -19,6 +19,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --path .                                   # spelen
 "$G" --headless --path . --script res://test/sim_test.gd    # simtest (zonder GPU)
 "$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2
+"$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
@@ -48,7 +49,15 @@ origineel `cash>`), `verlies` (`dorpelingen_onder`), `koe_generator` (klasse 171
 objecten), 10 dorpelingen (4 m, 4 v, 2 jongens), kas 6.999, doel kas > 10.000, verlies onder 2; kampvuur (90,76), vlag (92,73),
 4 eigen koeien (klasse 110), voorgebouwde boerderij (klasse 51) als afgebouwde melkerij (`Wereld.plaats_voorgebouwd`, gratis, na de view),
 bos 0,6. Scenario's `kaart` (van boven, noord boven, naast `lokaal/missies/m02_layout.png`) en `wolf`; frames `screenshots/missie2_*.jpg`.
-Nog niet: wolven (klasse 104, 3x) staan stil als blokjes-placeholder, zonder gedrag; goud (161) en drankjes (160) zijn placeholders, niet
+**Wolven** (klasse 104, 3x, `sim/wolf.gd`, port van beasts-src `Beast` Kind.WOLF, waarden in `spel.json` `wolf`): zwerven rond hun
+startplek, jagen op de dichtste koe binnen 7 tegels (wild of eigen) en eten haar na 2 beten op (`Wereld.verwijder_koe`, signaal
+`koe_weg`); een dichte poort houdt ze tegen, dus een koe in een gesloten weide is veilig. Daarna 25 s verzadigd. Dorpelingen doen ze
+niets. Vechten: met een selectie op een wolf klikken (`Wereld.geef_vechtbevel`, alleen volwassenen, niet de bouwer): hij loopt tot 4
+tegels en gooit elke 1,8 s een steen (2 schade, hp 8; munitie oneindig, clip `aanval_steen`); wie niets omhanden heeft gooit zelf naar
+een jagende wolf binnen 6 tegels. Hp 0: valt om, ligt 30 s. View: `view/wolf_model.gd` (placeholder uit meshes in de kleuren van
+`lokaal/concept/img/wolf.jpg`, poten, kop, hp-balkje als hij geraakt is) en `view/wolven_view.gd`. Test `test/wolf_test.gd`; scenario
+`wolf` (wolf bijt een koe, een man gooit), frame `screenshots/missie2_wolf_steen.jpg`.
+Nog niet: wolf-glb, kinderen/baby's pakken, vluchten, wolfgeluid; goud (161) en drankjes (160) zijn placeholders, niet
 op te rapen; klasse 226 (betekenis onbekend) is `geen`; prijzen/geluk, pensioen en de hints van missie 2 ontbreken; het leeg buiten de
 kaart (zwart in het origineel) wordt water, zodat het meer in het NW in de zee overloopt. `ontbreekt` in objecten.json geeft per klasse
 een waarschuwing in de log.
@@ -98,6 +107,7 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | links klikken op grond | loopbevel voor de selectie; meerdere units waaieren uit rond de tegel |
 | links klikken op een afgebouwde gereedschapsloods | de eerste volwassen man uit de selectie loopt erheen en wordt bouwer (30 kas): bouwt 2x zo snel, vecht niet, gele helm |
 | links klikken op een koe | de eerste volwassene uit de selectie claimt haar (paarse halsband + bel); nog eens = loslaten |
+| links klikken op een wolf | vechtbevel: de volwassenen uit de selectie (niet de bouwer) lopen erheen en gooien stenen |
 | rechts klikken | selectie weg |
 | rechts slepen, Q/E | camera draaien (PgUp/PgDn kantelen) |
 | WASD/pijlen, schermrand | pannen (begrensd tot het eiland) |
@@ -117,12 +127,12 @@ zijn knoppen (44 px hoog), plaatsen is indrukken-slepen-loslaten, en de ghost vo
 zoomen en draaien met twee vingers (`InputEventScreenDrag`/`InputEventMagnifyGesture` in `rts_camera.gd`, nu muis en
 toetsen), een selectie wissen zonder rechterklik (knop), en het kader (links slepen) naast slepen-om-te-pannen.
 
-Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`, nog zonder invoer en zonder gedrag).
+Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`; vechten = stenen gooien naar een wolf, werken heeft nog geen eigen invoer).
 
 ## Structuur
 
 - `data/` `spel.json` (tegelmaat 2 m, 10 Hz, looptempo, klok), `tegels.json` (kleur, loopbaar, snelheidsfactor: pad 1,15, gras 1, zand 0,9; water en rots niet loopbaar), `objecten.json` (klasse-id naar naam, model, voetafdruk, blokkeert).
-- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Vee` (koe: zwerft rond generator of, eigen, rond het kampvuur), `Plan`, `BouwRij` (rij weg of hek uit een sleepbeweging), `Gegevens`.
+- `sim/` zonder Node, dus headless te testen: `Wereld` (staat, vaste tik, klok, seizoen, weer, bevelen), `Raster`, `Router` (A* met grondprijs, port van beasts-src `Router.kt`, plus `glad` voor rechte routes), `Dorpeling`, `Vee` (koe: zwerft rond generator of, eigen, rond het kampvuur), `Wolf` (missie 2: zwerven, jagen, koe opeten, stenen gooien), `Plan`, `BouwRij` (rij weg of hek uit een sleepbeweging), `Gegevens`.
   Missie 1 in `Wereld`: kas (`spel.json` `missies.1.start_kas`, `prijzen`, betaald bij `plan_zet`), koe-generator (klasse 171, `missies.1.koe_generator`: start 1, max 3 wilde, elke 45 s; uit `m01.json` p5=1/p6=3, betekenis aangenomen), `geef_claimbevel`, `uitslag` + signaal `missie_einde`.
   Gezin (`Wereld._gezin`, port van beasts-src `family`, waarden in `spel.json` `gezin`): bedden = 2 per afgebouwde hut; `ruimte()` = bedden - iedereen - wiegen - baby's. Een vrije man + vrouw lopen naar de deurtegel (`Plan.deur_tegel`, voordeur aan -x bij draai 0) en verdwijnen naar binnen; 12 s later komt zij met de baby op de arm (5 s), dan staat er een jongen of meisje (hash, geen rng), 150 s later volwassen (glb wisselt). Ouders rusten 75 s. Een bevel van de speler breekt het af. ⚠️ Met 6 startbewoners zijn er 4 hutten nodig voor het eerste kind.
   Graan en brood (`Wereld._economie`, beasts-src-lus, `spel.json` `economie`): molen (= bakkerij, 4x3, deur aan +z, wieken draaien) begint met 8 brood; akker (2x2, 16 kas, 16 s werk, loopbaar) rijpt in 60 s in lente en zomer, rijp sterft bij het begin van de winter. Wie niets omhanden heeft kiest elke 0,5 s een klus: graan naar de dichtste molen, brood kopen na 30 s trek (ook kinderen; 3 kas per brood, 1,2 s aan de toonbank), of (volwassen) een rijpe akkertegel oogsten (2 s, zak op de rug). Een bevel van de speler gaat voor.
@@ -147,7 +157,7 @@ stronken) is ALLEEN weergave: de sim leest het niet en geen tegel wordt erdoor g
 texturensets (Texture2DArray, 2,8 m per herhaling) uit de hoekgewichten van `TerreinView._splat()`. De koe (klasse 171) komt uit `view/koe.gd`
 (pad, verborgen onderdelen en animatienaam staan alleen daar; nieuwe glb = sync + import). Seizoen: `Natuur.werk_seizoen()` (tint, rotssneeuw) en
 `TerreinView.zet_sneeuwlaag()` (winter), aangeroepen vanuit `WereldView.werk_seizoen()`.
-Scenario's voor frames: overzicht, kaart, dorp, selectie, pad, loop, vlag, wolf (missie 2), bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat), sleep (een weg en een hek door het bouwmenu gesleept met echte muisinvoer, `test/sleep_scenario.gd`; frame in `screenshots/bouwmenu_sleep_weg_hek.jpg`), nacht (hut + slaapzakken bij het vuur, --uur=20.6). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
+Scenario's voor frames: overzicht, kaart, dorp, selectie, pad, loop, vlag, wolf (missie 2: wolf bijt een koe, een man gooit stenen tot hij omvalt), bos, rots, koe, bouw (hut, loods en kippenhok naast het kampvuur, 4x), bouw2 (molen en melkerij, 4x; samen met bouw alle vier de standen, `screenshots/bouwstanden_bouwplaats.jpg`), claim, gezin (4 hutten, het eerste stel), molen (molen + 2 akkers, bijna rijp), melk (melkerij + koe bij het dorp), kippen (kippenhok, eerste ei na 3 s), bouwer (man wordt bouwer bij de loods), hek (weide met poort die opengaat), sleep (een weg en een hek door het bouwmenu gesleept met echte muisinvoer, `test/sleep_scenario.gd`; frame in `screenshots/bouwmenu_sleep_weg_hek.jpg`), nacht (hut + slaapzakken bij het vuur, --uur=20.6). De oude blokjes-placeholders in `props.gd` zijn alleen nog terugval als een glb ontbreekt.
 Uiterlijk per dorpeling: `Bumpkin.glb_voor(geslacht, leeftijd)` kiest een van de zes glb's (man, vrouw, jongen, meisje, oudere man/vrouw; kinderen zijn al 1,11 m in de glb). `sex` 13 = jongen, 14 = meisje is een aanname (niet geverifieerd). Ontbreekt een glb: de man (kind op 0,81x).
-Bouwplaats: houtstapel en steenhoop naast het plan slinken tot 35 % met de voortgang; bouwmenu: hut (B), gereedschapsloods (L, 5x2), kippenhok (H, 2x2), weg (T, 1x1) en de rest (zie Besturing), `Bouwmenu.GEBOUWEN` + `Wereld.BOUWSOORTEN`; glb's op ware grootte, een mensendeur schaalt. Hut klaar = `peasant_hut_rt.glb`, geschaald op de voordeur: 1,15x de langste volwassene (1,37 m) = 1,58 m, dat is de glb op ware grootte; voetafdruk dus 4x4 tegels (7,6 x 7,1 m incl. hek). Die glb (25 MB) staat niet in git: `blender -b -P ../modellen/peasant_hut_realtime.py`, anders blijft het een bruine kist.
+Bouwplaats: hut, loods, kippenhok, molen en melkerij tonen `<glb>_stand1..3.glb` (`Plan.stand()`, op exact de transform van de af-glb; ontbreekt er een, dan de kist), zaagbok en steenhoop ernaast slinken tot 35 % met de voortgang (zonder zaagbok de houtstapel) en een bouwer binnen 2,6 m kijkt ernaartoe; akker, weg, hek en poort: kist zonder stapels. De glb's laden een keer in de achtergrond zodra er een plan staat; de stand-materialen worden op naam die van de af-glb (texturen van alle 5 x 4 glb's 1594 -> 624 MB, gemeten 2026-10-30); bouwmenu: hut (B), gereedschapsloods (L, 5x2), kippenhok (H, 2x2), weg (T, 1x1) en de rest (zie Besturing), `Bouwmenu.GEBOUWEN` + `Wereld.BOUWSOORTEN`; glb's op ware grootte, een mensendeur schaalt. Hut klaar = `peasant_hut_rt.glb`, geschaald op de voordeur: 1,15x de langste volwassene (1,37 m) = 1,58 m, dat is de glb op ware grootte; voetafdruk dus 4x4 tegels (7,6 x 7,1 m incl. hek). Die glb (25 MB) staat niet in git: `blender -b -P ../modellen/peasant_hut_realtime.py`, anders blijft het een bruine kist.
 Hoogte (rotsboog, strand) is alleen weergave; de sim is plat.

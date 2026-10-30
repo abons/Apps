@@ -20,6 +20,10 @@
   "weg_per_tegel": 2,
   "zelf_bouwen_per_plan": 2,
   "bouwer": {"prijs": 30, "tempo": 2.0},
+  "_wolf": "sim/wolf.gd (beasts-src Beast.Kind.WOLF: pace 1,6 x dorpeling, zicht 7, bereik 0,9, hp 8, slag 0,9 s; prooi koe). Afstanden in tegels, tijden in s. koe_beten: beten tot de koe weg is (beasts-src: 1). Steen: dorpeling gooit binnen steen_bereik, elke worp_s, schade op raak_s. verweer_straal: wie niets omhanden heeft gooit zelf naar een jagende wolf zo dichtbij.",
+  "wolf": {"hp": 8, "snelheid_mps": 2.7, "zwerf_mps": 0.9, "zicht": 7.0, "verlies": 1.4, "bereik": 0.9, "slag_s": 0.9, "koe_beten": 2,
+    "kijk_s": 0.5, "zwerf_straal": 6, "zwerf_wacht": [3.0, 9.0], "rust_s": 25.0, "sterf_s": 1.0, "rot_s": 30.0,
+    "steen_bereik": 4.0, "steen_schade": 2, "worp_s": 1.8, "raak_s": 1.5, "verweer_straal": 6.0},
   "gezin": {"bedden_per_hut": 2, "wieg_s": 12, "baby_s": 5, "opgroeien_s": 150, "ouder_rust_s": 75},
   "_missies": "Per missie (main.gd --missie=<nr>, standaard 1): kaart, start_kas, doel (alles moet: dorpelingen >=, koeien = eigen koeien >=, kas_boven = kas >), verlies (dorpelingen_onder), koe_generator (klasse 171: start, max wilde, interval_s), optioneel bos_dichtheid (anders de algemene). Waarden uit lokaal/missies/m<nn>.json.",
   "missies": {

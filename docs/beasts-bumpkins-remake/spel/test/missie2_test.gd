@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless simtest missie 2 (Terug op het vasteland): godot --headless --path . --script res://test/missie2_test.gd
-## Kaart laadt, 10 dorpelingen (4 m, 4 v, 2 jongens), kampvuur, eigen koeien, wolven als object, voorgebouwde
+## Kaart laadt, 10 dorpelingen (4 m, 4 v, 2 jongens), kampvuur, eigen koeien, 3 wolven (Wolf), voorgebouwde
 ## boerderij (melkerij), routes over het vasteland, missiedoel kas > 10.000 en verlies onder 2.
 
 var fouten := 0
@@ -25,10 +25,14 @@ func _initialize() -> void:
 	for ob in w.objecten:
 		if ob["naam"] == "vlag":
 			vlag = Vector2i(ob["x"], ob["y"])
-		elif ob["naam"] == "wolf":
-			wolven += 1
 	_check(vlag == Vector2i(92, 73), "vlag op (92,73)")
-	_check(wolven == 3, "3 wolven als object (zijn %d)" % wolven)
+	wolven = w.wolven.size()
+	_check(wolven == 3, "3 wolven (sim/wolf.gd, zijn %d)" % wolven)
+	var als_object := 0
+	for ob in w.objecten:
+		if ob["naam"] == "wolf":
+			als_object += 1
+	_check(als_object == 0, "wolven staan niet meer als statisch object (%d)" % als_object)
 	var los := 0
 	for d in w.dorpelingen:
 		var t := d.tegel()

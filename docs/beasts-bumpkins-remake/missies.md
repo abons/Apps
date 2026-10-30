@@ -131,6 +131,9 @@ dorpelingen (4 x type 1, 4 x type 2, 2 x type 13: geen meisje), **4 eigen koeien
 3 wolven (klasse 104, groep 13, type 23) op (111,55), (125,88), (116,100), 3 goudbuidels (161), 3 drankjes (160), 10 paddenstoelen,
 52 bomen, klasse 226 (123,69) onbekend. Wegtypes 1-5 (14 tegels, van de boerderij langs de vlag naar de bron). Bos: 1.090 tegels 225/226;
 de kleine "vlekken" in het gras zijn bosjes met overgangsranden (tex 115-130).
+Wolven (2026-10-30, `spel/sim/wolf.gd`): zwerven rond hun startplek, jagen op koeien (wild of eigen) en eten ze op; een koe in een weide
+achter een dichte poort halen ze niet ("omheining helpt"). Volwassenen (niet de bouwer) gooien stenen op bevel (klik op de wolf) of zelf
+als een wolf vlakbij jaagt. Kinderen en baby's pakken (origineel) komt later (gameplay.md 7: "baby's als moeilijkheid later").
 
 ## Lokale bestanden (niet in git)
 

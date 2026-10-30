@@ -36,6 +36,9 @@ var klus_tegel := Vector2i(-1, -1)   ## akkertegel bij "oogst"
 var bezig := 0.0             ## s dat hij nog staat te oogsten of aan de toonbank staat
 var bouwt := false           ## in deze tik aan het bouwen (view: hamerlus)
 var snelheid_mps := 0.0       ## werkelijke loopsnelheid in deze tik, m/s incl. looptempo (0 = stil)
+var doel_wolf: Wolf = null    ## wolf waar hij stenen naar gooit (vechtbevel of zelf verdedigen, sim/wolf.gd vecht_tik)
+var worp_t := -1.0            ## s in de huidige worp, -1 = geen worp bezig
+var vecht_kijk := 0.0         ## s tot hij zijn route naar de wolf weer bijwerkt
 
 
 func volwassen() -> bool:
@@ -57,7 +60,7 @@ func vrij_voor_gezin() -> bool:
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
 func ledig() -> bool:
 	return bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
-		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null and slaapplek == null and not slaapt
+		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null and slaapplek == null and not slaapt and doel_wolf == null
 
 
 func tegel() -> Vector2i:
@@ -96,6 +99,8 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 		bezig = 0.0
 	binnen = false
 	werk_plan = null
+	doel_wolf = null             # elk nieuw bevel stopt het gooien; Wereld.geef_bevel("vecht") zet hem daarna weer
+	worp_t = -1.0
 	if doel_koe != null:          # een nieuw bevel laat de koe die hij ging claimen weer vrij
 		doel_koe.vast = false
 		doel_koe = null
@@ -135,6 +140,8 @@ func tick(w: Wereld, dt: float) -> void:
 	snelheid_mps = 0.0
 	bouwt = false
 	if binnen:
+		return
+	if doel_wolf != null and Wolf.vecht_tik(w, self, dt):   # stenen gooien; false = erheen lopen (hieronder)
 		return
 	if bezig > 0.0:
 		bezig = maxf(0.0, bezig - dt)

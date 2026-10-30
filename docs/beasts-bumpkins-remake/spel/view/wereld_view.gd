@@ -20,6 +20,7 @@ var _t := 0.0
 var _nat := 0.0
 var _vuur: Node3D
 var wegen: Wegen
+var wolven: Node3D             # view/wolven_view.gd
 
 
 func bouw(wereld: Wereld, l: Licht) -> void:
@@ -81,6 +82,10 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	w.koe_geclaimd.connect(func(k: Vee) -> void:
 		if koeien.has(k.id):
 			Koe.zet_eigen(koeien[k.id], k.eigenaar == 0))
+	# wolven, stenen gooien en opgegeten koeien (view/wolven_view.gd)
+	wolven = preload("res://view/wolven_view.gd").new()
+	add_child(wolven)
+	wolven.bouw(w, self)
 
 
 func _maak_unit(d: Dorpeling) -> void:

@@ -27,6 +27,13 @@ signal volwassen_geworden(d: Dorpeling)
 signal verkocht(winkel: Plan, waar: String, prijs: int)
 ## Melding voor de view (beasts-src `World.restock`): er kwam een stuk graan/melk/ei op het schap van `winkel`.
 signal geleverd(winkel: Plan, brengt: String)
+## Wolven (sim/wolf.gd): een koe is opgegeten (uit `vee`), een dorpeling begint een worp, een steen raakt, een wolf valt
+## om, een dode wolf is vergaan (uit `wolven`).
+signal koe_weg(koe: Vee)
+signal steen_gegooid(d: Dorpeling, wolf: Wolf)
+signal wolf_geraakt(wolf: Wolf)
+signal wolf_dood(wolf: Wolf)
+signal wolf_weg(wolf: Wolf)
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -59,6 +66,8 @@ var objecten: Array[Dictionary] = []     # {cls, naam, model, x, y, blokkeert, s
 var dorpelingen: Array[Dorpeling] = []
 var vee: Array[Vee] = []
 var kippen: Array[Kip] = []
+var wolven: Array[Wolf] = []             # missie 2: klasse 104 (objecten.json "beest": "wolf"), sim/wolf.gd
+var _kaart_wolven: Array = []            # tegels van de wolven uit de kaart
 var kas := 0
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
 var _generator := Vector2i(-1, -1)        # tegel van de koe-generator (klasse 171), (-1,-1) = geen
@@ -123,6 +132,7 @@ func laad(kaart_pad := "", nr := 1) -> bool:
 	_maak_dorpelingen()
 	kas = int(missie.get("start_kas", 0))
 	_maak_kaart_vee()
+	wolven = Wolf.uit_kaart(self, _kaart_wolven)
 	_start_generator()
 	tijd_s = float(spel["start_seizoen"]) * float(spel["seizoen_s"]) + float(spel["start_klok_s"])
 	return true
@@ -175,6 +185,9 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 			continue
 		if d.get("vee", false):      # koe uit de kaart: wordt een Vee, zie _maak_kaart_vee()
 			_kaart_vee.append({"tegel": Vector2i(int(o["x"]), int(o["y"])), "eigen": int(o.get("owner", 4)) == 0})
+			continue
+		if d.get("beest", "") == "wolf":   # wolf uit de kaart: wordt een Wolf, geen object
+			_kaart_wolven.append(Vector2i(int(o["x"]), int(o["y"])))
 			continue
 		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": d["model"], "x": int(o["x"]), "y": int(o["y"]),
 			"blokkeert": d["blokkeert"], "voetafdruk": d["voetafdruk"], "state": int(o["state"]), "sex": int(o["sex"]),
@@ -288,6 +301,7 @@ func tik(dt: float) -> void:
 	for p in plannen.duplicate():       # kopie: een afgebouwde weg haalt zijn plan uit de lijst
 		if not p.klaar and p.voortgang >= 1.0:
 			_rond_af(p)
+	Wolf.tik_alle(self, dt)
 	_werk_generator(dt)
 	_gezin(dt)
 	_economie(dt)
@@ -1102,7 +1116,7 @@ func spreid(doel: Vector2i, n: int) -> Array[Vector2i]:
 
 ## Geef een bevel aan de dorpelingen in `ids`. Lopen kan iedereen; "vecht" en "werk" alleen volwassenen.
 ## Meerdere uitvoerders waaieren uit over tegels rond het doel. Geeft het aantal dat het bevel kreeg.
-## ("vecht" en "werk" lopen voorlopig alleen naar het doel; het gedrag volgt met de economie.)
+## ("vecht" bij een wolf: stenen gooien, zie onder; anders, net als "werk", alleen naar het doel lopen.)
 func geef_bevel(ids: Array, soort: String, doel: Vector2i) -> int:
 	var uitvoerders: Array[Dorpeling] = []
 	for id in ids:
@@ -1131,8 +1145,51 @@ func geef_bevel(ids: Array, soort: String, doel: Vector2i) -> int:
 		over.erase(beste)
 		if beste.geef_bevel(self, soort, plek):
 			gelukt += 1
+	if soort == "vecht":            # een levende wolf bij het doel: stenen gooien (sim/wolf.gd vecht_tik)
+		var wf := wolf_bij(doel, 2.5)
+		if wf != null:
+			for d in uitvoerders:
+				if d.bevel.get("soort", "") == "vecht" or d.route.is_empty():
+					d.doel_wolf = wf
+					d.vecht_kijk = 0.0
 	bevel_gegeven.emit(ids, soort, t)
 	return gelukt
+
+
+## Vechtbevel op wolf `wolf_id` (Bestuur: klik op een wolf met een selectie). Alleen volwassenen, niet de bouwer.
+func geef_vechtbevel(ids: Array, wolf_id: int) -> int:
+	for wf in wolven:
+		if wf.id == wolf_id and wf.leeft():
+			return geef_bevel(ids, "vecht", wf.tegel())
+	return 0
+
+
+## Levende wolf binnen `straal` tegels van tegel `t` (de dichtste), of null.
+func wolf_bij(t: Vector2i, straal: float) -> Wolf:
+	var beste: Wolf = null
+	var bd := straal
+	for wf in wolven:
+		var af := wf.pos.distance_to(Vector2(t) + Vector2(0.5, 0.5))
+		if wf.leeft() and af <= bd:
+			bd = af
+			beste = wf
+	return beste
+
+
+## Een koe gaat van de kaart (de wolf heeft haar): wie haar ging melken of claimen stopt, de weides worden herverdeeld.
+func verwijder_koe(k: Vee) -> void:
+	if not k in vee:
+		return
+	vee.erase(k)
+	for d in dorpelingen:
+		if d.melk_koe == k or d.doel_koe == k:
+			d.melk_koe = null
+			d.doel_koe = null
+			d.bezig = 0.0
+			d.bevel = {}
+			d.route.clear()
+	_wijs_weides_toe()
+	koe_weg.emit(k)
 
 
 ## Maak een Plan van `soort` op `tegel` (linksboven), `draai` kwartslagen; null als de plek niet kan.

@@ -6,10 +6,14 @@ extends Node
 ## schuift hem (groen = kan, rood = kan niet), loslaten plaatst een Plan. Weg en hek: slepen legt een rij (BouwRij: hoekige
 ## route om obstakels, een ghost per tegel). De modus blijft aan na het plaatsen; stoppen met de Stop-knop, nog eens op
 ## de bouwknop, rechterklik of Esc. Draaien met de Draai-knop, het wiel (dan zoomt het wiel niet) of R.
-## Een Plan is een kist die in Plan.STANDEN groeit, met een houtstapel en steenhoop ernaast die slinken met de voortgang
-## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de kist wordt de glb van het gebouw. De glb's
-## zijn op ware grootte (dorpeling 1,37 m); een mensendeur ("voordeur", anders "deur", >= 1 m) schaalt ze op DEUR_M,
-## iets groter dan een volwassene. Ontbreekt de glb: een bruine kist.
+## Een Plan toont de bouwstand (Plan.stand() 1..3 = `<glb>_stand1..3.glb`, uit de af-glb gesneden: zelfde oorsprong en
+## ankers), op exact de transform van de af-glb, met een zaagbok en steenhoop ernaast die slinken met de voortgang
+## (alleen weergave; kas en aanvoer staan nog niet in de sim). Klaar: de af-glb. De glb's zijn op ware grootte
+## (dorpeling 1,37 m); een mensendeur ("voordeur", anders "deur", >= 1 m) schaalt ze op DEUR_M, iets groter dan een
+## volwassene. Ontbreekt een stand-glb: een kist die meegroeit; ontbreekt de af-glb: een bruine kist.
+## Glb's laden een keer, in de achtergrond (load_threaded_request) zodra een plan er staat; tot de stand er is staat
+## de kist er. De materialen van een stand worden op naam die van de af-glb (dus ook dezelfde atlassen), en de
+## bouwgrond van stand 1 is een gedeeld materiaal: de eigen atlassen van de stand-glb's vallen daarna vrij.
 ## Moet NA Bestuur in de boom staan: dan krijgt het de invoer eerst en neemt het de linkerklik van het kiezen over.
 
 const GROND_Y := 0.25
@@ -35,7 +39,9 @@ const KLEUR_BESTAAT := Color(0.85, 0.85, 0.85, 0.25)
 const POORT_OPEN_RAD := deg_to_rad(100.0)
 const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
 
-const STAPELS := ["houtstapel", "steenhoop"]
+const STAPELS := ["zaagbok", "steenhoop"]   ## bouwplaats (besluit gebruiker, origineel woodpile + rockpile)
+const STAPEL_TERUG := {"zaagbok": "houtstapel"}   ## als de eerste ontbreekt
+const KIJK_M := 2.6           ## een bouwer binnen deze afstand van de zaagbok of steenhoop kijkt ernaartoe
 const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
 const VOLWASSENE_M := 1.37     ## de man, langste volwassene (bumpkin_basis.py; vrouw en ouderen 1,31-1,33)
 const DEUR_M := VOLWASSENE_M * 1.15   ## gewenste hoogte van de voordeur: iets groter dan een volwassene
@@ -49,10 +55,17 @@ var knoppen := {}          ## soort -> Button
 var ghost: MeshInstance3D
 var _rechts_start := Vector2.ZERO
 var _rechts := false
-var _kisten := {}          ## Plan -> kist
+var _kisten := {}          ## Plan -> wat er op de bouwplaats staat: de kist of een stand-instantie
+var _getoond := {}         ## Plan -> getoonde stand (0 = de kist)
+var view: WereldView       ## optioneel: bouwers laten kijken naar zaagbok of steenhoop
 var _stapels := {}         ## Plan -> [Node3D]
 var terrein: TerreinView   ## optioneel: grondhoogte voor stapels en hut (anders GROND_Y)
-var _scenes := {}          ## soort -> PackedScene
+static var _scenes := {}   ## glb-pad -> PackedScene (een keer geladen; null = ontbreekt of mislukt)
+static var _laden := {}    ## glb-pad -> true: load_threaded_request loopt
+static var _af_info := {}  ## soort -> {schaal, midden}: de transform van de af-glb, ook voor de standen
+static var _af_mats := {}  ## soort -> {materiaalnaam: Material} uit de af-glb
+static var _los_mats := {} ## materiaalnaam -> Material dat niet in een af-glb zit (bouwgrond), gedeeld over gebouwen
+static var _gedeeld := {}  ## stand-pad -> true: materialen al omgezet
 var _wieken: Array[Node3D] = []
 var _gewas := {}           ## akkertegel -> Node3D (akker_rijp, groeit mee met Wereld.akkers)
 var _hekken: Node3D        ## alle hekpalen en -segmenten, opnieuw opgebouwd bij elk afgebouwd hek of poort
@@ -231,14 +244,19 @@ func _process(_dt: float) -> void:
 		for s: Node3D in _stapels[p]:
 			s.scale = Vector3.ONE * lerpf(1.0, STAPEL_RESTANT, p.voortgang)
 	for p in _kisten:
-		var k: MeshInstance3D = _kisten[p]
 		if p.klaar:
+			continue
+		if _werk_stand(p):
+			continue
+		var k := _kisten[p] as MeshInstance3D
+		if k == null:
 			continue
 		var f: float = float(p.stand()) / Plan.STANDEN
 		if p.soort != &"weg":      # een weg is plat: alleen de kleur loopt mee
 			k.scale.y = f
 			k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
+	_kijk_bouwers()
 	for pt in _poorten:
 		var dr: Node3D = _poorten[pt]
 		dr.rotation.y = lerp_angle(dr.rotation.y, POORT_OPEN_RAD if pt.open else 0.0, minf(1.0, _dt * 5.0))
@@ -305,11 +323,15 @@ func _toon_plan(p: Plan) -> void:
 	mi.position = _midden(p)
 	mi.rotation.y = p.draai * PI * 0.5
 	_kisten[p] = mi
+	_getoond[p] = 0
 	ghost.get_parent().add_child(mi)
 	var lijst: Array[Node3D] = []
 	var plekken := _stapelplekken(p, STAPELS.size() if not p.soort in [&"akker", &"hek", &"poort", &"weg"] else 0)
 	for i in plekken.size():
-		var n := Natuur.instantie(STAPELS[i])
+		var naam: String = STAPELS[i]
+		if not Natuur.bestaat(naam) and STAPEL_TERUG.has(naam):
+			naam = STAPEL_TERUG[naam]
+		var n := Natuur.instantie(naam)
 		if n == null:
 			continue
 		n.position = _grond(plekken[i])
@@ -350,9 +372,10 @@ func _plan_klaar(p: Plan) -> void:
 	for s: Node3D in _stapels.get(p, []):
 		s.queue_free()
 	_stapels.erase(p)
-	var k: MeshInstance3D = _kisten.get(p)
+	var k: Node3D = _kisten.get(p)
 	if k == null:
 		return
+	_getoond.erase(p)
 	if p.soort == &"akker":
 		_maak_akker(p)
 		k.queue_free()
@@ -367,17 +390,66 @@ func _plan_klaar(p: Plan) -> void:
 		_kisten.erase(p)
 		_bouw_hekken()
 		return
-	var glb: String = GEBOUWEN[p.soort]["glb"]
-	if not _scenes.has(p.soort) and ResourceLoader.exists(glb):
-		_scenes[p.soort] = load(glb)
-	if not _scenes.has(p.soort):
+	var ps := _scene(GEBOUWEN[p.soort]["glb"], true)
+	if ps == null:
+		if not k is MeshInstance3D:      # kan niet: een stand staat er alleen als de af-glb er is
+			return
 		k.scale.y = 1.0
 		k.position.y = GROND_Y + _hoogte(p.soort) * 0.5
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.55, 0.4, 0.25, 1.0)
 		return
-	var hut: Node3D = (_scenes[p.soort] as PackedScene).instantiate()
+	var hut: Node3D = ps.instantiate()
+	_zet_op_plek(hut, p)
+	ghost.get_parent().add_child(hut)
+	var wk := hut.find_child("wieken", true, false) as Node3D
+	if wk != null:
+		_wieken.append(wk)
+	k.queue_free()
+	_kisten.erase(p)
+
+
+## Glb-pad van bouwstand `n` (1..3) van `soort`, "" als de soort geen standen heeft (akker, weg, hek, poort).
+static func stand_pad(soort: StringName, n: int) -> String:
+	var glb: String = GEBOUWEN[soort]["glb"]
+	if not glb.ends_with("_rt.glb"):
+		return ""
+	return glb.trim_suffix("_rt.glb") + "_stand%d.glb" % n
+
+
+## De PackedScene van `pad` uit de cache. Niet geladen: start het laden in de achtergrond en geeft null (wacht = true:
+## blokkeert tot hij er is). Null blijft null als het bestand ontbreekt of het laden mislukte.
+static func _scene(pad: String, wacht := false) -> PackedScene:
+	if _scenes.has(pad):
+		return _scenes[pad]
+	if pad == "" or not ResourceLoader.exists(pad):
+		_scenes[pad] = null
+		return null
+	if not _laden.has(pad):
+		if wacht:
+			_scenes[pad] = load(pad) as PackedScene
+			return _scenes[pad]
+		ResourceLoader.load_threaded_request(pad, "PackedScene", true)
+		_laden[pad] = true
+		return null
+	var st := ResourceLoader.load_threaded_get_status(pad)
+	if st == ResourceLoader.THREAD_LOAD_LOADED or (wacht and st == ResourceLoader.THREAD_LOAD_IN_PROGRESS):
+		_scenes[pad] = ResourceLoader.load_threaded_get(pad) as PackedScene
+		_laden.erase(pad)
+		return _scenes[pad]
+	if st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		return null
+	_scenes[pad] = null      # mislukt
+	_laden.erase(pad)
+	return null
+
+
+## Schaal (op de mensendeur) en midden van het omhulsel van de af-glb van `soort`, een keer gemeten; de standen
+## krijgen dezelfde, want hun omhulsel is kleiner en hun deurblad ontbreekt. Bewaart ook de materialen van de af-glb.
+static func _info(soort: StringName, ps: PackedScene) -> Dictionary:
+	if _af_info.has(soort):
+		return _af_info[soort]
+	var hut: Node3D = ps.instantiate()
 	var box := _omhulsel(hut, Transform3D.IDENTITY)
-	var r := p.afdruk()
 	# Ware grootte, tenzij er een mensendeur is: dan op DEUR_M (het kippendeurtje van 0,4 m telt niet).
 	var schaal := 1.0
 	var deur := hut.find_child("voordeur", true, false)
@@ -387,22 +459,120 @@ func _plan_klaar(p: Plan) -> void:
 		var dh := _omhulsel_van(hut, deur).size.y
 		if dh >= 1.0:
 			schaal = DEUR_M / dh
-	hut.scale = Vector3.ONE * schaal
-	hut.rotation.y = p.draai * PI * 0.5
+	var mats := {}
+	_verzamel_mats(hut, mats)
+	_af_mats[soort] = mats
+	hut.free()
+	_af_info[soort] = {"schaal": schaal, "midden": box.get_center() * schaal}
+	return _af_info[soort]
+
+
+static func _verzamel_mats(n: Node, uit: Dictionary) -> void:
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		var mesh := (n as MeshInstance3D).mesh
+		for s in mesh.get_surface_count():
+			var m := mesh.surface_get_material(s)
+			if m != null and m.resource_name != "" and not uit.has(m.resource_name):
+				uit[m.resource_name] = m
+	for c in n.get_children():
+		_verzamel_mats(c, uit)
+
+
+## Zet de materialen van een stand-glb een keer om naar die van de af-glb (zelfde naam = zelfde atlas en UV's); wat
+## daar niet in zit (bouwgrond) wordt een materiaal dat alle gebouwen delen. De meshes zijn gedeeld tussen instanties,
+## dus dit geldt voor elke volgende instantie, en de eigen materialen en texturen van de stand vallen vrij.
+static func _deel_materialen(pad: String, soort: StringName, ps: PackedScene) -> void:
+	if _gedeeld.has(pad):
+		return
+	_gedeeld[pad] = true
+	var af: Dictionary = _af_mats.get(soort, {})
+	var n := ps.instantiate()
+	var lijst: Array = []
+	Natuur._meshes(n, lijst)
+	for mi: MeshInstance3D in lijst:
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(s)
+			if m == null or m.resource_name == "":
+				continue
+			var nm := m.resource_name
+			if af.has(nm):
+				mi.mesh.surface_set_material(s, af[nm])
+			elif _los_mats.has(nm):
+				mi.mesh.surface_set_material(s, _los_mats[nm])
+			else:
+				_los_mats[nm] = m
+	n.free()
+
+
+## Zet een gebouw-instantie (af of stand) op de transform van de af-glb voor plan `p`.
+func _zet_op_plek(n: Node3D, p: Plan) -> void:
+	var info := _info(p.soort, _scene(GEBOUWEN[p.soort]["glb"], true))
+	var schaal: float = info["schaal"]
+	var r := p.afdruk()
+	n.scale = Vector3.ONE * schaal
+	n.rotation.y = p.draai * PI * 0.5
 	var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
 	if terrein != null:
 		m.y = _laagste_grond(r)
-	var midden := box.get_center() * schaal
+	var midden: Vector3 = info["midden"]
 	# y = 0 in de glb is de grond (stenen en keien steken er met opzet onder); vroeger zette dit de onderkant van het
 	# omhulsel op de grond, en dan zweefde de hut 16 cm (de funderingsstenen gaan tot -0,16 m)
-	hut.position = m - Vector3(midden.x, 0.0, midden.z).rotated(Vector3.UP, hut.rotation.y)
-	ghost.get_parent().add_child(hut)
-	var wk := hut.find_child("wieken", true, false) as Node3D
-	if wk != null:
-		_wieken.append(wk)
-	k.queue_free()
-	_kisten.erase(p)
+	n.position = m - Vector3(midden.x, 0.0, midden.z).rotated(Vector3.UP, n.rotation.y)
 
+
+## Bouwstand bijwerken voor een plan dat nog niet klaar is. False = deze soort of stand heeft geen glb (dan groeit de
+## kist zoals vroeger); true = de stand staat er, of hij wordt nog geladen (dan blijft staan wat er stond).
+func _werk_stand(p: Plan) -> bool:
+	var wil := p.stand()
+	var pad := stand_pad(p.soort, wil)
+	if pad == "":
+		return false
+	var nu: int = _getoond.get(p, 0)
+	if nu == wil:
+		return true
+	var af_pad: String = GEBOUWEN[p.soort]["glb"]
+	var af := _scene(af_pad)
+	var ps := _scene(pad)
+	if wil < Plan.STANDEN - 1:
+		_scene(stand_pad(p.soort, wil + 1))     # de volgende alvast in de achtergrond
+	if (ps == null and _scenes.has(pad)) or (af == null and _scenes.has(af_pad)):
+		return nu > 0              # ontbreekt: de vorige stand blijft staan, of de kist groeit verder
+	if ps == null or af == null:
+		return true                # wordt nog geladen: de kist (of de vorige stand) blijft
+	_info(p.soort, af)
+	_deel_materialen(pad, p.soort, ps)
+	var n: Node3D = ps.instantiate()
+	_zet_op_plek(n, p)
+	ghost.get_parent().add_child(n)
+	(_kisten[p] as Node3D).queue_free()
+	_kisten[p] = n
+	_getoond[p] = wil
+	return true
+
+
+## Een bouwer die aan een plan werkt en binnen KIJK_M van de zaagbok of steenhoop staat, kijkt ernaartoe (met de
+## hamerclip; een zaagclip is er nog niet).
+func _kijk_bouwers() -> void:
+	if view == null:
+		return
+	for d in w.dorpelingen:
+		if not d.bouwt or d.werk_plan == null or d.werk_plan.klaar or not _stapels.has(d.werk_plan):
+			continue
+		var u: Dictionary = view.units.get(d.id, {})
+		if u.is_empty():
+			continue
+		var b: Bumpkin = u["bump"]
+		var best: Node3D = null
+		var best_d := KIJK_M
+		for s: Node3D in _stapels[d.werk_plan]:
+			var a := Vector2(s.global_position.x - b.global_position.x, s.global_position.z - b.global_position.z).length()
+			if a < best_d:
+				best_d = a
+				best = s
+		if best != null:
+			b.kijk_naar(best.global_position - b.global_position)
 
 ## Hekken opnieuw: een paal op elk hektegelmidden, een segment (2 m, palen op x = +-1) naar elk hek- of poortbuur
 ## (recht; schuin alleen zonder rechte tussenburen, dan 1,41x lang). Een poort draait zijn doorgang langs de hekken.

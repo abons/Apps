@@ -5,7 +5,8 @@ extends Node
 ## Klik op een poort (met of zonder selectie): open of dicht.
 ## Klik op een afgebouwde gereedschapsloods met een selectie: de eerste volwassen man wordt er bouwer (kost kas).
 ## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
-## Fight- en werkbevelen bestaan in Wereld.geef_bevel (alleen volwassenen); er is nog geen invoer voor.
+## Klik op een levende wolf met een selectie: vechtbevel (Wereld.geef_vechtbevel; alleen volwassenen, niet de bouwer),
+## ze lopen erheen en gooien stenen (sim/wolf.gd). Werkbevelen hebben nog geen eigen invoer.
 
 const KLIK_DREMPEL := 6.0       # px: minder slepen telt als klik
 const PICK_PX := 30.0           # px rond een unit waarbinnen een klik hem kiest
@@ -106,6 +107,12 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			return
 	if gekozen.is_empty():
 		return
+	var wid := _wolf_onder(pos)          # vechtbevel: de volwassenen (niet de bouwer) gooien stenen
+	if wid >= 0 and w.geef_vechtbevel(gekozen, wid) > 0:
+		for wf in w.wolven:
+			if wf.id == wid:
+				view.markeer(wf.tegel())
+		return
 	var kid := _koe_onder(pos)
 	if kid >= 0 and w.geef_claimbevel(gekozen, kid) > 0:
 		view.markeer(w.koe(kid).tegel())
@@ -121,6 +128,23 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			view.markeer(g.deur_tegel())
 			return
 		geef_loopbevel(t)
+
+
+## Levende wolf onder een schermpunt (binnen PICK_PX rond zijn rug), -1 als er geen is.
+func _wolf_onder(pos: Vector2) -> int:
+	if view.wolven == null:
+		return -1
+	var beste := -1
+	var bd := PICK_PX * 1.4
+	for wf in w.wolven:
+		var p: Vector3 = view.wolven.wolf_pos(wf.id)
+		if not wf.leeft() or p == Vector3.INF or cam.is_position_behind(p):
+			continue
+		var af := cam.unproject_position(p + Vector3(0, 0.6, 0)).distance_to(pos)
+		if af < bd:
+			bd = af
+			beste = wf.id
+	return beste
 
 
 ## Koe onder een schermpunt (binnen PICK_PX rond haar rug), -1 als er geen is.

@@ -76,6 +76,7 @@ func _ready() -> void:
 	bouwmenu = Bouwmenu.new()
 	bouwmenu.name = "Bouwmenu"
 	bouwmenu.terrein = view.terrein
+	bouwmenu.view = view            # bouwers kijken naar zaagbok of steenhoop
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
 	var geluid: Node3D = preload("res://view/geluid.gd").new()   # stemmen, werk, dieren, omgeving (view/geluid.gd)
@@ -157,8 +158,8 @@ func _start_scenario() -> void:
 		"vlag":
 			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("vlag", Vector2i(104, 65))) + Vector3(0, 1.6, 0), 0.9, deg_to_rad(12), 7.0)
 		"wolf":
-			# missie 2: de eerste wolf (placeholder, staat stil) met goud en drankjes in de buurt
-			cam.zet_direct(view.terrein.tegel_midden(_object_tegel("wolf", Vector2i(111, 55))) + Vector3(0, 0.4, 0), 0.7, deg_to_rad(26), 7.0)
+			# missie 2: de eerste wolf besluipt een wilde koe, een man krijgt na 1 s een vechtbevel en gooit stenen
+			_wolf_scenario()
 		"bos":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(114, 50)), 0.8, deg_to_rad(24), 16.0)
 		"koe":
@@ -284,6 +285,21 @@ func _start_scenario() -> void:
 				w.geef_bouwbevel(ids.slice(3, 4), h)
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(105, 64)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
+		"bouw2":
+			# molen en melkerij naast het kampvuur, elk door de helft van de volwassenen, 4x: alle vier de bouwstanden
+			w.alles_open = true
+			var ids2 := []
+			for d in w.dorpelingen:
+				if d.volwassen():
+					ids2.append(d.id)
+			var ml := _vrij_plan(&"molen", Vector2i(98, 60))
+			if ml != null and w.plan_zet(ml):
+				w.geef_bouwbevel(ids2.slice(0, 2), ml)
+			var mk2 := _vrij_plan(&"melkerij", Vector2i(105, 61))
+			if mk2 != null and w.plan_zet(mk2):
+				w.geef_bouwbevel(ids2.slice(2, 4), mk2)
+			w.tempo = 4.0
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(103, 62)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
 		"sleep":
 			# een weg en een hek slepen door het bouwmenu, met echte muisinvoer (test/sleep_scenario.gd)
 			add_child(load("res://test/sleep_scenario.gd").new().start(self))
@@ -292,6 +308,55 @@ func _start_scenario() -> void:
 			w.dorpeling(3).zet_tegel(Vector2i(108, 47))
 			w.dorpeling(3).anker = Vector2i(108, 47)
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(113, 52)), 0.3, deg_to_rad(60), 34.0)
+
+
+var _wolf_man: Dorpeling = null
+
+
+## Scenario wolf: op open grasland (12x8 vrij) staat de eerste wolf aan de oostkant, een wilde koe 5 tegels west en een
+## man nog 4 tegels verder; de koe houdt het langer vol (koe_beten 20) zodat de stenen vliegen terwijl de wolf bijt.
+func _wolf_scenario() -> void:
+	if w.wolven.is_empty():
+		return
+	var wf: Wolf = w.wolven[0]
+	w.spel["wolf"]["koe_beten"] = 20
+	var o := Vector2i(-1, -1)
+	for r in range(6, 30):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if o.x >= 0 or maxi(absi(dx), absi(dy)) != r:
+					continue
+				var c := w.kampvuur + Vector2i(dx, dy)
+				var vrij := true
+				for ey in range(-2, 10):
+					for ex in range(-2, 14):
+						var t := c + Vector2i(ex, ey)
+						if not w.raster.loopbaar_v(t) or w.bereik[w.raster.idx(t.x, t.y)] == 0:
+							vrij = false
+				if vrij:
+					o = c
+	if o.x < 0:
+		o = wf.tegel() + Vector2i(-11, -3)
+	wf.zet_tegel(o + Vector2i(11, 3))
+	wf.anker = wf.tegel()
+	var kt := o + Vector2i(6, 4)
+	var k := Vee.new()
+	k.id = w._volgende_koe_id
+	w._volgende_koe_id += 1
+	k.zet_tegel(kt)
+	k.anker = kt
+	k.wacht = 99.0
+	w.vee.append(k)
+	w.koe_erbij.emit(k)
+	for d in w.dorpelingen:
+		if d.volwassen() and d.geslacht == "man":
+			_wolf_man = d
+			break
+	_wolf_man.zet_tegel(o + Vector2i(1, 5))
+	_wolf_man.route.clear()
+	_wolf_man.bevel = {}
+	_wolf_man.anker = _wolf_man.tegel()
+	cam.zet_direct(view.terrein.tegel_midden(kt) + Vector3(-3.0, 0.4, 0), 0.25, deg_to_rad(50), 11.0)
 
 
 ## Tegel van het eerste kaartobject met `naam` (voor scenario's op elke kaart), anders `anders`.
@@ -320,6 +385,12 @@ func _camyaw(y: float) -> void:
 
 func _scenario_stap() -> void:
 	match scenario:
+		"wolf":
+			if _stap == 0 and szt >= 1.0 and _wolf_man != null and not w.wolven.is_empty():
+				bestuur.gekozen = [_wolf_man.id]
+				view.gekozen = bestuur.gekozen
+				w.geef_vechtbevel(bestuur.gekozen, w.wolven[0].id)
+				_stap = 1
 		"hek":
 			if _stap == 0 and szt >= 2.0:
 				for p in w.plannen:
