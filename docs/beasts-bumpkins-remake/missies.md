@@ -173,7 +173,7 @@ Wolven (2026-10-30, `spel/sim/wolf.gd`): zwerven rond hun startplek, jagen op ko
 achter een dichte poort halen ze niet ("omheining helpt"). Volwassenen (niet de bouwer) gooien stenen op bevel (klik op de wolf) of zelf
 als een wolf vlakbij jaagt. Kinderen en baby's pakken (origineel) komt later (gameplay.md 7: "baby's als moeilijkheid later").
 
-**Prijzen, geluk en misdaad (2026-10-30).** Origineel: goudicoon in de bovenbalk (MIS1-10) opent `STATS.MFB` (`lokaal/bb_original/stats.png`):
+**Prijzen, geluk en misdaad (2026-10-30).** **Besluit gebruiker:** misdaad en de straf-schuiven per misdaad pas vanaf M13 (met de gevangenis), zoals het origineel. Origineel: goudicoon in de bovenbalk (MIS1-10) opent `STATS.MFB` (`lokaal/bb_original/stats.png`):
 een schuif per waar (eieren, water, brood, melk, cider, kerk, belasting) van weinig munten naar een stapel goud, daaronder per misdaad
 (vloeken, diefstal, mishandeling, moord) de straf van duim omhoog tot duim omlaag. MIS2-3: hoge prijzen = ontevreden = korter leven.
 Statistiekreeksen in elke .MIS: Happiness, Crimes, Convictions, Trade, Tax. Misdaad en gevangenis (pikenier) pas in M13. Bedragen,
