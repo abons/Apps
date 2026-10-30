@@ -30,7 +30,7 @@ Teken-cheatsheet (lokale Euler, graden): romp/nek/kop: +rx buigt voorover, +ry d
 
 ANIMATIES (24 fps, alleen rotaties + Hips-locatie; benen via 2-botten-IK per frame uitgerekend en
 dan gewoon gekeyframed): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen, zagen (bouwers wisselen
-hameren en zagen af, prop_zaag), dragen (beide handen voor de borst; het spel legt hem als bovenlijf-blend over de
+hameren en zagen af, prop_zaag), houweel (prop_houweel, twee handen), dragen (beide handen voor de borst; het spel legt hem als bovenlijf-blend over de
 loopclips). Linker- en rechterarm kunnen in richtingsmodus (sleutels LA/RA, arm_ik legt de palm op een punt).
 Elke actie heeft custom property `snelheid_mps`; zie ook bumpkin_anim.json.
 """
@@ -799,6 +799,37 @@ def clip_zagen(M):
     return N, True, k, {"snelheid_mps": 0.0}, {"impact_s": IMP / FPS}
 
 
+def clip_houweel(M):
+    """Houweel (origineel `pick`/`vpick`): met twee handen boven de rechterschouder uithalen en de punt in de
+    steenhoop/grond slaan. Rechterhand hoog op de steel (prop_R), linkerhand lager naar het eind. 24 frames (1,0 s),
+    lus; impact = punt in de grond (frame 11)."""
+    N, IMP = 24, 11
+    s, sl = M.s, M.sl
+    vo = {"LF": (0.135 * sl, -0.07 * sl, 0, 0, 8), "RF": (-0.135 * sl, 0.07 * sl, 0, 0, -8)}
+    # f: (rechterpalm (x, y, z) * s, alpha greep-as, romp-pitch, T.z, T.y)
+    S = {0: ((-0.10, 0.02, 1.22), 135, -7, -0.03, 0.03),
+         4: ((-0.10, 0.04, 1.26), 150, -9, -0.025, 0.04),
+         8: ((-0.08, -0.22, 1.02), 75, 4, -0.06, 0.0),
+         IMP: ((-0.05, -0.36, 0.52), -38, 14, -0.12, -0.04),
+         14: ((-0.05, -0.34, 0.56), -30, 13, -0.115, -0.035),
+         18: ((-0.08, -0.22, 0.85), 50, 4, -0.07, 0.0),
+         N: ((-0.10, 0.02, 1.22), 135, -7, -0.03, 0.03)}
+    P = {}
+    for f, (r, alpha, rp, tz, ty) in S.items():
+        p = dict(T=(0, ty * sl, tz * sl), Hips=(rp * 0.5, 2, 0), Spine=(rp * 0.5, 2, 0), Spine1=(rp * 0.6, 2, 0),
+                 Spine2=(rp * 0.5, 1, 0), Neck=(2, 0, 0), Head=(4 + max(0, rp) * 0.4, 0, 0),
+                 RightHandFist=(70, 0, 0), LeftHandFist=(70, 0, 0), **vo)
+        R = Vector(r) * s
+        a = math.radians(alpha)
+        h = Vector((0, -math.cos(a), math.sin(a)))
+        L = R - h * (HOUWEEL_LINKS * s) + Vector((-0.10, 0, 0)) * s    # palmen liggen ~5 cm buiten het IK-doel
+        p["RA"] = arm_ik(M, p, RECHTS, R, (-1.0, 0.3, -0.6), alpha=alpha)
+        p["LA"] = arm_ik(M, p, LINKS, L, (0.9, 0.2, -0.6))
+        P[f] = p
+    k = sleutels_naar_reeksen(P, N, True, M)
+    return N, True, k, {"snelheid_mps": 0.0}, {"impact_s": IMP / FPS}
+
+
 def clip_dragen(M):
     """Iets voor de borst dragen (beker, zak, mand): beide handen voor de borst, ellebogen omlaag langs het lijf.
     Alleen de armen tellen in het spel (bovenlijf-blend over idle/lopen/rennen). 48 frames (2 s), lus, ademt licht."""
@@ -819,7 +850,7 @@ def clip_dragen(M):
 
 CLIPS = [("idle", clip_idle), ("lopen", clip_lopen), ("rennen", clip_rennen),
          ("bouwen", clip_bouwen), ("aanval_zwaard", clip_zwaard), ("aanval_steen", clip_steen),
-         ("zagen", clip_zagen), ("dragen", clip_dragen)]
+         ("zagen", clip_zagen), ("dragen", clip_dragen), ("houweel", clip_houweel)]
 
 
 def bouw_animaties(rig, alleen=None):
@@ -954,6 +985,7 @@ def bouw_placeholder(rig, maat=None):
     prop("prop_zwaard", "prop_R", lambda n: maak_zwaard(n))
     prop("prop_steen", "prop_R", lambda n: maak_steen(n))
     prop("prop_zaag", "prop_R", lambda n: maak_zaag(n))
+    prop("prop_houweel", "prop_R", lambda n: maak_houweel(n))
     return body
 
 
@@ -1015,6 +1047,39 @@ def maak_zaag(naam):
     nb = len(blad_v)
     for poly in me.polygons:                   # het blad is het laatst aangemaakt: de laatste nb verts
         if min(poly.vertices) >= len(me.vertices) - nb:
+            poly.material_index = 1
+    bmesh_fix(ob)
+    return ob
+
+
+HOUWEEL_LINKS = 0.20   # linkerhand zoveel (m, x s) lager op de steel dan de rechter
+
+
+def maak_houweel(naam):
+    """Pikhouweel: steel langs +Y (greep-as) van -0,28 tot +0,37 m, ijzeren kop dwars erop langs +-Z (in het
+    slagvlak), aan beide kanten taps naar een punt; kop 0,44 m."""
+    mb = MeshBouwer()
+    mb.kapsel((0, -0.28, 0), (0, 0.37, 0), 0.017, 0.02, "hout")
+    n_hout = len(mb.bm.verts)
+    mb.doos((0, 0.36, 0), (0.045, 0.06, 0.07), "ijzer")              # oog om de steel
+    bm = mb.bm
+    for sg in (1, -1):                                                # twee tapse armen naar een punt
+        ring0 = [(-0.02, 0.34, 0.03 * sg), (0.02, 0.34, 0.03 * sg), (0.02, 0.38, 0.03 * sg), (-0.02, 0.38, 0.03 * sg)]
+        ring1 = [(-0.012, 0.335, 0.13 * sg), (0.012, 0.335, 0.13 * sg), (0.012, 0.365, 0.13 * sg), (-0.012, 0.365, 0.13 * sg)]
+        v0 = [bm.verts.new(c) for c in ring0]
+        v1 = [bm.verts.new(c) for c in ring1]
+        vp = bm.verts.new((0.0, 0.32, 0.22 * sg))
+        bm.faces.new(v0)
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((v0[i], v0[j], v1[j], v1[i]))
+            bm.faces.new((v1[i], v1[j], vp))
+    ob = mb.naar_object(naam, materiaal("houweel_hout", (0.42, 0.28, 0.15)))
+    for v in list(ob.vertex_groups):
+        ob.vertex_groups.remove(v)
+    ob.data.materials.append(materiaal("houweel_ijzer", (0.40, 0.40, 0.42)))
+    for poly in ob.data.polygons:                # alles na de steel is ijzer
+        if min(poly.vertices) >= n_hout:
             poly.material_index = 1
     bmesh_fix(ob)
     return ob

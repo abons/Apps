@@ -136,7 +136,7 @@ func _maak_unit(d: Dorpeling) -> void:
 	var b := Bumpkin.new()
 	b.name = "Dorpeling_%d" % d.id
 	var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd, d.rol)
-	b.werk_zaad = d.id                         # hameren of zagen eerst, en het wisselritme (Bumpkin.WERK_WISSEL)
+	b.werk_zaad = d.id                         # welk gereedschap eerst, en het wisselritme (Bumpkin.WERK_WISSEL)
 	if g != "":
 		b.glb = g
 	elif d.leeftijd == "kind":

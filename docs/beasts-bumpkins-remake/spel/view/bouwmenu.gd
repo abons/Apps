@@ -339,6 +339,7 @@ func _toon_plan(p: Plan) -> void:
 			continue
 		n.position = _grond(plekken[i])
 		n.rotation.y = p.draai * PI * 0.5 + i * 0.7
+		n.set_meta("stapel", STAPELS[i])
 		ghost.get_parent().add_child(n)
 		lijst.append(n)
 	_stapels[p] = lijst
@@ -585,18 +586,21 @@ func _werk_stand(p: Plan) -> bool:
 	return true
 
 
-## Een bouwer die aan een plan werkt en binnen KIJK_M van de zaagbok of steenhoop staat, kijkt ernaartoe (met de
-## hamerclip; een zaagclip is er nog niet).
+## Een bouwer die aan een plan werkt en binnen KIJK_M van de zaagbok of steenhoop staat, kijkt ernaartoe en pakt
+## het gereedschap van het origineel: bij de zaagbok de zaag (`saw`), bij de steenhoop de houweel (`pick`).
+const STAPEL_WERK := {"zaagbok": &"zagen", "steenhoop": &"houweel"}
+
 func _kijk_bouwers() -> void:
 	if view == null:
 		return
 	for d in w.dorpelingen:
-		if not d.bouwt or d.werk_plan == null or d.werk_plan.klaar or not _stapels.has(d.werk_plan):
-			continue
 		var u: Dictionary = view.units.get(d.id, {})
 		if u.is_empty():
 			continue
 		var b: Bumpkin = u["bump"]
+		b.werk_voorkeur = &""
+		if not d.bouwt or d.werk_plan == null or d.werk_plan.klaar or not _stapels.has(d.werk_plan):
+			continue
 		var best: Node3D = null
 		var best_d := KIJK_M
 		for s: Node3D in _stapels[d.werk_plan]:
@@ -606,6 +610,7 @@ func _kijk_bouwers() -> void:
 				best = s
 		if best != null:
 			b.kijk_naar(best.global_position - b.global_position)
+			b.werk_voorkeur = STAPEL_WERK.get(best.get_meta("stapel", ""), &"")
 
 ## Hekken opnieuw: een paal op elk hektegelmidden, een segment (2 m, palen op x = +-1) naar elk hek- of poortbuur
 ## (recht; schuin alleen zonder rechte tussenburen, dan 1,41x lang). Een poort draait zijn doorgang langs de hekken.

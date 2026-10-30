@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -317,9 +317,11 @@ func _start_scenario() -> void:
 			w.tempo = 2.0
 			var dt_ := ld.deur_tegel() if ld != null else Vector2i(101, 63)
 			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
-		"zagen":
+		"zagen", "houweel":
+			# houweel: hetzelfde, maar de bouwer begint met de houweel (werk_zaad 2 in _scenario_stap, Bumpkin.WERK_REEKS).
 			# een hut naast het kampvuur, twee mannen bouwen; de eerste is meteen bouwer (eigen model), dichtbij, de camera van voren.
-			# Bouwers wisselen hameren en zagen af (Bumpkin.WERK_WISSEL); per id begint de een met de hamer, de ander met de zaag
+			# Bouwers wisselen hamer, zaag en houweel af (Bumpkin.WERK_WISSEL, per id een ander begin); bij de zaagbok de zaag,
+			# bij de steenhoop de houweel (Bouwmenu.STAPEL_WERK)
 			var ids := []
 			for d in w.dorpelingen:
 				if d.volwassen() and d.geslacht == "man":
@@ -560,9 +562,11 @@ func _scenario_stap() -> void:
 	match scenario:
 		"hints":
 			_hints_stap()
-		"zagen":
+		"zagen", "houweel":
 			if _wolf_man != null:
 				cam.doel_focus = cam.doel_focus.lerp(view.unit_pos(_wolf_man.id) + Vector3(0, 0.6, 0), 0.05)
+				if scenario == "houweel" and view.units.has(_wolf_man.id):
+					(view.units[_wolf_man.id]["bump"] as Bumpkin).werk_zaad = 2   # leest hij bij de eerste werkstart
 		"ei":
 			if _stap == 0 and szt >= 6.0:
 				_stap = 1

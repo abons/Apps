@@ -9,7 +9,7 @@ VERWACHT_BOTEN = ["Hips", "Spine", "Spine1", "Spine2", "Neck", "Head", "HeadTop_
                   "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand", "RightShoulder", "RightArm", "RightForeArm",
                   "RightHand", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightUpLeg", "RightLeg",
                   "RightFoot", "RightToeBase", "prop_R", "prop_L"]
-VERWACHT_ANIM = ["idle", "lopen", "rennen", "bouwen", "aanval_zwaard", "aanval_steen", "zagen", "dragen"]
+VERWACHT_ANIM = ["idle", "lopen", "rennen", "bouwen", "aanval_zwaard", "aanval_steen", "zagen", "dragen", "houweel"]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=os.path.join(HERE, "bumpkin_test.glb"))

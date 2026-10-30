@@ -1350,7 +1350,7 @@ def poses(sc, rig, tag=""):
     """Extreme standen uit de animaties, iso en van voren-opzij."""
     keuzes = [("idle", 0), ("lopen", 3), ("lopen", 15), ("bouwen", 0), ("bouwen", 11),
               ("aanval_zwaard", 6), ("aanval_zwaard", 10), ("aanval_steen", 8), ("aanval_steen", 16),
-              ("zagen", 0), ("zagen", 10), ("dragen", 0)]
+              ("zagen", 0), ("zagen", 10), ("dragen", 0), ("houweel", 4), ("houweel", 11)]
     props = [o for o in sc.objects if o.name.startswith("prop_") and o.name != "prop_strootje"
              and o.name not in C.extra.get("zichtbare_props", ())]
     tmp = bpy.app.tempdir
@@ -1369,7 +1369,8 @@ def poses(sc, rig, tag=""):
                 p.hide_render = not ((act == "bouwen" and "hamer" in p.name) or
                                      (act == "aanval_zwaard" and "zwaard" in p.name) or
                                      (act == "aanval_steen" and "steen" in p.name) or
-                                     (act == "zagen" and "zaag" in p.name))
+                                     (act == "zagen" and "zaag" in p.name) or
+                                     (act == "houweel" and "houweel" in p.name))
             sc.frame_set(f)
             studio(sc, 260, 1.5, 1.9, doel=(0, -0.1, 0.8 * rig.get("hoogte", 1.37) / 1.37), yaw=yaw, pitch=pitch)
             panelen.append(bijsnijden(render_np(sc, os.path.join(tmp, f"p_{act}_{f}.png"))))
@@ -1451,7 +1452,7 @@ def bouw_personage(p):
     log("LOD0 driehoeken", driehoeken(delen.values()), {o.name: driehoeken([o]) for o in delen.values()})
     # props van de rig op prop_R, zoals bumpkin_test.glb
     for pn, fn in (("prop_hamer", R.maak_hamer), ("prop_zwaard", R.maak_zwaard), ("prop_steen", R.maak_steen),
-                   ("prop_zaag", R.maak_zaag)):
+                   ("prop_zaag", R.maak_zaag), ("prop_houweel", R.maak_houweel)):
         ob = fn(pn)
         ob.parent = rig
         ob.parent_type = "BONE"

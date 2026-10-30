@@ -4,10 +4,11 @@ extends Node3D
 ## Wissel het uiterlijk (leeftijd/sekse) door BUMPKIN_GLB te wijzigen; skelet en animatienamen blijven gelijk.
 ##
 ## Animaties (in de glb): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen (optioneel: zonder clip gooit hij toch),
-## zagen (bouwers wisselen hameren en zagen af, zoals `saw` in het origineel), dragen (handen voor de borst).
+## zagen en houweel (bouwers wisselen hamer, zaag en houweel af, zoals `saw`/`pick` in het origineel; bij de zaagbok
+## de zaag, bij de steenhoop de houweel: werk_voorkeur), dragen (handen voor de borst).
 ## Sidecar `bumpkin_anim.json`: {naam: {loop, duur_s, snelheid_mps, impact_s}}.
 ## Boom: BlendSpace1D(idle, lopen, rennen op snelheid) -> TimeScale -> Blend2(dragen, alleen armen)
-##       -> Transition(loco | werk=bouwen | zagen)
+##       -> Transition(loco | werk=bouwen | zagen | houweel)
 ##       -> OneShot(Transition zwaard | steen, alleen bovenlichaam, dus loopbenen blijven doorlopen).
 ## Model kijkt in Blender naar -Y; glTF (+Y op) zet dat om naar +Z in Godot en de importer draait niet mee:
 ## het gezicht wijst langs lokale +Z. Daarom yaw = atan2(dx, dz) (+ MODEL_YAW_OFFSET).
@@ -27,7 +28,8 @@ const DRAAI := 10.0         # draaisnelheid (1/s, exponentieel)
 const CROSSFADE := 0.25
 const ARMEN := ["LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand",
 	"RightHand", "LeftHandFist", "RightHandFist", "prop_L", "prop_R"]
-const WERK_WISSEL := Vector2(6.0, 10.0)   ## bouwer: na zoveel seconden (willekeurig binnen) van hamer naar zaag en terug
+const WERK_WISSEL := Vector2(6.0, 10.0)   ## bouwer: na zoveel seconden (willekeurig binnen) naar het volgende gereedschap
+const WERK_REEKS: Array[StringName] = [&"bouwen", &"zagen", &"houweel"]   ## de wisselvolgorde (hamer, zaag, houweel)
 const BOVENLICHAAM := ["Spine", "Spine1", "Spine2", "Neck", "Head", "LeftShoulder", "RightShoulder",
 	"LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "prop_L", "prop_R"]
 
@@ -40,7 +42,8 @@ static var gang := GANG_SCHREDE   ## hoe volg() de loop-animatie aan een hogere 
 var glb := BUMPKIN_GLB      ## zet voor add_child (zie glb_voor)
 var tempo := 1.0            ## 1 = de loopsnelheid uit de sidecar; <1 langzamer (afspeeltempo schaalt mee)
 var heeft_model := false
-var werk_zaad := -1         ## >= 0 (dorpeling-id): bepaalt of hij met hameren of zagen begint en het wisselritme
+var werk_zaad := -1         ## >= 0 (dorpeling-id): bepaalt met welk gereedschap hij begint en het wisselritme
+var werk_voorkeur := &""    ## zagen/houweel: staat bij de zaagbok of steenhoop (Bouwmenu), wint van de wissel
 
 var _model: Node3D
 var _speler: AnimationPlayer
@@ -54,13 +57,15 @@ var _meta := {
 	"aanval_steen": {"loop": false, "duur_s": 1.1, "snelheid_mps": 0.0, "impact_s": 0.5},  # impact_s = release
 	"zagen": {"loop": true, "duur_s": 0.8333, "snelheid_mps": 0.0, "impact_s": 0.4167},
 	"dragen": {"loop": true, "duur_s": 2.0, "snelheid_mps": 0.0, "impact_s": 0.0},
+	"houweel": {"loop": true, "duur_s": 1.0, "snelheid_mps": 0.0, "impact_s": 0.4583},
 }
 var _hamer: Node3D
 var _zaag: Node3D
+var _houweel: Node3D
 var _staf: Node3D
 var _skelet: Skeleton3D
-var _werk_soort := &"bouwen"   # bouwen (hamer) of zagen
-var _werk_wissel := 0.0        # s tot de volgende wissel hamer <-> zaag
+var _werk_soort := &"bouwen"   # bouwen (hamer), zagen of houweel
+var _werk_wissel := 0.0        # s tot de volgende wissel van gereedschap
 var _werk_rng := RandomNumberGenerator.new()
 var _draag_doel := 0.0
 var _draag := 0.0
@@ -281,6 +286,8 @@ func _bouw_model() -> void:
 	_staf = _model.find_child("prop_staf", true, false) as Node3D
 	_skelet = _model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if _zaag: _zaag.visible = false
+	_houweel = _model.find_child("prop_houweel", true, false) as Node3D
+	if _houweel: _houweel.visible = false
 	_zwaard = _model.find_child("prop_zwaard", true, false) as Node3D
 	_steen_prop = _model.find_child("prop_steen", true, false) as Node3D
 	_hand_r = _model.find_child("prop_R", true, false) as Node3D
@@ -331,10 +338,11 @@ func _bouw_boom() -> void:
 	bs.add_blend_point(_anim_knoop(&"rennen"), v_ren, -1, &"rennen")
 
 	var tr := AnimationNodeTransition.new()
-	tr.input_count = 3
+	tr.input_count = 4
 	tr.set_input_name(0, "loco")
 	tr.set_input_name(1, "werk")
 	tr.set_input_name(2, "zagen")
+	tr.set_input_name(3, "houweel")
 	tr.xfade_time = CROSSFADE
 
 	var os := AnimationNodeOneShot.new()
@@ -371,6 +379,7 @@ func _bouw_boom() -> void:
 	bt.add_node("tempo", AnimationNodeTimeScale.new(), Vector2(200, 0))
 	bt.add_node("werkanim", _anim_knoop(&"bouwen"), Vector2(0, 150))
 	bt.add_node("zaaganim", _anim_knoop(&"zagen" if _speler.has_animation("zagen") else &"bouwen"), Vector2(0, 220))
+	bt.add_node("houweelanim", _anim_knoop(&"houweel" if _speler.has_animation("houweel") else &"bouwen"), Vector2(0, 290))
 	bt.add_node("draganim", _anim_knoop(&"dragen"), Vector2(200, 100))
 	bt.add_node("drag", dr, Vector2(300, 0))
 	bt.add_node("basis", tr, Vector2(400, 0))
@@ -384,6 +393,7 @@ func _bouw_boom() -> void:
 	bt.connect_node("basis", 0, "drag")
 	bt.connect_node("basis", 1, "werkanim")
 	bt.connect_node("basis", 2, "zaaganim")
+	bt.connect_node("basis", 3, "houweelanim")
 	bt.connect_node("aanval", 0, "basis")
 	bt.connect_node("keuze", 0, "zwaardanim")
 	bt.connect_node("keuze", 1, "steenanim")
@@ -445,6 +455,8 @@ func _stop_werk() -> void:
 		_hamer.visible = false
 	if _zaag:
 		_zaag.visible = false
+	if _houweel:
+		_houweel.visible = false
 
 
 func _process(dt: float) -> void:
@@ -493,9 +505,9 @@ func _werk_stap(dt: float) -> void:
 		_werkt = true
 		if _werk_wissel <= 0.0:          # eerste keer: zaad bepaalt waarmee hij begint en het ritme
 			_werk_rng.seed = hash(werk_zaad) if werk_zaad >= 0 else randi()
-			_werk_soort = &"zagen" if (werk_zaad >= 0 and werk_zaad % 2 == 1) else &"bouwen"
+			_werk_soort = WERK_REEKS[werk_zaad % WERK_REEKS.size()] if werk_zaad >= 0 else &"bouwen"
 			_werk_wissel = _werk_rng.randf_range(WERK_WISSEL.x, WERK_WISSEL.y)
-		_zet_werk_soort(_werk_soort)
+		_zet_werk_soort(werk_voorkeur if werk_voorkeur != &"" else _werk_soort)
 	if not _werkt:
 		return
 	_werk_t += dt
@@ -505,26 +517,35 @@ func _werk_stap(dt: float) -> void:
 	if _werk_t >= duur:
 		_werk_t -= duur
 		_werk_impact_gedaan = false
-		if _werk_wissel <= 0.0 and _heeft_clip("zagen"):    # wissel alleen op de lusgrens
+		if werk_voorkeur != &"" and werk_voorkeur != _werk_soort and _heeft_clip(werk_voorkeur):   # alleen op de lusgrens
+			_zet_werk_soort(werk_voorkeur)
+		elif werk_voorkeur == &"" and _werk_wissel <= 0.0:
 			_werk_wissel = _werk_rng.randf_range(WERK_WISSEL.x, WERK_WISSEL.y)
-			_zet_werk_soort(&"bouwen" if _werk_soort == &"zagen" else &"zagen")
+			var i := WERK_REEKS.find(_werk_soort)
+			for n in WERK_REEKS.size():                  # het volgende gereedschap waarvan de clip er is
+				var s: StringName = WERK_REEKS[(i + 1 + n) % WERK_REEKS.size()]
+				if s == &"bouwen" or _heeft_clip(s):
+					_zet_werk_soort(s)
+					break
 	if not _werk_impact_gedaan and _werk_t >= imp:
 		_werk_impact_gedaan = true
 		impact.emit(_werk_soort)
 
 
 func _zet_werk_soort(soort: StringName) -> void:
-	if soort == &"zagen" and not _heeft_clip("zagen"):
+	if soort != &"bouwen" and not _heeft_clip(soort):
 		soort = &"bouwen"
 	_werk_soort = soort
 	_werk_t = -CROSSFADE   # impact_s telt vanaf het begin van de clip
 	_werk_impact_gedaan = false
 	if _boom:
-		_boom.set("parameters/basis/transition_request", "zagen" if soort == &"zagen" else "werk")
+		_boom.set("parameters/basis/transition_request", "werk" if soort == &"bouwen" else String(soort))
 	if _hamer:
 		_hamer.visible = soort == &"bouwen"
 	if _zaag:
 		_zaag.visible = soort == &"zagen"
+	if _houweel:
+		_houweel.visible = soort == &"houweel"
 
 
 func _aanval_stap(dt: float) -> void:

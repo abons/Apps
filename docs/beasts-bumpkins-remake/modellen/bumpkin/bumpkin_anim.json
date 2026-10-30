@@ -48,5 +48,11 @@
     "duur_s": 2.0,
     "snelheid_mps": 0.0,
     "impact_s": null
+  },
+  "houweel": {
+    "loop": true,
+    "duur_s": 1.0,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.4583
   }
 }
