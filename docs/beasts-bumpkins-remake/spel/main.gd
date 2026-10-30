@@ -100,6 +100,7 @@ func _ready() -> void:
 	bouwmenu.view = view            # bouwers kijken naar zaagbok of steenhoop
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
+	cam.pan_blokkade = func() -> bool: return bouwmenu.actief   # touch: een vinger slepen plaatst dan, pant niet
 	var geluid: Node3D = preload("res://view/geluid.gd").new()   # stemmen, werk, dieren, omgeving (view/geluid.gd)
 	add_child(geluid)
 	geluid.bouw(w, view, cam, bestuur)

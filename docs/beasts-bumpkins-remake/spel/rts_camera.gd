@@ -2,6 +2,9 @@ extends Camera3D
 ## RTS-camera: draaien om een brandpunt, pannen, zoomen van deurhoogte (~2 m) tot eilandoverzicht (~130 m), begrensd
 ## tot `grens` (main.gd: met mist het hele raster plus marge, zoals het origineel ver het zwart in liet scrollen).
 ## Alle invoer zet doelwaarden; _process loopt er zacht naartoe.
+## Touch (alleen InputEventScreenTouch/Drag, op pc dus niets): een vinger slepen = pannen (niet als `pan_blokkade`
+## true geeft: bouwmenu actief), twee vingers: midden slepen = pannen, knijpen = zoom, draaien = yaw. Een tik blijft
+## via emulate_mouse_from_touch een linkerklik (Bestuur, bouwmenu, minikaart). Randpannen staat op mobiel uit.
 
 const AFSTAND_MIN := 2.0
 const AFSTAND_MAX := 130.0
@@ -23,6 +26,11 @@ var grens := Rect2(-1e6, -1e6, 2e6, 2e6)   # m (x,z): waar het brandpunt mag kom
 var invoer_aan := true
 var rand_pannen := true
 var _draaien := false
+var pan_blokkade := Callable()   # main.gd: true = een vinger slepen pant niet (bouwmenu actief)
+const TOUCH_DREMPEL := 12.0      # px: minder slepen telt als tik
+var _vingers := {}               # index -> positie, alleen aanrakingen die hier (buiten de GUI) begonnen
+var _touch_start := Vector2.ZERO
+var touch_pant := false          # vinger voorbij de drempel of twee vingers: Bestuur maakt er geen klik van
 
 
 func _ready() -> void:
@@ -51,6 +59,9 @@ func spring_naar(f: Vector3) -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if not invoer_aan:
 		return
+	if e is InputEventScreenTouch or e is InputEventScreenDrag:
+		_touch(e)
+		return
 	if e is InputEventMouseButton:
 		match e.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
@@ -64,6 +75,54 @@ func _unhandled_input(e: InputEvent) -> void:
 		if _draaien:
 			doel_yaw -= e.relative.x * 0.006
 			doel_pitch = clampf(doel_pitch + e.relative.y * 0.005, PITCH_MIN, PITCH_MAX)
+
+
+func _touch(e: InputEvent) -> void:
+	var idx: int = e.index
+	var pos: Vector2 = e.position
+	if e is InputEventScreenTouch:
+		if e.pressed:
+			_vingers[idx] = pos
+			if _vingers.size() == 1:
+				_touch_start = pos
+				touch_pant = false
+			else:
+				touch_pant = true           # twee vingers: nooit een tik of kader
+		else:
+			_vingers.erase(idx)      # touch_pant blijft staan tot de volgende eerste vinger (Bestuur leest het bij loslaten)
+		return
+	if not _vingers.has(idx):
+		return
+	var oud: Vector2 = _vingers[idx]
+	if _vingers.size() == 1:
+		if not touch_pant and pos.distance_to(_touch_start) > TOUCH_DREMPEL:
+			if pan_blokkade.is_valid() and pan_blokkade.call():
+				_vingers[idx] = pos
+				return
+			touch_pant = true
+		if touch_pant:
+			_pan_scherm(pos - oud)
+	else:
+		var ander: int = idx
+		for i in _vingers:
+			if i != idx:
+				ander = i
+				break
+		var p2: Vector2 = _vingers[ander]
+		var d_oud := oud.distance_to(p2)
+		var d_nieuw := pos.distance_to(p2)
+		if d_oud > 1.0 and d_nieuw > 1.0:
+			doel_afstand = clampf(doel_afstand * d_oud / d_nieuw, AFSTAND_MIN, AFSTAND_MAX)
+			doel_yaw -= wrapf((pos - p2).angle() - (oud - p2).angle(), -PI, PI)
+		_pan_scherm((pos - oud) * 0.5)
+	_vingers[idx] = pos
+
+
+## Schuift het brandpunt zo dat de grond ongeveer met de vinger meegaat (`d` = schermverschuiving in px).
+func _pan_scherm(d: Vector2) -> void:
+	var h := get_viewport().get_visible_rect().size.y
+	var m_per_px := 2.0 * doel_afstand * tan(deg_to_rad(fov) * 0.5) / maxf(h, 1.0)
+	doel_focus += (-_rechts() * d.x + _vooruit() * d.y / maxf(sin(pitch), 0.35)) * m_per_px
 
 
 func _rechts() -> Vector3:
@@ -81,7 +140,7 @@ func _process(dt: float) -> void:
 		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): v.y -= 1
 		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): v.x += 1
 		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): v.x -= 1
-		if rand_pannen and DisplayServer.window_is_focused() and not _draaien:
+		if rand_pannen and not OS.has_feature("mobile") and DisplayServer.window_is_focused() and not _draaien:
 			var m := get_viewport().get_mouse_position()
 			var r := get_viewport().get_visible_rect().size
 			if m.x >= 0 and m.y >= 0 and m.x <= r.x and m.y <= r.y:

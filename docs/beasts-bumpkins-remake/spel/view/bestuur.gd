@@ -25,6 +25,7 @@ var _start := Vector2.ZERO
 var _sleept := false
 var _rechts := false
 var _rechts_beweging := 0.0
+var _touch_sleept := false      # vinger (emulate_mouse_from_touch) sleepte: dat pant de camera, geen kader of klik
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -34,9 +35,12 @@ func _unhandled_input(e: InputEvent) -> void:
 				_links = true
 				_start = e.position
 				_sleept = false
+				_touch_sleept = false
 			elif _links:
 				_links = false
-				if _sleept:
+				if _touch_sleept or (e.device == InputEvent.DEVICE_ID_EMULATION and cam.get("touch_pant") == true):
+					pass
+				elif _sleept:
 					kader.zet(Rect2(), false)
 					kies_in_rechthoek(Rect2(_start, e.position - _start).abs(), Input.is_key_pressed(KEY_SHIFT))
 				else:
@@ -52,7 +56,11 @@ func _unhandled_input(e: InputEvent) -> void:
 				if _rechts_beweging < KLIK_DREMPEL:
 					wis_selectie()
 	elif e is InputEventMouseMotion:
-		if _links:
+		if _links and e.device == InputEvent.DEVICE_ID_EMULATION:
+			# vinger: slepen is camerapannen (rts_camera.gd); een echte muis is nooit emulatie, op pc verandert niets
+			if e.position.distance_to(_start) > KLIK_DREMPEL or cam.get("touch_pant") == true:
+				_touch_sleept = true
+		elif _links:
 			if not _sleept and e.position.distance_to(_start) > KLIK_DREMPEL:
 				_sleept = true
 				cam.rand_pannen = false      # geen randpannen midden in een kader

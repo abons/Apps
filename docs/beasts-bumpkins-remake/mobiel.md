@@ -1,7 +1,15 @@
 # Beasts & Bumpkins-remake op mobiel: PWA of APK?
 
-Onderzoek 2026-10-30. Geen code gewijzigd, **geen proefexport gemaakt**: er staan geen export templates op deze pc (zie "Wat er staat").
-Waar Godot-gedrag hieronder uit kennis komt en niet uit een proef, staat "(onbevestigd)".
+Onderzoek 2026-10-30, daarna dezelfde dag de APK-proef (zie "Stand APK"). Waar Godot-gedrag uit kennis komt en niet uit een proef, staat "(onbevestigd)".
+
+## Stand APK (2026-10-30, emulator `beasts`)
+
+- Gedaan: export templates 4.7.2, editor_settings (SDK `D:/emulator`, JDK 17), `export_presets.cfg` (Android, arm64-v8a + x86_64, debug-keystore uit editor_settings, geen pad of wachtwoord in het bestand), `project.godot`: `rendering_method.mobile="mobile"`, schaduw `.mobile` 2048, `import_etc2_astc=true`. Touch in `rts_camera.gd` (1 vinger pannen, 2 vingers pan/knijp-zoom/draai, randpannen uit op mobiel) en `view/bestuur.gd` (gesleepte vinger = geen kader/klik). Geluid laadde al via `load()` (geïmporteerd).
+- Export: `"$G" --headless --path . --export-debug "Android" out/android/beasts.apk`, ~1 min, **818 MB** APK. Install op de emulator 25 s, start ~45 s tot het eiland.
+- **Mobile/Vulkan op de emulator: zwart beeld, 3 pogingen.** (1) SwiftShader: "no Vulkan surface". (2) `-gpu host -memory 4096`: Vulkan 1.3 op de RTX 2060, sim start (`[spel] missie 1 ...`), maar `Couldn't present to Vulkan queue (VkResult error 5)`, screencap en emulator-screenshot zwart. Met de standaard 1536 MB RAM bleef System UI hangen (ANR). (3) Compatibility-rooktest (`command_line/extra_args="--rendering-method gl_compatibility --rendering-driver opengl3"` tijdelijk in het preset, niet gecommit; `am start --esa command_line_params` werkt niet): **HUD en briefing goed, 3D zwart** door de mist (`android_compat_mist_zwart.jpg`), met `-- --mist=uit` erbij **het hele spel** (`android_compat_start.jpg`): terrein, bomen, bumpkins, vlag, vuur, minikaart, schaduw.
+- Touch op de emulator (adb `input`): tik sluit briefing en hint, tik op bouwknop zet bouwmodus aan, **een vinger slepen pant** (`android_compat_pan.jpg`, de grond volgt de vinger). Twee vingers kan adb niet; op de telefoon testen. Logcat: alleen de SSAO-waarschuwing onder Mobile (verwacht), geen scriptfouten.
+- Pc ongewijzigd: alle 11 tests ALLES OK; `--scenario=overzicht`-frame tegen `out/voor_overzicht` (voor de mobiel-wijzigingen): 3D pixelgelijk, verschil alleen in de HUD (prijzen/geluk van een ander onderwerp).
+- **Voor de Motorola**: claimen (`device-lock.ps1 acquire -Serial ZY22GD8FG4`), `adb install -r out/android/beasts.apk` (arm64), kijken of Mobile/Vulkan daar wel beeld geeft (verwacht: ja, Adreno 619 met echte Vulkan; de emulator-fout is een present-probleem van de emulator), dan fps, RAM (`dumpsys meminfo`, 818 MB assets), twee-vinger-zoom/draai. Lukt Vulkan niet: Compatibility + mist/water-z-fix (`d*2-1`, zie Web hieronder). Geen app-icoon gezet (exportwaarschuwing).
 
 ## Wat het project nu gebruikt
 
@@ -22,8 +30,8 @@ Waar Godot-gedrag hieronder uit kennis komt en niet uit een proef, staat "(onbev
 | onderdeel | stand |
 | --- | --- |
 | Godot 4.7.2 stable | ja, `...WinGet\Packages\GodotEngine.GodotEngine_...\Godot_v4.7.2-stable_win64.exe` (172 MB) |
-| **Export templates 4.7.2** | **nee**: `%APPDATA%\Godot\export_templates\` is leeg. Download ~1 GB (alle platformen; web + android samen ~150-250 MB als je ze apart pakt uit de .tpz, onbevestigd) |
-| `export_presets.cfg` | nee (en niet committen) |
+| **Export templates 4.7.2** | ja, `%APPDATA%\Godot\export_templates\4.7.2.stable\` (2026-10-30) |
+| `export_presets.cfg` | ja, Android-preset, zonder keystorepad of wachtwoord (gecommit) |
 | JDK 17 | ja, `E:\werk\tools\jdk-17.0.20+8` (staat al in Godot editor_settings; `java` op PATH is nog de te oude 1.8) |
 | Android SDK | **ja, op `D:\emulator`** (correctie 2026-10-30): build-tools 36.0.0, platforms 34/35/36, platform-tools, cmdline-tools, emulator + AVD `beasts_api34`. Alleen het SDK-pad in Godots editor_settings omzetten (wijst nu naar het niet-bestaande `%LOCALAPPDATA%\Android\Sdk`) |
 | Debug keystore | ja, `%APPDATA%\Godot\keystores\debug.keystore` (buiten het repo, nooit committen) |
