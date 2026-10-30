@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
 var w: Wereld
@@ -172,6 +172,17 @@ func _start_scenario() -> void:
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(114, 50)), 0.8, deg_to_rad(24), 16.0)
 		"koe":
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(118, 58)) + Vector3(0, 0.6, 0), -2.2, deg_to_rad(28), 7.0)
+		"paddenstoel":
+			# missie 1: de paddenstoel op (101,59) met een man ernaast voor de maat
+			var pt := _object_tegel("paddenstoel", Vector2i(101, 59))
+			for d in w.dorpelingen:
+				if d.volwassen() and d.geslacht == "man":
+					d.zet_tegel(w.dichtstbij_loopbaar(pt + Vector2i(1, 0)))
+					d.route.clear()
+					d.bevel = {}
+					d.anker = d.tegel()
+					break
+			cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0.8, 0.5, 0), 0.5, deg_to_rad(30), 7.0)
 		"gezin":
 			# vier hutten staan al (8 bedden voor 6 mensen): het eerste stel gaat naar binnen, de baby komt eruit, 4x
 			var eerste: Plan = null

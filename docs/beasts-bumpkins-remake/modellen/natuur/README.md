@@ -21,7 +21,7 @@ Driehoeken: LOD0 / LOD1 (+ sneeuwlaag).
 | kleine struik, 1,2 m | `struik_klein.glb` | 440 / 146 | wind, tint |
 | rotstegel 1..6, 2 x 2 m | `rots_1.glb` .. `rots_6.glb` | ~2600 / ~650 | vormen van rock01..06, gebakken |
 | klifrand recht / buitenhoek / binnenhoek | `klif_recht.glb`, `klif_hoek_buiten.glb`, `klif_hoek_binnen.glb` | ~3200 / ~800 | stap 2,0 m, hoge kant +y; lassen in elke draaiing |
-| paddenstoel, 0,4 m | `paddenstoel.glb` | 864 | pickup, groter dan echt |
+| paddenstoel, 0,49 m | `paddenstoel.glb` | 864 | pickup; in het spel schaal 2,3 (1,1 m, als in het origineel) |
 | zilveren beker, 0,55 m | `zilveren_beker.glb` | 2224 | metaal, emissieve smaragden |
 | vlag, paal 2,4 m | `vlag.glb` | 1000 | doek fladdert (UV2), vertexgroep `doek` |
 | kampvuur, 1,1 m | `kampvuur.glb` | 1452 | `kampvuur_gloed` + `kampvuur_vlam` emissief, Empty `vuur_bron` (0, 0, 0,22) |

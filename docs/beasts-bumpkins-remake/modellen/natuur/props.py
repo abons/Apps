@@ -206,7 +206,7 @@ def m(naam):
 
 # --- Paddenstoel -----------------------------------------------------------------------------
 def paddenstoel():
-    """Eekhoorntjesbrood-achtig: bruine hoed met putjes, oranje voet; 0,36 m hoog (kaartpickup)."""
+    """Eekhoorntjesbrood-achtig: bruine hoed met putjes, oranje voet; 0,49 m hoog (kaartpickup, in het spel x2,3)."""
     rnd = random.Random(3)
     putjes = [Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(0.15, 1))).normalized() for _ in range(55)]
     putr = [rnd.uniform(0.016, 0.034) for _ in putjes]
@@ -216,7 +216,7 @@ def paddenstoel():
         for i in range(n + 1):
             t = i / n                          # 0 = top, 1 = rand
             a = t * math.pi * 0.56
-            out.append((0.24 * math.sin(a) * 1.05, 0.28 + 0.12 * math.cos(a)))
+            out.append((0.24 * math.sin(a) * 1.05, 0.29 + 0.20 * math.cos(a)))   # bolle hoed zoals concept/origineel
         out.append((0.235, 0.275))             # omkrulde rand
         out.append((0.2, 0.27))
         return out
@@ -240,12 +240,13 @@ def paddenstoel():
     def bouw_deel(fijn):
         b = L.Bouwer()
         s = 3 if fijn else 1
-        draai(b, hoed_prof(10 * s), 24 * s, uvr=(0, 0.5, 1, 1), mat=0, punt=hoed_punt)
+        # hoed en plaat lopen van binnen naar buiten/boven; omgedraaid, anders wijzen de normalen naar binnen (2026-10-30: hoed onzichtbaar)
+        draai(b, hoed_prof(10 * s)[::-1], 24 * s, uvr=(0, 0.5, 1, 1), mat=0, punt=hoed_punt)
         draai(b, voet, 16 * s, uvr=(0, 0, 0.6, 0.5), mat=1, punt=voet_punt)
-        draai(b, plaat, 24 * s, uvr=(0.6, 0, 1, 0.5), mat=2)
+        draai(b, plaat[::-1], 24 * s, uvr=(0.6, 0, 1, 0.5), mat=2)
         return b
     # hoog: procedurele materialen
-    hm = L.smat("hoed_h", lambda nt: _putjes(nt, _ruiskleur(nt, (0.20, 0.075, 0.025), (0.33, 0.14, 0.05), 18)), ruw=0.55,
+    hm = L.smat("hoed_h", lambda nt: _putjes(nt, _ruiskleur(nt, (0.12, 0.045, 0.016), (0.23, 0.095, 0.034), 18)), ruw=0.55,
                 normaal=lambda nt: _putjes_bump(nt))
     vm = L.smat("voet_h", lambda nt: _ruiskleur(nt, (0.48, 0.14, 0.035), (0.66, 0.27, 0.08), 60, streep=True), ruw=0.7,
                 normaal=lambda nt: _bump(nt, 120, 0.4))

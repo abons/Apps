@@ -40,7 +40,7 @@ Klasse-ids uit `objects_list.txt`/BBTools-README. Posities zijn tegel (x,y). Lij
 | 0 | boom (onverwoestbaar, grote den) | 27 | N-kust (104..109, 39..41), O-rand (113..124, 47..63), W-rand (82..89, 60..74), zuid (107,79) |
 | 6 | spar | 11 | bij de bomen: (82..86, 62..69), (108..123, 42..57), (108,79), (115,67) |
 | 5 | boom | 4 | (97,56), (105,79), (118,68), (114,65) |
-| 83 | paddenstoel | 7 | (101,59), (104,58), (93,70), (88,63), (110,83), (118,73), (117,64); `state` 3-6 = soort; vergiftigd? |
+| 83 | paddenstoel | 7 | (101,59), (104,58), (93,70), (88,63), (110,83), (118,73), (117,64); eigenaar 4 (wild), `state` 0/3/4/5/6. **Maat** (`mission1.png`, 2026-10-30): 38x42 px tegen een man van 50 px in dezelfde opname = 0,84 man, dus ~1,1 m: het origineel overdrijft al; remake `schaal` 2,3 op de 0,49 m-glb. Een sprite-uiterlijk (bruine bolle hoed, oranje voet), geen variaties te zien, dus `state` niet in kleur/maat. **Gedrag**: niets in de bestanden. Geen hinttekst (MISTEXT0 noemt geen mushroom), geen conditie in M1-M3.MIS op klasse 83 of de slotindexen (4, 34, 142-146); M2 heeft er 10, M3 25. Eten/gif/oprapen is dus spel-code (exe ontbreekt): alleen in het origineel te toetsen. Tot dan decor. |
 | 103 | **villager** | 6 | (104,67), (99,65), (99,67), (103,69), (99,64), (102,64); veld `sex` 14,13,1,2,2,1 (1=man, 2=vrouw, 13/14 = waarschijnlijk kind; niet geverifieerd) |
 | 98 | vlag (flagpost) | 1 | (104,65), inlever-/spawnpunt |
 | 143 | kampvuur | 1 | (102,68) |
