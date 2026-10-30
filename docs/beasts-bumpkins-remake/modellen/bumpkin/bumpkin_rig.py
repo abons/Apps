@@ -29,7 +29,9 @@ Teken-cheatsheet (lokale Euler, graden): romp/nek/kop: +rx buigt voorover, +ry d
 +rz (rechts) brengt de arm naar het lijf (hangend = ongeveer 40). Onderarm: +rx buigt de elleboog.
 
 ANIMATIES (24 fps, alleen rotaties + Hips-locatie; benen via 2-botten-IK per frame uitgerekend en
-dan gewoon gekeyframed): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen.
+dan gewoon gekeyframed): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen, zagen (bouwers wisselen
+hameren en zagen af, prop_zaag), dragen (beide handen voor de borst; het spel legt hem als bovenlijf-blend over de
+loopclips). Linker- en rechterarm kunnen in richtingsmodus (sleutels LA/RA, arm_ik legt de palm op een punt).
 Elke actie heeft custom property `snelheid_mps`; zie ook bumpkin_anim.json.
 """
 import json
@@ -307,6 +309,7 @@ def RA(u, f, alpha=None, roll=0.0):
     g = ha(alpha, roll) if alpha is not None else (0,) * 6
     return tuple(u) + tuple(f) + tuple(g)
 RA_HANG = (-0.64, 0, -0.77, -0.64, 0, -0.77, 0, 0, 0, 0, 0, 0)   # richtingsmodus rechterarm: boven, onder, greep, 'omhoog' van de prop
+LA_HANG = (0.64, 0, -0.77, 0.64, 0, -0.77, 0, 0, 0, 0, 0, 0)     # idem linkerarm (sleutel "LA")
 
 
 def ha(alpha, roll=0.0):
@@ -346,12 +349,12 @@ def sleutels_naar_reeksen(keys, N, lus, M):
         out[("T", ax)] = kan("T", i, STAND_T)
     if any("RA" in keys[f] for f in frames):
         for i in range(12):
-            out[("RA", i)] = kan("RA", i, RA_HANG[i])
-        out["dir"] = True
-    if any("RA" in keys[f] for f in frames):
-        for i in range(12):
             out[("RA", i)] = kan("RA", i, RA_HANG)
         out["dir"] = True
+    if any("LA" in keys[f] for f in frames):
+        for i in range(12):
+            out[("LA", i)] = kan("LA", i, LA_HANG)
+        out["dirL"] = True
     sl = M.sl
     for nm, st in (("LF", STAND_L), ("RF", STAND_R)):
         for i in range(5):
@@ -372,13 +375,16 @@ def zet_pose_frame(rig, M, k, f):
         q = eul([k[(b, a)][f] for a in "xyz"])
         qs[b] = q
         Dw[b] = Dw[M.ouder[b]] @ (rr[b] @ q @ rr[b].inverted())
-    if k.get("dir"):
-        v = [k[("RA", i)][f] for i in range(12)]
+    for zijde, kan_, vlag in ((RECHTS, "RA", "dir"), (LINKS, "LA", "dirL")):
+        if not k.get(vlag):
+            continue
+        A, F, H, S = zijde + "Arm", zijde + "ForeArm", zijde + "Hand", zijde + "Shoulder"
+        v = [k[(kan_, i)][f] for i in range(12)]
         u, fo = Vector(v[0:3]).normalized(), Vector(v[3:6]).normalized()
-        d_arm = (M.staart["RightArm"] - M.kop["RightArm"]).normalized().rotation_difference(u)
-        d_fore = (M.staart["RightForeArm"] - M.kop["RightForeArm"]).normalized().rotation_difference(fo)
-        qs["RightArm"] = rr["RightArm"].inverted() @ Dw["RightShoulder"].inverted() @ d_arm @ rr["RightArm"]
-        qs["RightForeArm"] = rr["RightForeArm"].inverted() @ d_arm.inverted() @ d_fore @ rr["RightForeArm"]
+        d_arm = (M.staart[A] - M.kop[A]).normalized().rotation_difference(u)
+        d_fore = (M.staart[F] - M.kop[F]).normalized().rotation_difference(fo)
+        qs[A] = rr[A].inverted() @ Dw[S].inverted() @ d_arm @ rr[A]
+        qs[F] = rr[F].inverted() @ d_arm.inverted() @ d_fore @ rr[F]
         h = Vector(v[6:9])
         if h.length > 1e-6:
             h.normalize()
@@ -387,10 +393,10 @@ def zet_pose_frame(rig, M, k, f):
             x = h.cross(z)
             # prop: lokale Y = greep, Z = omhoog (rust: Y = -Y wereld, Z = +Z wereld)
             Rt = Matrix(((x.x, h.x, z.x), (x.y, h.y, z.y), (x.z, h.z, z.z))).to_quaternion()
-            d_hand = Rt @ rr["prop_R"].inverted()
+            d_hand = Rt @ rr["prop_" + zijde[0]].inverted()
         else:
             d_hand = d_fore
-        qs["RightHand"] = rr["RightHand"].inverted() @ d_fore.inverted() @ d_hand @ rr["RightHand"]
+        qs[H] = rr[H].inverted() @ d_fore.inverted() @ d_hand @ rr[H]
     for zijde, nm in ((LINKS, "LF"), (RECHTS, "RF")):
         x, y, lift, pitch, yaw = [k[(nm, i)][f] for i in range(5)]
         z = M.grond_z(pitch) + lift
@@ -735,8 +741,85 @@ def clip_steen(M):
     return N, False, k, {"snelheid_mps": 0.0}, {"impact_s": REL / FPS, "release_s": REL / FPS, "pak_s": PAK / FPS}
 
 
+def schouder_pos(M, pose, zijde):
+    """Wereldpositie van het armgewricht (kop van <zijde>Arm) in een sleutelpose (FK over Hips..Shoulder)."""
+    T = Vector(pose.get("T", STAND_T))
+    pos, Dw = {}, {}
+    vorige = None
+    for b in ("Hips", "Spine", "Spine1", "Spine2", zijde + "Shoulder", zijde + "Arm"):
+        q = eul(pose.get(b, (0, 0, 0)))
+        if vorige is None:
+            pos[b] = M.kop[b] + T
+            Dw[b] = M.rr[b] @ q @ M.rr[b].inverted()
+        else:
+            pos[b] = pos[vorige] + Dw[vorige] @ (M.kop[b] - M.kop[vorige])
+            Dw[b] = Dw[vorige] @ (M.rr[b] @ q @ M.rr[b].inverted())
+        vorige = b
+    return pos[zijde + "Arm"]
+
+
+def arm_ik(M, pose, zijde, doel, pool, alpha=None, roll=0.0):
+    """Richtingssleutel (RA/LA) die de handpalm op `doel` (wereld, m) legt; `pool` = waar de elleboog heen wijst.
+    alpha/roll als bij RA (greep-as van de prop); None = hand volgt de onderarm."""
+    S = schouder_pos(M, pose, zijde)
+    L1 = (M.staart[zijde + "Arm"] - M.kop[zijde + "Arm"]).length
+    L2 = (M.staart[zijde + "ForeArm"] - M.kop[zijde + "ForeArm"]).length +         0.5 * (M.staart[zijde + "Hand"] - M.kop[zijde + "Hand"]).length
+    d = Vector(doel) - S
+    ac = min(max(d.length, abs(L1 - L2) + 1e-3), (L1 + L2) * 0.999)
+    r = d.normalized()
+    cosa = (L1 ** 2 + ac ** 2 - L2 ** 2) / (2 * L1 * ac)
+    a = math.acos(max(-1.0, min(1.0, cosa)))
+    pl = Vector(pool) - r * Vector(pool).dot(r)
+    pl.normalize()
+    el = S + r * (L1 * math.cos(a)) + pl * (L1 * math.sin(a))
+    u = (el - S).normalized()
+    f = (S + r * ac - el).normalized()
+    return RA(u, f, alpha, roll)
+
+
+def clip_zagen(M):
+    """Zagen (origineel `saw`/`vsaw`): voorovergebogen over de zaagbok, rechterhand duwt de zaag vlak heen en weer,
+    linkerhand op het hout. 20 frames (0,83 s), lus; impact = einde van de duwslag (frame 10)."""
+    N, IMP = 20, 10
+    s, sl = M.s, M.sl
+    vo = {"LF": (0.13 * sl, -0.07 * sl, 0, 0, 10), "RF": (-0.13 * sl, 0.06 * sl, 0, 0, -12)}
+    terug, voor = Vector((-0.12, -0.13, 0.6)) * s, Vector((-0.10, -0.39, 0.57)) * s
+    links = Vector((0.11, -0.33, 0.53)) * s
+    P = {}
+    for f in (0, 5, 10, 15, 20):
+        t = 0.5 - 0.5 * math.cos(math.pi * f / IMP)              # 0 terug, 1 voor (frame 10), 0 terug (frame 20)
+        p = dict(T=(0, -0.01 * sl * t, -0.055 * sl - 0.008 * sl * t), Hips=(6 + 1.5 * t, -3, 0),
+                 Spine=(6 + 1.5 * t, -4 + 2 * t, 0), Spine1=(7 + 1.5 * t, -4 + 2 * t, 0), Spine2=(5 + t, -5 + 3 * t, 0),
+                 Neck=(3, 2, 0), Head=(10, 4 - 2 * t, 0), RightShoulder=(0, 2 - 4 * t, 0),
+                 RightHandFist=(65, 0, 0), LeftHandFist=(15, 0, 0), **vo)
+        p["RA"] = arm_ik(M, p, RECHTS, terug.lerp(voor, t), (-0.5, 1.0, -0.4), alpha=-20)
+        p["LA"] = arm_ik(M, p, LINKS, links + Vector((0, -0.01 * t, 0)) * s, (0.8, 0.3, -0.5))
+        P[f] = p
+    k = sleutels_naar_reeksen(P, N, True, M)
+    return N, True, k, {"snelheid_mps": 0.0}, {"impact_s": IMP / FPS}
+
+
+def clip_dragen(M):
+    """Iets voor de borst dragen (beker, zak, mand): beide handen voor de borst, ellebogen omlaag langs het lijf.
+    Alleen de armen tellen in het spel (bovenlijf-blend over idle/lopen/rennen). 48 frames (2 s), lus, ademt licht."""
+    N = 48
+    s, sl = M.s, M.sl
+    P = {}
+    for f in (0, 24, 48):
+        t = 0.5 - 0.5 * math.cos(2 * math.pi * f / N)
+        p = dict(T=(0, 0, -0.022 * sl), Spine=(-2, 0, 0), Spine1=(-2, 0, 0), Spine2=(-2 - 1.5 * t, 0, 0), Head=(4, 0, 0),
+                 RightHandFist=(30, 0, 0), LeftHandFist=(30, 0, 0))
+        h = 0.8 + 0.006 * t
+        p["RA"] = arm_ik(M, p, RECHTS, Vector((-0.085, -0.25, h)) * s, (-0.5, 0.3, -0.8))
+        p["LA"] = arm_ik(M, p, LINKS, Vector((0.085, -0.25, h)) * s, (0.5, 0.3, -0.8))
+        P[f] = p
+    k = sleutels_naar_reeksen(P, N, True, M)
+    return N, True, k, {"snelheid_mps": 0.0}, None
+
+
 CLIPS = [("idle", clip_idle), ("lopen", clip_lopen), ("rennen", clip_rennen),
-         ("bouwen", clip_bouwen), ("aanval_zwaard", clip_zwaard), ("aanval_steen", clip_steen)]
+         ("bouwen", clip_bouwen), ("aanval_zwaard", clip_zwaard), ("aanval_steen", clip_steen),
+         ("zagen", clip_zagen), ("dragen", clip_dragen)]
 
 
 def bouw_animaties(rig, alleen=None):
@@ -870,6 +953,7 @@ def bouw_placeholder(rig, maat=None):
     prop("prop_hamer", "prop_R", lambda n: maak_hamer(n))
     prop("prop_zwaard", "prop_R", lambda n: maak_zwaard(n))
     prop("prop_steen", "prop_R", lambda n: maak_steen(n))
+    prop("prop_zaag", "prop_R", lambda n: maak_zaag(n))
     return body
 
 
@@ -902,6 +986,36 @@ def maak_zwaard(naam):
     ob = mb.naar_object(naam, materiaal("zwaard", (0.75, 0.76, 0.8)))
     for v in list(ob.vertex_groups):
         ob.vertex_groups.remove(v)
+    bmesh_fix(ob)
+    return ob
+
+
+def maak_zaag(naam):
+    """Handzaag: houten handvat in de palm, blad langs +Y (greep-as), rug boven, tanden aan -Z; blad 0,42 m."""
+    mb = MeshBouwer()
+    mb.doos((0, 0.0, -0.005), (0.026, 0.11, 0.05), "hout")         # handvat (dicht blok, in de vuist)
+    mb.doos((0, 0.055, -0.035), (0.03, 0.03, 0.09), "hout")        # hiel waar het blad in zit
+    bm = mb.bm
+    # blad: trapezium, rug op z=-0.01, tanden van z=-0.10 (hiel) tot -0.055 (punt), 2 mm dik
+    prof = [(0.06, -0.008), (0.48, -0.012), (0.48, -0.055), (0.06, -0.10)]
+    vv = []
+    for xs in (-0.0012, 0.0012):
+        vv.append([bm.verts.new((xs, y, z)) for y, z in prof])
+    bm.faces.new(vv[0])
+    bm.faces.new(list(reversed(vv[1])))
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new((vv[0][i], vv[0][j], vv[1][j], vv[1][i]))
+    blad_v = set(v for r in vv for v in r)
+    ob = mb.naar_object(naam, materiaal("zaag_hout", (0.42, 0.26, 0.13)))
+    for v in list(ob.vertex_groups):
+        ob.vertex_groups.remove(v)
+    ob.data.materials.append(materiaal("zaag_blad", (0.72, 0.73, 0.76)))
+    me = ob.data
+    nb = len(blad_v)
+    for poly in me.polygons:                   # het blad is het laatst aangemaakt: de laatste nb verts
+        if min(poly.vertices) >= len(me.vertices) - nb:
+            poly.material_index = 1
     bmesh_fix(ob)
     return ob
 

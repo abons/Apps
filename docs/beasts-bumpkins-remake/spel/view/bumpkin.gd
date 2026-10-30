@@ -3,9 +3,11 @@ extends Node3D
 ## Herbruikbare dorpeling: laadt een geriggde glb (Mixamo-botnamen) en stuurt hem met een AnimationTree.
 ## Wissel het uiterlijk (leeftijd/sekse) door BUMPKIN_GLB te wijzigen; skelet en animatienamen blijven gelijk.
 ##
-## Animaties (in de glb): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen (optioneel: zonder clip gooit hij toch).
+## Animaties (in de glb): idle, lopen, rennen, bouwen, aanval_zwaard, aanval_steen (optioneel: zonder clip gooit hij toch),
+## zagen (bouwers wisselen hameren en zagen af, zoals `saw` in het origineel), dragen (handen voor de borst).
 ## Sidecar `bumpkin_anim.json`: {naam: {loop, duur_s, snelheid_mps, impact_s}}.
-## Boom: BlendSpace1D(idle, lopen, rennen op snelheid) -> TimeScale -> Transition(loco | werk=bouwen)
+## Boom: BlendSpace1D(idle, lopen, rennen op snelheid) -> TimeScale -> Blend2(dragen, alleen armen)
+##       -> Transition(loco | werk=bouwen | zagen)
 ##       -> OneShot(Transition zwaard | steen, alleen bovenlichaam, dus loopbenen blijven doorlopen).
 ## Model kijkt in Blender naar -Y; glTF (+Y op) zet dat om naar +Z in Godot en de importer draait niet mee:
 ## het gezicht wijst langs lokale +Z. Daarom yaw = atan2(dx, dz) (+ MODEL_YAW_OFFSET).
@@ -16,12 +18,15 @@ signal impact(welke: StringName)  ## bouwen (elke lus) en aanval_zwaard op impac
 const BUMPKIN_GLB := "res://assets/bumpkin_man.glb"
 ## Uiterlijk per (geslacht, leeftijd); kinderen zijn al 1,11 m (0,81x de man) in de glb. Ontbreekt er een: de man.
 const UITERLIJK := {"man": "bumpkin_man", "vrouw": "bumpkin_vrouw", "jongen": "bumpkin_jongen", "meisje": "bumpkin_meisje",
-	"oude_man": "bumpkin_oudere_man", "oude_vrouw": "bumpkin_oudere_vrouw"}
+	"oude_man": "bumpkin_oudere_man", "oude_vrouw": "bumpkin_oudere_vrouw", "bouwer": "bumpkin_bouwer"}
 const BUMPKIN_ANIM := "res://assets/bumpkin_anim.json"
 const MODEL_YAW_OFFSET := 0.0
 const ACCEL := 6.0          # m/s^2
 const DRAAI := 10.0         # draaisnelheid (1/s, exponentieel)
 const CROSSFADE := 0.25
+const ARMEN := ["LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand",
+	"RightHand", "LeftHandFist", "RightHandFist", "prop_L", "prop_R"]
+const WERK_WISSEL := Vector2(6.0, 10.0)   ## bouwer: na zoveel seconden (willekeurig binnen) van hamer naar zaag en terug
 const BOVENLICHAAM := ["Spine", "Spine1", "Spine2", "Neck", "Head", "LeftShoulder", "RightShoulder",
 	"LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "prop_L", "prop_R"]
 
@@ -34,6 +39,7 @@ static var gang := GANG_SCHREDE   ## hoe volg() de loop-animatie aan een hogere 
 var glb := BUMPKIN_GLB      ## zet voor add_child (zie glb_voor)
 var tempo := 1.0            ## 1 = de loopsnelheid uit de sidecar; <1 langzamer (afspeeltempo schaalt mee)
 var heeft_model := false
+var werk_zaad := -1         ## >= 0 (dorpeling-id): bepaalt of hij met hameren of zagen begint en het wisselritme
 
 var _model: Node3D
 var _speler: AnimationPlayer
@@ -45,8 +51,18 @@ var _meta := {
 	"bouwen": {"loop": true, "duur_s": 1.6, "snelheid_mps": 0.0, "impact_s": 0.4},
 	"aanval_zwaard": {"loop": false, "duur_s": 1.0, "snelheid_mps": 0.0, "impact_s": 0.45},
 	"aanval_steen": {"loop": false, "duur_s": 1.1, "snelheid_mps": 0.0, "impact_s": 0.5},  # impact_s = release
+	"zagen": {"loop": true, "duur_s": 0.8333, "snelheid_mps": 0.0, "impact_s": 0.4167},
+	"dragen": {"loop": true, "duur_s": 2.0, "snelheid_mps": 0.0, "impact_s": 0.0},
 }
 var _hamer: Node3D
+var _zaag: Node3D
+var _staf: Node3D
+var _skelet: Skeleton3D
+var _werk_soort := &"bouwen"   # bouwen (hamer) of zagen
+var _werk_wissel := 0.0        # s tot de volgende wissel hamer <-> zaag
+var _werk_rng := RandomNumberGenerator.new()
+var _draag_doel := 0.0
+var _draag := 0.0
 var _zwaard: Node3D
 var _steen_prop: Node3D
 var _hand_r: Node3D
@@ -123,6 +139,29 @@ func werk(aan: bool) -> void:
 	_werk_gewenst = aan
 	if not aan:
 		_stop_werk()
+
+
+func draag(aan: bool) -> void:
+	## Iets voor de borst (beker, zak): de dragen-clip over de armen, de benen lopen/staan gewoon door.
+	_draag_doel = 1.0 if aan and _heeft_clip("dragen") else 0.0
+
+
+func draagt() -> bool: return _draag_doel > 0.0
+
+
+## Wereldpositie tussen de handpalmen (prop_L/prop_R) als hij met de dragen-clip iets vasthoudt, anders Vector3.INF.
+func draag_pos() -> Vector3:
+	if _skelet == null or _draag < 0.5:
+		return Vector3.INF
+	var r := _skelet.find_bone("prop_R")
+	var l := _skelet.find_bone("prop_L")
+	if r < 0 or l < 0:
+		return Vector3.INF
+	var m := (_skelet.get_bone_global_pose(r).origin + _skelet.get_bone_global_pose(l).origin) * 0.5
+	return _skelet.global_transform * m
+
+
+func werk_soort() -> StringName: return _werk_soort
 
 
 func val_aan() -> void:
@@ -203,8 +242,11 @@ func _lees_meta() -> void:
 						_meta[k][f] = d[k][f]
 
 
-## Het glb-pad voor een dorpeling, of "" als dat model niet in assets/ staat.
-static func glb_voor(geslacht: String, leeftijd: String) -> String:
+## Het glb-pad voor een dorpeling, of "" als dat model niet in assets/ staat. Rol "bouwer" heeft een eigen model
+## (concept bouwer.jpg: gele helm, blauwe tuniek), als dat er is.
+static func glb_voor(geslacht: String, leeftijd: String, rol := "") -> String:
+	if rol == "bouwer" and ResourceLoader.exists("res://assets/%s.glb" % UITERLIJK["bouwer"]):
+		return "res://assets/%s.glb" % UITERLIJK["bouwer"]
 	var k := geslacht
 	if leeftijd == "kind":
 		k = "meisje" if geslacht == "vrouw" else "jongen"
@@ -227,6 +269,10 @@ func _bouw_model() -> void:
 		return
 	heeft_model = true
 	_hamer = _model.find_child("prop_hamer", true, false) as Node3D
+	_zaag = _model.find_child("prop_zaag", true, false) as Node3D
+	_staf = _model.find_child("prop_staf", true, false) as Node3D
+	_skelet = _model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _zaag: _zaag.visible = false
 	_zwaard = _model.find_child("prop_zwaard", true, false) as Node3D
 	_steen_prop = _model.find_child("prop_steen", true, false) as Node3D
 	_hand_r = _model.find_child("prop_R", true, false) as Node3D
@@ -277,9 +323,10 @@ func _bouw_boom() -> void:
 	bs.add_blend_point(_anim_knoop(&"rennen"), v_ren, -1, &"rennen")
 
 	var tr := AnimationNodeTransition.new()
-	tr.input_count = 2
+	tr.input_count = 3
 	tr.set_input_name(0, "loco")
 	tr.set_input_name(1, "werk")
+	tr.set_input_name(2, "zagen")
 	tr.xfade_time = CROSSFADE
 
 	var os := AnimationNodeOneShot.new()
@@ -296,6 +343,15 @@ func _bouw_boom() -> void:
 			if bot in BOVENLICHAAM:
 				os.set_filter_path(ref.track_get_path(i), true)
 
+	var dr := AnimationNodeBlend2.new()
+	dr.filter_enabled = true
+	if _speler.has_animation("dragen"):
+		var ref := _speler.get_animation("dragen")
+		for i in ref.get_track_count():
+			var p := String(ref.track_get_path(i))
+			if (p.get_slice(":", 1) if p.contains(":") else "") in ARMEN:
+				dr.set_filter_path(ref.track_get_path(i), true)
+
 	var kz := AnimationNodeTransition.new()
 	kz.input_count = 2
 	kz.set_input_name(0, "zwaard")
@@ -306,14 +362,20 @@ func _bouw_boom() -> void:
 	bt.add_node("loco", bs, Vector2(0, 0))
 	bt.add_node("tempo", AnimationNodeTimeScale.new(), Vector2(200, 0))
 	bt.add_node("werkanim", _anim_knoop(&"bouwen"), Vector2(0, 150))
+	bt.add_node("zaaganim", _anim_knoop(&"zagen" if _speler.has_animation("zagen") else &"bouwen"), Vector2(0, 220))
+	bt.add_node("draganim", _anim_knoop(&"dragen"), Vector2(200, 100))
+	bt.add_node("drag", dr, Vector2(300, 0))
 	bt.add_node("basis", tr, Vector2(400, 0))
 	bt.add_node("zwaardanim", _anim_knoop(&"aanval_zwaard"), Vector2(400, 150))
 	bt.add_node("steenanim", _anim_knoop(&"aanval_steen"), Vector2(400, 300))
 	bt.add_node("keuze", kz, Vector2(500, 150))
 	bt.add_node("aanval", os, Vector2(600, 0))
 	bt.connect_node("tempo", 0, "loco")
-	bt.connect_node("basis", 0, "tempo")
+	bt.connect_node("drag", 0, "tempo")
+	bt.connect_node("drag", 1, "draganim")
+	bt.connect_node("basis", 0, "drag")
 	bt.connect_node("basis", 1, "werkanim")
+	bt.connect_node("basis", 2, "zaaganim")
 	bt.connect_node("aanval", 0, "basis")
 	bt.connect_node("keuze", 0, "zwaardanim")
 	bt.connect_node("keuze", 1, "steenanim")
@@ -327,6 +389,7 @@ func _bouw_boom() -> void:
 	_boom.anim_player = _boom.get_path_to(_speler)
 	_boom.active = true
 	_boom.set("parameters/basis/transition_request", "loco")
+	_boom.set("parameters/drag/blend_amount", 0.0)
 
 
 func _bouw_nacht() -> void:
@@ -372,6 +435,8 @@ func _stop_werk() -> void:
 		_boom.set("parameters/basis/transition_request", "loco")
 	if _hamer:
 		_hamer.visible = false
+	if _zaag:
+		_zaag.visible = false
 
 
 func _process(dt: float) -> void:
@@ -379,7 +444,11 @@ func _process(dt: float) -> void:
 	rotation.y = lerp_angle(rotation.y, _yaw_doel, 1.0 - exp(-DRAAI * dt))
 	_werk_stap(dt)
 	_aanval_stap(dt)
+	_draag = move_toward(_draag, _draag_doel, dt / 0.2)
+	if _staf:
+		_staf.visible = _draag < 0.5
 	if _boom:
+		_boom.set("parameters/drag/blend_amount", _draag)
 		_boom.set("parameters/loco/blend_position", _snelheid / maxf(tempo, 0.1))
 		_boom.set("parameters/tempo/scale", tempo)
 
@@ -414,23 +483,40 @@ func _beweeg(dt: float) -> void:
 func _werk_stap(dt: float) -> void:
 	if _werk_gewenst and not _werkt and not _onderweg and _snelheid < 0.05 and _aanval_t < 0.0:
 		_werkt = true
-		_werk_t = -CROSSFADE   # impact_s telt vanaf het begin van de bouwen-clip
-		_werk_impact_gedaan = false
-		if _boom:
-			_boom.set("parameters/basis/transition_request", "werk")
-		if _hamer:
-			_hamer.visible = true
+		if _werk_wissel <= 0.0:          # eerste keer: zaad bepaalt waarmee hij begint en het ritme
+			_werk_rng.seed = hash(werk_zaad) if werk_zaad >= 0 else randi()
+			_werk_soort = &"zagen" if (werk_zaad >= 0 and werk_zaad % 2 == 1) else &"bouwen"
+			_werk_wissel = _werk_rng.randf_range(WERK_WISSEL.x, WERK_WISSEL.y)
+		_zet_werk_soort(_werk_soort)
 	if not _werkt:
 		return
 	_werk_t += dt
-	var duur: float = _meta["bouwen"]["duur_s"]
-	var imp: float = _meta["bouwen"]["impact_s"]
+	_werk_wissel -= dt
+	var duur: float = _meta[_werk_soort]["duur_s"]
+	var imp: float = _meta[_werk_soort]["impact_s"]
 	if _werk_t >= duur:
 		_werk_t -= duur
 		_werk_impact_gedaan = false
+		if _werk_wissel <= 0.0 and _heeft_clip("zagen"):    # wissel alleen op de lusgrens
+			_werk_wissel = _werk_rng.randf_range(WERK_WISSEL.x, WERK_WISSEL.y)
+			_zet_werk_soort(&"bouwen" if _werk_soort == &"zagen" else &"zagen")
 	if not _werk_impact_gedaan and _werk_t >= imp:
 		_werk_impact_gedaan = true
-		impact.emit(&"bouwen")
+		impact.emit(_werk_soort)
+
+
+func _zet_werk_soort(soort: StringName) -> void:
+	if soort == &"zagen" and not _heeft_clip("zagen"):
+		soort = &"bouwen"
+	_werk_soort = soort
+	_werk_t = -CROSSFADE   # impact_s telt vanaf het begin van de clip
+	_werk_impact_gedaan = false
+	if _boom:
+		_boom.set("parameters/basis/transition_request", "zagen" if soort == &"zagen" else "werk")
+	if _hamer:
+		_hamer.visible = soort == &"bouwen"
+	if _zaag:
+		_zaag.visible = soort == &"zagen"
 
 
 func _aanval_stap(dt: float) -> void:

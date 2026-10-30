@@ -425,15 +425,18 @@ func _werk_dorpelingen() -> void:
 
 
 ## Hamerklap op de bouwimpact (Bumpkin.impact); soms een zaag (hout), een houweel bij de akker.
+## Zagen (de zaagclip van de bouwer, impact = einde van de duwslag) geeft altijd de zaag.
 func _bij_impact(welke: StringName, id: int) -> void:
-	if welke != &"bouwen" or w.gepauzeerd:
+	if (welke != &"bouwen" and welke != &"zagen") or w.gepauzeerd:
 		return
 	var d := w.dorpeling(id)
 	if d == null or not view.units.has(id):
 		return
 	var pos := view.unit_pos(id) + Vector3(0, 0.8, 0)
 	var soort: StringName = d.werk_plan.soort if d.werk_plan != null else &""
-	if soort == &"akker":
+	if welke == &"zagen":
+		speel3d("zaag", pos, -4.0, 5.0, 35.0, 0.05)
+	elif soort == &"akker":
 		speel3d("houweel", pos, -2.0, 5.0, 35.0)
 	elif soort in ZAAG_SOORTEN and _rng.randf() < 0.2:
 		speel3d("zaag", pos, -4.0, 5.0, 35.0, 0.05)

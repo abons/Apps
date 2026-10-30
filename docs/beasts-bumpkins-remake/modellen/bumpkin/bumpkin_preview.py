@@ -97,8 +97,9 @@ for act in list(bpy.data.actions):
         rig.animation_data.action_slot = act.slots[0]
     except Exception:
         pass
-    welke = {"bouwen": "prop_hamer", "aanval_zwaard": "prop_zwaard", "aanval_steen": "prop_steen"}.get(act.name)
-    for pn in ("prop_hamer", "prop_zwaard", "prop_steen"):
+    welke = {"bouwen": "prop_hamer", "aanval_zwaard": "prop_zwaard", "aanval_steen": "prop_steen",
+             "zagen": "prop_zaag"}.get(act.name)
+    for pn in ("prop_hamer", "prop_zwaard", "prop_steen", "prop_zaag"):
         bpy.data.objects[pn].hide_render = pn != welke
     n = int(act.frame_end)
     lus = bool(act.get("snelheid_mps", 0) > 0 or act.use_cyclic)

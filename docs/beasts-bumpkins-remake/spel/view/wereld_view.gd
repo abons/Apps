@@ -91,7 +91,8 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 func _maak_unit(d: Dorpeling) -> void:
 	var b := Bumpkin.new()
 	b.name = "Dorpeling_%d" % d.id
-	var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd)
+	var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd, d.rol)
+	b.werk_zaad = d.id                         # hameren of zagen eerst, en het wisselritme (Bumpkin.WERK_WISSEL)
 	if g != "":
 		b.glb = g
 	elif d.leeftijd == "kind":
@@ -167,13 +168,21 @@ func _maak_unit(d: Dorpeling) -> void:
 	b.kijk_naar(Vector3(0, 0, 1), true)
 
 
-## Bouwer: een gele helm op het Head-bot (concept bouwer, "helm v2"), tot er een eigen bouwer-glb is.
+## Bouwer: het eigen bouwer-model (Bumpkin.glb_voor met rol); wisselt de rol, dan wordt de unit opnieuw gemaakt.
+## Zonder bumpkin_bouwer.glb in assets/: een gele helm op het Head-bot (concept bouwer, "helm v2").
 func _zet_rol(d: Dorpeling) -> void:
 	var b: Bumpkin = units[d.id]["bump"]
+	var g := Bumpkin.glb_voor(d.geslacht, d.leeftijd, d.rol)
+	if g != "" and g != b.glb and b.is_inside_tree():
+		var yaw := b.rotation.y
+		b.queue_free()
+		_maak_unit(d)
+		(units[d.id]["bump"] as Node3D).rotation.y = yaw
+		return
 	var oud := b.find_child("Bouwerhelm", true, false)
 	if oud != null:
 		oud.queue_free()
-	if d.rol != "bouwer":
+	if d.rol != "bouwer" or b.glb.ends_with("bumpkin_bouwer.glb"):
 		return
 	var sk := b.find_child("Skeleton3D", true, false) as Skeleton3D
 	if sk == null or sk.find_bone("Head") < 0:
@@ -314,6 +323,10 @@ func _process(dt: float) -> void:
 	_t += dt
 	var a := w.alpha()
 	var donker := licht.donker
+	var dragers := {}                                   # dorpeling-id -> true als hij een voorwerp (beker) draagt
+	for ob in Voorwerpen.alle(w):
+		if int(ob["drager"]) >= 0:
+			dragers[int(ob["drager"])] = true
 	for d in w.dorpelingen:
 		var u: Dictionary = units[d.id]
 		var b: Bumpkin = u["bump"]
@@ -340,9 +353,16 @@ func _process(dt: float) -> void:
 		(u["baby"] as MeshInstance3D).visible = d.baby > 0.0
 		var zak: MeshInstance3D = u["zak"]
 		zak.visible = d.draagt != ""
+		b.draag(d.draagt != "" or dragers.has(d.id))     # dragen-clip over de armen (beker, kelk, waren)
 		if zak.visible:
 			(zak.material_override as StandardMaterial3D).albedo_color = DRAAG_KLEUR.get(d.draagt, Color.WHITE)
-			zak.scale = Vector3.ONE * (0.45 if d.draagt == "ei" else 1.0)
+			var hp := b.draag_pos()
+			if hp != Vector3.INF:                        # in de handen, iets kleiner; anders op de rug
+				zak.global_position = hp
+				zak.scale = Vector3.ONE * (0.45 if d.draagt == "ei" else 0.75)
+			else:
+				zak.position = Vector3(0, 1.0, -0.2)
+				zak.scale = Vector3.ONE * (0.45 if d.draagt == "ei" else 1.0)
 	_werk_koeien(a, dt)
 	_werk_kippen(a, dt)
 	_werk_pad()

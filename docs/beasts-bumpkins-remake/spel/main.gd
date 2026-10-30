@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -310,6 +310,21 @@ func _start_scenario() -> void:
 			w.tempo = 2.0
 			var dt_ := ld.deur_tegel() if ld != null else Vector2i(101, 63)
 			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
+		"zagen":
+			# een hut naast het kampvuur, twee mannen bouwen; de eerste is meteen bouwer (eigen model), dichtbij, de camera van voren.
+			# Bouwers wisselen hameren en zagen af (Bumpkin.WERK_WISSEL); per id begint de een met de hamer, de ander met de zaag
+			var ids := []
+			for d in w.dorpelingen:
+				if d.volwassen() and d.geslacht == "man":
+					ids.append(d.id)
+			var p := _vrij_plan(&"hut", Vector2i(99, 62))
+			if p != null and w.plan_zet(p) and not ids.is_empty():
+				_wolf_man = w.dorpeling(ids[0])           # de camera volgt hem (_scenario_stap)
+				_wolf_man.rol = "bouwer"
+				w.rol_veranderd.emit(_wolf_man)
+				w.geef_bouwbevel(ids.slice(0, 2), p)
+			var pt: Vector2i = p.deur_tegel() if p != null else Vector2i(99, 62)
+			cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0, 0.6, 0), 3.7, deg_to_rad(26), 5.0)
 		"hek":
 			# een weide van 6x5 tegels met een poort in de onderkant, meteen af; de poort gaat na 2 s open (via _scenario_stap)
 			# en na 12 s weer dicht
@@ -525,6 +540,9 @@ func _scenario_stap() -> void:
 	match scenario:
 		"hints":
 			_hints_stap()
+		"zagen":
+			if _wolf_man != null:
+				cam.doel_focus = cam.doel_focus.lerp(view.unit_pos(_wolf_man.id) + Vector3(0, 0.6, 0), 0.05)
 		"ei":
 			if _stap == 0 and szt >= 6.0:
 				_stap = 1

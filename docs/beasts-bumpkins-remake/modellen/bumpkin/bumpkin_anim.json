@@ -36,5 +36,17 @@
     "impact_s": 0.6667,
     "release_s": 0.6667,
     "pak_s": 0.25
+  },
+  "zagen": {
+    "loop": true,
+    "duur_s": 0.8333,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.4167
+  },
+  "dragen": {
+    "loop": true,
+    "duur_s": 2.0,
+    "snelheid_mps": 0.0,
+    "impact_s": null
   }
 }

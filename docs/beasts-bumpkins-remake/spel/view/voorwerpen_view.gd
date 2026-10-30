@@ -71,5 +71,8 @@ func _process(_dt: float) -> void:
 			continue
 		var b: Node3D = u["bump"]
 		n.visible = b.is_visible_in_tree()
-		n.global_transform = Transform3D(b.global_transform.basis.orthonormalized(), b.global_transform * HAND)
+		var hp: Vector3 = b.draag_pos() if b.has_method("draag_pos") else Vector3.INF   # tussen de handpalmen (dragen-clip)
+		n.global_transform = Transform3D(b.global_transform.basis.orthonormalized(), b.global_transform * HAND if hp == Vector3.INF else hp)
 		n.scale = e["schaal"] * HAND_SCHAAL
+		if hp != Vector3.INF:
+			n.global_position.y -= 0.3 * n.scale.y      # de handen om de onderkant van de kom, niet om de voet
