@@ -25,6 +25,8 @@ $bron = @(
     '..\modellen\bumpkin\bumpkin_meisje.glb',
     '..\modellen\bumpkin\bumpkin_oudere_man.glb',
     '..\modellen\bumpkin\bumpkin_oudere_vrouw.glb',
+    '..\modellen\bumpkin\bumpkin_bouwer.glb',
+    '..\modellen\bumpkin\bumpkin_voetsoldaat.glb',
     '..\modellen\bumpkin\bumpkin_anim.json',
     '..\modellen\gebouwen\gereedschapsloods_rt.glb',
     '..\modellen\gebouwen\kippenhok_rt.glb',
