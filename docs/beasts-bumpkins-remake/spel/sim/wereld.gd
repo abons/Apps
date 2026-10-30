@@ -378,6 +378,7 @@ func _economie(dt: float) -> void:
 				akkers[t] = 0.0
 	for k in vee:
 		k.leeg = maxf(0.0, k.leeg - dt)
+	_kalveren(dt)
 	for d in dorpelingen:
 		if not d.slaapt:          # wie slaapt krijgt geen trek
 			for waar in WAREN:
@@ -469,7 +470,7 @@ func _dichtste_winkel(d: Dorpeling, soort: StringName, met_voorraad: bool) -> Pl
 ## Melkbaar: niet leeg, niet al vast (claim of melker onderweg) en binnen `melk_straal` tegels van het kampvuur
 ## (besluit gebruiker: ook wilde koeien geven melk, maar alleen als ze dicht bij het dorp staan).
 func melkbaar(k: Vee) -> bool:
-	return k.leeg <= 0.0 and not k.vast and Vector2(k.tegel()).distance_to(Vector2(kampvuur)) <= float(spel["economie"]["melk_straal"])
+	return k.leeg <= 0.0 and not k.vast and not k.is_kalf() and Vector2(k.tegel()).distance_to(Vector2(kampvuur)) <= float(spel["economie"]["melk_straal"])
 
 
 ## Zelfstandig werk, in deze volgorde: wat hij draagt wegbrengen; 's nachts naar bed (een hut met een vrij bed);
@@ -968,12 +969,79 @@ func koe(id: int) -> Vee:
 	return null
 
 
+## Volwassen eigen koeien: het doel van missie 1 telt klasse 110 (cow > 3, M1.MIS), een kalf is klasse 96 en telt
+## pas mee als het een koe is.
 func eigen_koeien() -> int:
 	var n := 0
 	for k in vee:
-		if k.eigenaar == 0:
+		if k.eigenaar == 0 and not k.is_kalf():
 			n += 1
 	return n
+
+
+## 0 = net geboren kalf .. 1 = koe (view/koe.gd zet_kalf).
+func kalf_groei(k: Vee) -> float:
+	if not k.is_kalf():
+		return 1.0
+	return 1.0 - k.kalf / float(spel["economie"].get("kalf_groei_s", 270.0))
+
+
+func kalveren() -> int:
+	var n := 0
+	for k in vee:
+		if k.is_kalf():
+			n += 1
+	return n
+
+
+## Kalven (hint 1-11: "koeien kalven in de lente, houd ze bij elkaar"; origineel klasse 96 `baby cow`, sprite cowborn).
+## Een volwassen eigen koe die deze lente `kalf_samen_s` binnen `kalf_straal` tegels van een andere volwassen eigen koe
+## stond, krijgt met kans `kalf_kans` (hash, geen rng: zelfde spel, zelfde kalveren) een kalf naast zich; een keer per
+## lente. Een kalf is na `kalf_groei_s` een koe. Getallen zijn eigen keuze (niet in de data gevonden).
+func _kalveren(dt: float) -> void:
+	var e: Dictionary = spel["economie"]
+	var groei := float(e.get("kalf_groei_s", 270.0))
+	for k in vee:
+		if k.is_kalf():
+			k.kalf = maxf(0.0, k.kalf - dt)
+			if not k.is_kalf():
+				k.moeder = null
+				k.anker = kampvuur if k.eigenaar == 0 else k.tegel()
+	if seizoen() != 0:
+		for k in vee:
+			k.samen_s = 0.0
+		return
+	var jaar := int(tijd_s / (4.0 * seizoen_duur()))
+	var straal := float(e.get("kalf_straal", 4.0))
+	var nieuw: Array[Vee] = []
+	for k in vee:
+		if k.eigenaar != 0 or k.is_kalf() or k.kalf_jaar == jaar:
+			continue
+		for o in vee:
+			if o != k and o.eigenaar == 0 and not o.is_kalf() and k.pos.distance_to(o.pos) <= straal:
+				k.samen_s += dt
+				break
+		if k.samen_s < float(e.get("kalf_samen_s", 20.0)):
+			continue
+		k.kalf_jaar = jaar
+		if _hash2(k.id, jaar + 11) < float(e.get("kalf_kans", 0.5)):
+			nieuw.append(k)
+	for m in nieuw:
+		var t := dichtstbij_loopbaar(m.tegel() + Vector2i(1, 0))
+		if t.x < 0:
+			continue
+		var c := Vee.new()
+		c.id = _volgende_koe_id
+		_volgende_koe_id += 1
+		c.zet_tegel(t)
+		c.anker = m.tegel()
+		c.eigenaar = m.eigenaar
+		c.weide = m.weide
+		c.kalf = groei
+		c.moeder = m
+		c.wacht = 2.0
+		vee.append(c)
+		koe_erbij.emit(c)
 
 
 ## Stuur de eerste volwassene uit `ids` naar koe `koe_id`; aangekomen claimt hij haar, of laat haar los als ze al van
@@ -1018,6 +1086,9 @@ func claim_aangekomen(d: Dorpeling) -> void:
 	else:
 		k.eigenaar = 0
 		k.anker = kampvuur
+	for c in vee:
+		if c.moeder == k:
+			c.eigenaar = k.eigenaar      # haar kalf gaat mee
 	_wijs_weides_toe()       # een eigen koe hoort in een weide als die er is
 	k.wacht = 1.0
 	koe_geclaimd.emit(k)

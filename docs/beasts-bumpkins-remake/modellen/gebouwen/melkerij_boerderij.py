@@ -68,7 +68,8 @@ UIT = OPTS.get("uit", os.path.join(E.PREVIEW, NAAM + "_render.png"))
 if "rt" in OPTS or "rt_vergelijk" in OPTS:
     if "rt" in OPTS:
         n = E.rt_bouw(NAAM, BLEND, res=int(OPTS.get("res", 2048)),
-                      ratio_opaak={"steen": 0.09, "bloem": 0.25, "varken": 0.35}, lod1_doel=7600)
+                      ratio_opaak={"steen": 0.09, "bloem": 0.25, "varken": 0.35}, lod1_doel=7600,
+                      riet_ext=0.40, riet_ray=0.55, schil_bron=False)   # schil ligt op de halmen: alleen halmen als bron (2026-10-30)
         print("RT", n)
     for lod, suf in (("_rt", ""), ("_rt_lod1", "_lod1")):
         E.rt_vergelijk(NAAM, SPRITE, 4, REF_WERELD, REF_PX, os.path.join(E.PREVIEW, f"{NAAM}_rt{suf}.png"), lod)

@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -261,6 +261,20 @@ func _start_scenario() -> void:
 			w.vee[0].anker = w.vee[0].tegel()
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(100, 63)) + Vector3(0, 0.6, 0), 0.6, deg_to_rad(36), 20.0)
+		"kalf":
+			# lente: drie eigen koeien bij elkaar bij het kampvuur; na 2 s samen kalven ze (kans 1), het kalf loopt bij de moeder
+			w.spel["economie"]["kalf_kans"] = 1.0
+			w.spel["economie"]["kalf_samen_s"] = 2.0
+			while w.vee.size() < 3:
+				w._spawn_koe()
+			for i in w.vee.size():
+				var k: Vee = w.vee[i]
+				k.eigenaar = 0
+				k.van_generator = false
+				k.anker = w.kampvuur + Vector2i(4, -4)
+				k.zet_tegel(w.dichtstbij_loopbaar(k.anker + Vector2i(i * 2 - 2, i % 2)))
+				w.koe_geclaimd.emit(k)
+			cam.zet_direct(view.terrein.tegel_midden(w.kampvuur + Vector2i(4, -4)) + Vector3(0, 0.4, 0), 0.6, deg_to_rad(34), 9.0)
 		"kippen":
 			# kippenhok bij het dorp; de eerste kip legt meteen, een volwassene raapt het ei en brengt het het hok in, 2x
 			var kh := _vrij_plan(&"kippenhok", Vector2i(99, 62))
@@ -270,6 +284,17 @@ func _start_scenario() -> void:
 				w.kippen[0].leeg = 3.0
 			w.tempo = 2.0
 			cam.zet_direct(view.terrein.tegel_midden(kh.deur_tegel() if kh != null else Vector2i(99, 62)) + Vector3(0, 0.3, 0), 0.6, deg_to_rad(30), 9.0)
+		"ei":
+			# kippenhok bij het dorp; alle kippen leggen meteen en blijven 6 s ongestoord op hun ei (vast), daarna raapt een
+			# volwassene ze en brengt ze het hok in (view/kip_model.gd zet_ei)
+			var kh := _vrij_plan(&"kippenhok", Vector2i(99, 62))
+			if kh != null and w.plan_zet(kh):
+				w._rond_af(kh)
+			for k in w.kippen:
+				k.leeg = 0.5
+				k.vast = true
+			var kt: Vector2i = w.kippen[0].tegel() if not w.kippen.is_empty() else Vector2i(99, 62)
+			cam.zet_direct(view.terrein.tegel_midden(kt), 0.6, deg_to_rad(42), 7.0)
 		"bouwer":
 			# loods staat; een man laat zich bouwer maken en bouwt daarna een hut, naast een gewone man op een tweede hut, 4x
 			var ld := _vrij_plan(&"gereedschapsloods", Vector2i(99, 61))
@@ -346,6 +371,23 @@ func _start_scenario() -> void:
 				w.geef_bouwbevel(ids.slice(3, 4), h)
 			w.tempo = 4.0
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(105, 64)) + Vector3(0, 0.8, 0), 0.7, deg_to_rad(32), 21.0)
+		"daken":
+			# hut, melkerij en kippenhok af naast elkaar: het riet van de drie vergelijken (gebakken halmen, 2026-10-30)
+			w.alles_open = true
+			for sd in [[&"hut", Vector2i(98, 60)], [&"melkerij", Vector2i(103, 59)], [&"kippenhok", Vector2i(108, 61)]]:
+				var dp := _vrij_plan(sd[0], sd[1])
+				if dp != null and w.plan_zet(dp):
+					w._rond_af(dp)
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(104, 61)) + Vector3(0, 1.0, 0), 0.7, deg_to_rad(36), 17.0)
+		"stapels":
+			# vijf bouwplaatsen in alle vier draaiingen: zaagbok en steenhoop staan aan de deurkant, naast de deur
+			w.alles_open = true
+			for sd in [[&"hut", Vector2i(97, 60), 0], [&"melkerij", Vector2i(104, 58), 1], [&"kippenhok", Vector2i(110, 62), 2],
+					[&"gereedschapsloods", Vector2i(97, 68), 3], [&"molen", Vector2i(105, 68), 0]]:
+				var sp := _vrij_plan(sd[0], sd[1], sd[2])
+				if sp != null and w.plan_zet(sp):
+					sp.voortgang = 0.7      # stand 3: het gebouw is te zien, de stapels nog groot genoeg
+			cam.zet_direct(view.terrein.tegel_midden(Vector2i(104, 63)), 0.7, deg_to_rad(52), 22.0)
 		"bouw2":
 			# molen en melkerij naast het kampvuur, elk door de helft van de volwassenen, 4x: alle vier de bouwstanden
 			w.alles_open = true
@@ -448,12 +490,12 @@ func _object_tegel(naam: String, anders: Vector2i) -> Vector2i:
 
 
 ## Eerste plan van `soort` dat kan, in ringen rond `bij` (voor scenario's).
-func _vrij_plan(soort: StringName, bij: Vector2i) -> Plan:
+func _vrij_plan(soort: StringName, bij: Vector2i, draai := 0) -> Plan:
 	for r in 8:
 		for dy in range(-r, r + 1):
 			for dx in range(-r, r + 1):
 				if maxi(absi(dx), absi(dy)) == r:
-					var p := w.maak_plan(soort, bij + Vector2i(dx, dy), 0)
+					var p := w.maak_plan(soort, bij + Vector2i(dx, dy), draai)
 					if p != null:
 						return p
 	return null
@@ -483,6 +525,11 @@ func _scenario_stap() -> void:
 	match scenario:
 		"hints":
 			_hints_stap()
+		"ei":
+			if _stap == 0 and szt >= 6.0:
+				_stap = 1
+				for k in w.kippen:
+					k.vast = false
 		"minikaart":
 			if _stap == 0 and szt >= 8.0:
 				_stap = 1

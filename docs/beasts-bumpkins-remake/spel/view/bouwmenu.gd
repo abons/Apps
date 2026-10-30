@@ -348,21 +348,37 @@ func _grond(t: Vector2i) -> Vector3:
 	return v
 
 
-## Loopbare tegels die aan de voetafdruk grenzen (niet op de hoeken), te beginnen aan de voorkant (+z na draaien).
+## Stapelplekken: tegels net buiten de voetafdruk aan de deurkant (sim/plan.gd deur_richting, ook na draaien), naast de
+## deurtegel en niet op het pad ervoor of op een weg, dichtstbij de deur eerst; pas als die kant vol is de andere
+## kanten. Zo staan zaagbok en steenhoop voor het gebouw bij de deur, nooit erachter of erin (2026-10-30).
 func _stapelplekken(p: Plan, n: int) -> Array[Vector2i]:
-	var r := p.afdruk()
-	var rand: Array[Vector2i] = []
-	for c in range(r.position.x, r.end.x):
-		rand.append(Vector2i(c, r.end.y))
-	for rij in range(r.position.y, r.end.y):
-		rand.append(Vector2i(r.end.x, rij))
-	for c in range(r.position.x, r.end.x):
-		rand.append(Vector2i(c, r.position.y - 1))
-	for rij in range(r.position.y, r.end.y):
-		rand.append(Vector2i(r.position.x - 1, rij))
 	var uit: Array[Vector2i] = []
-	for t in rand:
-		if uit.size() < n and w.raster.loopbaar_v(t) and w.plan_op(t) == null:
+	if n <= 0:
+		return uit
+	var r := p.afdruk()
+	var deur := p.deur_tegel()
+	var dr := p.deur_richting()
+	var pad_i := w.raster.namen.find("pad")
+	var vrij := func(t: Vector2i) -> bool:
+		if r.has_point(t) or t == deur or t == deur + dr or not w.raster.loopbaar_v(t) or w.plan_op(t) != null:
+			return false
+		return pad_i < 0 or w.raster.soort[w.raster.idx(t.x, t.y)] != pad_i
+	var zij := Vector2i(-dr.y, dr.x)       # langs de gevel
+	var kand: Array[Vector2i] = []
+	for k in range(1, maxi(r.size.x, r.size.y) + 2):   # deurkant: om en om naast de deur, eerst dichtbij
+		kand.append(deur + zij * k)
+		kand.append(deur - zij * k)
+	for k in range(1, 4):                  # een rij verder van de gevel
+		kand.append(deur + dr + zij * k)
+		kand.append(deur + dr - zij * k)
+	for c in range(r.position.x - 1, r.end.x + 1):     # noodgeval: de rest van de rand
+		kand.append(Vector2i(c, r.end.y))
+		kand.append(Vector2i(c, r.position.y - 1))
+	for rij in range(r.position.y, r.end.y):
+		kand.append(Vector2i(r.end.x, rij))
+		kand.append(Vector2i(r.position.x - 1, rij))
+	for t in kand:
+		if uit.size() < n and not t in uit and vrij.call(t):
 			uit.append(t)
 	return uit
 

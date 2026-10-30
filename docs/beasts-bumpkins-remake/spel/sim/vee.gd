@@ -21,6 +21,14 @@ var snelheid_mps := 0.0
 var weide := {}               ## tegels van de weide waar ze in hoort (eigen koe, Wereld.weides), {} = vrij rond het anker
 var leeg := 0.0               ## s tot ze weer melk geeft (beasts-src Herd.again: koe 90 s)
 var gemolken := false         ## er zit iemand naast te melken (view: gemolken_worden)
+var kalf := 0.0               ## > 0: een kalf (origineel klasse 96 `baby cow`), s tot het een koe is (klasse 110)
+var moeder: Vee = null        ## een kalf loopt achter haar aan
+var samen_s := 0.0            ## s deze lente dicht bij een andere eigen koe (Wereld._kalveren)
+var kalf_jaar := -1           ## het jaar waarin ze al gekalfd heeft (een kalf per lente)
+
+
+func is_kalf() -> bool:
+	return kalf > 0.0
 
 
 func tegel() -> Vector2i:
@@ -44,6 +52,10 @@ func tick(w: Wereld, dt: float) -> void:
 		route.clear()
 		return
 	if route.is_empty():
+		if moeder != null and moeder in w.vee:
+			anker = moeder.tegel()         # een kalf blijft bij de moeder
+			if Vector2(tegel()).distance_to(Vector2(anker)) > 2.0:
+				wacht = minf(wacht, 0.0)
 		_zwerf(w, dt)
 		return
 	if w.poort_dicht(Vector2i(int(floor(route[0].x)), int(floor(route[0].y)))):
@@ -71,9 +83,12 @@ func _zwerf(w: Wereld, dt: float) -> void:
 		return
 	wacht = w.rng.randf_range(5.0, 14.0)    # grazen duurt langer dan een dorpeling stilstaat
 	var tegels: Array = weide.keys()
+	var straal := 1 if moeder != null else ZWERF_STRAAL
 	for _i in 8:
 		var t: Vector2i
-		if not tegels.is_empty():
+		if moeder != null:
+			t = anker + Vector2i(w.rng.randi_range(-straal, straal), w.rng.randi_range(-straal, straal))
+		elif not tegels.is_empty():
 			t = tegels[w.rng.randi() % tegels.size()]      # in de weide (of erheen, als ze er nog buiten staat)
 		else:
 			t = anker + Vector2i(w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL), w.rng.randi_range(-ZWERF_STRAAL, ZWERF_STRAAL))

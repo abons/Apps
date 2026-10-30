@@ -241,6 +241,7 @@ func _werk_kippen(a: float, dt: float) -> void:
 			n.rotation.y = lerp_angle(n.rotation.y, atan2(d.x, d.z), minf(1.0, dt * 10.0))
 		n.position = nieuw
 		var t := 0.0 if w.gepauzeerd else w.tempo
+		KipModel.zet_ei(n, k.ei)
 		if k.ei:
 			KipModel.speel(n, "zitten", t)
 		elif k.snelheid_mps > 0.0:
@@ -267,6 +268,7 @@ func _werk_koeien(a: float, dt: float) -> void:
 		if Vector2(d.x, d.z).length() > 0.002:
 			n.rotation.y = lerp_angle(n.rotation.y, atan2(d.x, d.z), minf(1.0, dt * 6.0))   # gezicht langs +Z, als Bumpkin
 		n.position = nieuw
+		Koe.zet_kalf(n, w.kalf_groei(k))
 		if w.gepauzeerd:
 			Koe.speel(n, "idle", 0.0)
 		elif k.gemolken:

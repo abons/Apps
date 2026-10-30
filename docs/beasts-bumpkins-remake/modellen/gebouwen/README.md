@@ -50,10 +50,12 @@ Glb's: atlassen 1024 (`rt res=1024`, budget 2026-10-29); `res=2048` voor de voll
 Vergelijkingen per ronde: `preview/<naam>_vergelijk_ronde<n>.png`; glb's: `preview/<naam>_rt_vergelijk.png`
 (beauty | LOD0 | LOD1, Cycles).
 
-- ⚠️ Gebakken riet (melkerij en kippenhok) mist de halmen grotendeels: veel stralen raken de onderlaag
-  (die ook bron is) i.p.v. de halmen, het dak wordt bruin-egaal met gele vlekken. Te doen: de rietschil
-  als bron weglaten of de cage groter, opnieuw bakken. De bronnen worden voor het bakken samengevoegd
-  (selected-to-active met honderden objecten liep uren op de CPU), dus de tint per steen gaat verloren.
+- ✅ Gebakken riet (melkerij en kippenhok) opnieuw gebakken 2026-10-30. Was bruin met gele vlekken: de rietschil
+  bakte als bron mee met de donkere Poly Haven-onderlaag, en de halmbuizen verloren Hair Info (Random, Intercept)
+  dus elke halm werd even donker. Nu: schil als bron met egaal stro (`RIET_VUL`, `riet_vul_bron`), halmbuizen
+  dragen `hrand`/`hint` (`mat_attr`, zoals de hut). Melkerij: de schil ligt op de halmen, dus daar alleen de
+  halmen als bron (`schil_bron=False`, `riet_ext=0.40 riet_ray=0.55`); gemiste stralen = `RIET_VUL`. De bronnen worden voor het bakken samengevoegd (selected-to-active met honderden
+  objecten liep uren op de CPU), dus de tint per steen gaat verloren.
 - `pack_islands` hangt in Blender 5.2 op duizenden eilandjes; `uv_atlas` gebruikt alleen smart project.
 
 | gebouw | LOD0 | LOD1 |

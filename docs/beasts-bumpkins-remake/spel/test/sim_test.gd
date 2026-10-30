@@ -602,6 +602,8 @@ func _initialize() -> void:
 	_check(bleef, "poort dicht: koe blijft in de weide")
 
 	_test_wegen()
+	_test_kalveren()
+	_test_stapels()
 
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUT(EN)" % fouten)
 	quit(0 if fouten == 0 else 1)
@@ -682,3 +684,89 @@ func _check(ok: bool, tekst: String) -> void:
 	print(("ok    " if ok else "FOUT  "), tekst)
 	if not ok:
 		fouten += 1
+
+## Kalven (hint 1-11, origineel klasse 96 `baby cow`): twee eigen koeien bij elkaar krijgen in de lente elk een kalf
+## (kans 1 in de test), een keer per lente; een kalf telt niet mee als koe, wordt niet gemolken en is na kalf_groei_s een
+## koe die wel meetelt. Een koe alleen of in de zomer kalft niet.
+func _test_kalveren() -> void:
+	var w := Wereld.new()
+	w.laad()
+	w.spel["economie"]["kalf_kans"] = 1.0
+	w.tijd_s = 10.0
+	var koeien: Array[Vee] = []
+	for i in 3:
+		var k := w._spawn_koe()
+		k.van_generator = false
+		koeien.append(k)
+	for i in 2:
+		koeien[i].eigenaar = 0
+		koeien[i].anker = w.kampvuur
+		koeien[i].zet_tegel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(2 + i, 2)))
+	koeien[2].eigenaar = 0                       # derde eigen koe ver weg, alleen
+	koeien[2].vast = true
+	koeien[2].zet_tegel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(14, 0)))
+	koeien[0].vast = true
+	koeien[1].vast = true
+	_check(w.seizoen() == 0 and w.eigen_koeien() == 3 and w.kalveren() == 0, "lente, 3 eigen koeien, geen kalf")
+	for i in int(30.0 / w.tik_dt):
+		w.tik(w.tik_dt)
+	_check(w.kalveren() == 2, "twee koeien bij elkaar: twee kalveren (%d)" % w.kalveren())
+	_check(w.eigen_koeien() == 3, "kalf telt niet mee als koe (%d)" % w.eigen_koeien())
+	var kalf: Vee = w.vee[w.vee.size() - 1]
+	_check(kalf.is_kalf() and kalf.eigenaar == 0 and kalf.moeder != null and kalf.moeder != koeien[2], "kalf is eigen en hoort bij een moeder")
+	kalf.leeg = 0.0
+	_check(not w.melkbaar(kalf), "kalf wordt niet gemolken")
+	for i in int(60.0 / w.tik_dt):
+		w.tik(w.tik_dt)
+	_check(w.kalveren() == 2, "een kalf per koe per lente")
+	_check(kalf.moeder == null or Vector2(kalf.tegel()).distance_to(Vector2(kalf.moeder.tegel())) <= 3.0, "kalf blijft bij de moeder")
+	for i in int(240.0 / w.tik_dt):
+		w.tik(w.tik_dt)
+	_check(w.kalveren() == 0 and w.eigen_koeien() == 5, "na kalf_groei_s zijn de kalveren koeien (%d koeien, %d kalveren, %d vee, t=%.0f)" % [w.eigen_koeien(), w.kalveren(), w.vee.size(), w.tijd_s])
+	var z := Wereld.new()
+	z.laad()
+	z.spel["economie"]["kalf_kans"] = 1.0
+	z.tijd_s = z.seizoen_duur() + 10.0
+	for i in 2:
+		var k := z._spawn_koe()
+		k.eigenaar = 0
+		k.vast = true
+		k.zet_tegel(z.dichtstbij_loopbaar(z.kampvuur + Vector2i(2 + i, 2)))
+	for i in int(40.0 / z.tik_dt):
+		z.tik(z.tik_dt)
+	_check(z.kalveren() == 0, "in de zomer geen kalveren")
+
+## Bouwplaatsstapels (view/bouwmenu.gd _stapelplekken): voor elk gebouw in elke draaiing twee tegels buiten de
+## voetafdruk, aan de deurkant (langs de gevel of een rij verder), niet op de deurtegel of het pad ervoor.
+func _test_stapels() -> void:
+	var w := Wereld.new()
+	w.laad()
+	var bm := Bouwmenu.new()
+	bm.w = w
+	var goed := 0
+	var fout := []
+	for soort in [&"hut", &"melkerij", &"kippenhok", &"gereedschapsloods", &"molen"]:
+		for dr_ in 4:
+			var p: Plan = null
+			for r in 10:
+				for dy in range(-r, r + 1):
+					for dx in range(-r, r + 1):
+						if p == null and maxi(absi(dx), absi(dy)) == r:
+							p = w.maak_plan(soort, w.kampvuur + Vector2i(4 + dx, 4 + dy), dr_)
+			if p == null:
+				fout.append("%s/%d geen plek" % [soort, dr_])
+				continue
+			var pl: Array[Vector2i] = bm._stapelplekken(p, 2)
+			var deur := p.deur_tegel()
+			var dr := p.deur_richting()
+			var ok := pl.size() == 2
+			for t in pl:
+				var v := Vector2(t - deur).dot(Vector2(dr))
+				if p.afdruk().has_point(t) or t == deur or t == deur + dr or v < 0.0 or v > 1.0:
+					ok = false
+			if ok:
+				goed += 1
+			else:
+				fout.append("%s/%d %s deur %s" % [soort, dr_, pl, deur])
+	bm.free()
+	_check(fout.is_empty(), "stapels aan de deurkant, vrij van voetafdruk en pad: %d/20 %s" % [goed, fout])

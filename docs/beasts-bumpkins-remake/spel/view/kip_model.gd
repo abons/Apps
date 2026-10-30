@@ -32,6 +32,36 @@ static func speel(n: Node3D, anim: String, tempo := 1.0) -> void:
 	ap.speed_scale = tempo
 
 
+## Het ei bij een zittende kip (sim/kip.gd `ei`): assets/ei.glb achter de staart, weg zodra het geraapt is. Het
+## origineel (`chickegg`) toont een los bruin ei naast de kip; 6 cm is vanaf de RTS-camera onzichtbaar, dus x2.
+const EI_GLB := "res://assets/ei.glb"
+const EI_PLEK := Vector3(0.1, 0.0, -0.24)   # lokaal: kip kijkt langs +Z
+const EI_SCHAAL := 2.0
+
+
+static func zet_ei(n: Node3D, aan: bool) -> void:
+	var e := n.get_node_or_null("ei") as Node3D
+	if e == null:
+		if not aan:
+			return
+		if ResourceLoader.exists(EI_GLB):
+			e = (load(EI_GLB) as PackedScene).instantiate()
+		else:
+			var mi := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.025
+			sm.height = 0.06
+			mi.mesh = sm
+			mi.position.y = 0.03
+			e = Node3D.new()
+			e.add_child(mi)
+		e.name = "ei"
+		e.position = EI_PLEK
+		e.scale = Vector3.ONE * EI_SCHAAL
+		n.add_child(e)
+	e.visible = aan
+
+
 static func _speler(n: Node) -> AnimationPlayer:
 	if n is AnimationPlayer:
 		return n

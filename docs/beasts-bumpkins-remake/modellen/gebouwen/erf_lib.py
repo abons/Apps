@@ -1073,6 +1073,25 @@ def halm_buizen(ob, coll, sides=3):
     if "Scale" in c2m.inputs:
         rad = ng.nodes.new("GeometryNodeInputRadius")
         ng.links.new(rad.outputs[0], c2m.inputs["Scale"])
+    # Hair Info (Random, Intercept) bestaat niet op een mesh: als attributen hrand/hint meegeven (zoals de hut,
+    # peasant_hut_realtime.mat_attr), anders bakt elke halm in dezelfde donkere kleur (2026-10-30)
+    sp = ng.nodes.new("GeometryNodeSplineParameter")
+    st_hint = ng.nodes.new("GeometryNodeStoreNamedAttribute")
+    st_hint.data_type = "FLOAT"
+    st_hint.domain = "POINT"
+    st_hint.inputs["Name"].default_value = "hint"
+    ng.links.new(poly.outputs["Curve"], st_hint.inputs["Geometry"])
+    ng.links.new(sp.outputs["Factor"], st_hint.inputs["Value"])
+    rv = ng.nodes.new("FunctionNodeRandomValue")
+    rv.data_type = "FLOAT"
+    rv.inputs["Seed"].default_value = 7
+    st_rand = ng.nodes.new("GeometryNodeStoreNamedAttribute")
+    st_rand.data_type = "FLOAT"
+    st_rand.domain = "CURVE"
+    st_rand.inputs["Name"].default_value = "hrand"
+    ng.links.new(st_hint.outputs["Geometry"], st_rand.inputs["Geometry"])
+    ng.links.new(rv.outputs[0], st_rand.inputs["Value"])
+    ng.links.new(st_rand.outputs["Geometry"], c2m.inputs["Curve"])
     ng.links.new(c2m.outputs[0], go.inputs[0])
     k = bpy.data.objects.new("_buis", bpy.data.meshes.new("_buis"))
     coll.objects.link(k)
@@ -1083,10 +1102,46 @@ def halm_buizen(ob, coll, sides=3):
     o = bpy.data.objects.new(ob.name + "_buis", me)
     coll.objects.link(o)
     o.data.materials.clear()
-    o.data.materials.append(ob.data.materials[0])
+    o.data.materials.append(mat_attr(ob.data.materials[0]))
     o.data.polygons.foreach_set("material_index", [0] * len(o.data.polygons))
     log("  buizen", ob.name, len(me.polygons))
     return o
+
+
+def mat_attr(src):
+    """Halmmateriaal voor een mesh: Hair Info (Random, Intercept) -> attributen hrand, hint."""
+    naam = src.name + "_buis"
+    if naam in bpy.data.materials:
+        return bpy.data.materials[naam]
+    m = src.copy()
+    m.name = naam
+    nt = m.node_tree
+    for hi in [n for n in nt.nodes if n.type == "HAIR_INFO"]:
+        for out, an in (("Random", "hrand"), ("Intercept", "hint")):
+            a = nt.nodes.new("ShaderNodeAttribute")
+            a.attribute_name = an
+            for l in list(hi.outputs[out].links):
+                nt.links.new(a.outputs["Fac"], l.to_socket)
+        nt.nodes.remove(hi)
+    return m
+
+
+# bakbron voor de rietschil zelf: egaal stro, iets donkerder dan de halmen (diepte), zodat stralen die tussen de
+# halmen door de schil raken geen bruine Poly Haven-onderlaag bakken (2026-10-30: dak bruin met gele strepen)
+RIET_VUL = (0.50, 0.33, 0.09, 1)
+
+
+def riet_vul_bron(o, coll):
+    m = bpy.data.materials.get("_riet_vul")
+    if m is None:
+        m, nt, b = principled("_riet_vul", 0.85)
+        b.inputs["Base Color"].default_value = RIET_VUL
+    k = bpy.data.objects.new(o.name + "_vul", eval_mesh(o, o.name + "_vul"))
+    k.data.materials.clear()
+    k.data.materials.append(m)
+    k.data.polygons.foreach_set("material_index", [0] * len(k.data.polygons))
+    coll.objects.link(k)
+    return k
 
 
 def uv_atlas(objs, marge=0.002, gewicht=None):
@@ -1285,12 +1340,12 @@ def exporteer(pad, objs):
 
 
 # bakgroepen: (cage-extrusie, max. straalafstand, kleur voor gemiste stralen, tweezijdig)
-GROEPEN = {"opaak": (0.01, 0.03, None, False), "riet": (0.11, 0.25, (0.55, 0.36, 0.1, 1), True),
+GROEPEN = {"opaak": (0.01, 0.03, None, False), "riet": (0.11, 0.25, RIET_VUL, True),
            "grond": (0.08, 0.14, (0.35, 0.24, 0.1, 1), False)}
 HALM_GROEP = {"halm": "riet", "halm_grond": "grond"}     # hair curves -> bron van welke groep
 
 
-def rt_bouw(naam, blend, res=2048, ratio_opaak=None, lod1_doel=7500, riet_ext=0.11, riet_ray=0.25):
+def rt_bouw(naam, blend, res=2048, ratio_opaak=None, lod1_doel=7500, riet_ext=0.11, riet_ray=0.25, schil_bron=True):
     """Bak <naam>.blend naar <naam>_rt.glb (LOD0) en <naam>_rt_lod1.glb.
     ratio_opaak: {objectnaam-prefix: decimeerratio} voor zware bronnen (stenen, bolletjes).
     Atlassen per groep: 'opaak' (alles, plus de deurbladen), 'riet' (dakschillen; bron = halmen +
@@ -1341,7 +1396,10 @@ def rt_bouw(naam, blend, res=2048, ratio_opaak=None, lod1_doel=7500, riet_ext=0.
             decimeer_obj(t, r)
             me = t.data
             bpy.data.objects.remove(t)
-        bron[g].append(o)
+        if g != "riet":
+            bron[g].append(o)
+        elif schil_bron:                             # schil_bron=False: alleen de halmen (schil ligt er bovenop)
+            bron[g].append(riet_vul_bron(o, RT))
         d = deur_van(o)
         (per_deur[d] if d else groep[g]).append(me)
     lows = {g: samen(f"{naam}_{g}", ms, RT) for g, ms in groep.items() if ms}

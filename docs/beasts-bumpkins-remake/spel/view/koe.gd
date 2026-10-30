@@ -47,6 +47,15 @@ static func zet_eigen(n: Node3D, eigen: bool) -> void:
 		bel.visible = eigen
 
 
+## Kalf (sim/vee.gd `kalf`): de koe verkleind, van KALF_SCHAAL bij de geboorte naar 1 als ze volwassen is (`groei` 0..1).
+## Origineel `cowborn`: een klein wit-zwart kalf, ~0,6 van de koe (34x21 tegen 51x34 px).
+const KALF_SCHAAL := 0.55
+
+
+static func zet_kalf(n: Node3D, groei: float) -> void:
+	n.scale = Vector3.ONE * lerpf(KALF_SCHAAL, 1.0, clampf(groei, 0.0, 1.0))
+
+
 ## Speel `anim` (lus volgens koe_anim.json) als hij nog niet speelt; `tempo` schaalt het afspelen.
 static func speel(n: Node3D, anim: String, tempo := 1.0) -> void:
 	var ap := _speler(n)
