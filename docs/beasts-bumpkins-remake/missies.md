@@ -176,12 +176,21 @@ als een wolf vlakbij jaagt. Kinderen en baby's pakken (origineel) komt later (ga
 **Prijzen, geluk en misdaad (2026-10-30).** **Besluit gebruiker:** misdaad en de straf-schuiven per misdaad pas vanaf M13 (met de gevangenis), zoals het origineel. Origineel: goudicoon in de bovenbalk (MIS1-10) opent `STATS.MFB` (`lokaal/bb_original/stats.png`):
 een schuif per waar (eieren, water, brood, melk, cider, kerk, belasting) van weinig munten naar een stapel goud, daaronder per misdaad
 (vloeken, diefstal, mishandeling, moord) de straf van duim omhoog tot duim omlaag. MIS2-3: hoge prijzen = ontevreden = korter leven.
-Statistiekreeksen in elke .MIS: Happiness, Crimes, Convictions, Trade, Tax. Misdaad en gevangenis (pikenier) pas in M13. Bedragen,
-kansen en de straf-schuiven staan niet in de data. **Remake** (`spel/sim/handel.gd`, `spel/view/prijzen.gd`, spel.json `handel`): alleen
-brood/melk/ei, prijs 1-9 per verkoop (start 3 = beasts-src `VISIT_PRICE`); geluk loopt langzaam naar 1 - prijsdruk, laag geluk versnelt
+Statistiekreeksen in elke .MIS: Happiness, Crimes, Convictions, Trade, Tax. Misdaad en gevangenis (pikenier) pas in M13.
+**Prijzen uit `BEASTS.EXE` (2026-10-30).** Warentabel (init `0x414537`-`0x414803`, 36 bytes: naam + `i16` basis): **water 50, ei 80,
+brood 50, melk 100, cider 100, kerk/tiende 20, belasting 150** (plus vier onbekende: 2000, 320, 500, 60). Schuif (teken `0x42cad0`,
+klik `0x42d0ca`, zet `0x42d780`): 82 px, x = 47 + 82 x prijs / (2 x basis), klik zet prijs = basis x (x - 47) / 41 begrensd op 0..2,
+dus **bereik 0..2 x basis, per pixel, start = basis (midden)**; getal naast de schuif = de prijs. Straf per misdaad: (x - 47) / 27 begrensd
+op 0..3, byte, dus **4 standen** (duim omhoog 0 .. duim omlaag 3), start 0 in alle .MIS. Misdaadnamen in de EXE: Nowt, Swearing, Arson,
+Murder, Assault, Stealing. In het .MIS-spelerrecord staan de prijzen als `i16` vanaf `+84` (index x 2; water `+84`, ei `+92`, brood `+96`,
+cider `+100`, belasting `+104`, kerk `+106`, melk `+118`), gelijk aan de basis in alle M1..M30 en alle 5 records, behalve kerk 200 in
+M1-4/14/18/25 en belasting 0 in M2/M18. Wat de prijs in de sim doet (per verkoop, per seizoen) is niet uitgezocht.
+**Remake** (`spel/sim/handel.gd`, `spel/view/prijzen.gd`, spel.json `handel`): alleen brood/melk/ei, basis en bereik zoals het origineel,
+prijs per verkoop naar de kas, - / + = 0,1 x basis (eigen keuze); geluk loopt naar 0,75 - 0,75 x prijsdruk (prijs / basis - 1, gemiddeld),
+dus 0,75 op de basis zoals voorheen, 0 als alles op max (eigen keuze), laag geluk versnelt
 de ouderdom (`sim/leven.gd`); misdaad alleen met `missies.N.misdaad.aan` (nu geen missie), kans en zwaarte (vloeken > diefstal >
 mishandeling > moord) groeien met het ongeluk. Scherm pauzeert de sim, +/- en klikken/slepen op de balk (muis en touch), toets O.
-Eigen keuze: alle getallen, geen straf-schuiven, geen water/cider/kerk/belasting (komen met put, brouwerij, kerk, belastinginner).
+Eigen keuze: overige getallen, geen straf-schuiven, geen water/cider/kerk/belasting (komen met put, brouwerij, kerk, belastinginner).
 Test `spel/test/economie_test.gd`, frame `spel/screenshots/prijzen.jpg` (`--scenario=prijzen`).
 
 ## Lokale bestanden (niet in git)

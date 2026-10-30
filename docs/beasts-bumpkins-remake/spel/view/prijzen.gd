@@ -58,17 +58,18 @@ func bouw(wereld: Wereld) -> void:
 		naam.custom_minimum_size = Vector2(84, 0)
 		rij.add_child(naam)
 		var min_k := _knop("-")
-		min_k.pressed.connect(func() -> void: zet(waar, w.handel.prijs(waar) - 1))
+		min_k.pressed.connect(func() -> void: zet(waar, w.handel.prijs(waar) - w.handel.stap(waar)))
 		rij.add_child(min_k)
 		var b := Balk.new()
 		b.custom_minimum_size = Vector2(190, 40)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.gekozen.connect(func(f: float) -> void:
-			zet(waar, w.handel.prijs_min() + roundi(f * float(w.handel.prijs_max() - w.handel.prijs_min()))))
+			w.handel.zet_deel(waar, f)
+			_ververs())
 		rij.add_child(b)
 		balken[waar] = b
 		var plus_k := _knop("+")
-		plus_k.pressed.connect(func() -> void: zet(waar, w.handel.prijs(waar) + 1))
+		plus_k.pressed.connect(func() -> void: zet(waar, w.handel.prijs(waar) + w.handel.stap(waar)))
 		rij.add_child(plus_k)
 		var v := _label("", 19)
 		v.custom_minimum_size = Vector2(70, 0)
@@ -162,11 +163,9 @@ func wissel() -> void:
 
 
 func _ververs() -> void:
-	var span := float(maxi(1, w.handel.prijs_max() - w.handel.prijs_min()))
 	for waar in balken:
-		var p := w.handel.prijs(waar)
-		(balken[waar] as Balk).zet(float(p - w.handel.prijs_min()) / span)
-		(waarden[waar] as Label).text = "%d goud" % p
+		(balken[waar] as Balk).zet(w.handel.deel(waar))
+		(waarden[waar] as Label).text = "%d goud" % w.handel.prijs(waar)
 	var g := w.handel.dorp_geluk(w)
 	geluk_balk.zet(g)
 	geluk_label.text = "%d%%" % roundi(g * 100.0)

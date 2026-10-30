@@ -6,9 +6,12 @@ extends RefCounted
 ## diefstal, mishandeling, moord) de straf, van duim omhoog tot duim omlaag. De remake heeft alleen de waren uit
 ## Wereld.WAREN (brood, melk, ei); water, cider, tiende en belasting komen met put, brouwerij, kerk en belastinginner.
 ##
-## - Prijs per waar (`prijs` [min, max], start economie.prijs_per_stuk): wat de kas krijgt per verkoop (Wereld.klus_af).
-## - Geluk per dorpeling 0..1 (Dorpeling.geluk): loopt met `geluk_per_s` naar 1 - prijsdruk (gemiddelde over de waren
-##   van (prijs - min) / (max - min), maal `druk_gewicht`). Hint 2-3: hoge prijzen maken ontevreden en ontevreden
+## - Prijs per waar: wat de kas krijgt per verkoop (Wereld.klus_af). Origineel (BEASTS.EXE, zie missies.md): per waar
+##   een basisprijs (`basis`), de schuif loopt van 0 tot 2 x basis (`bereik` [0, 2] als deel van de basis) en start op
+##   de basis (midden). - / + in het scherm schuiven `knop_stap` x basis.
+## - Geluk per dorpeling 0..1 (Dorpeling.geluk): loopt met `geluk_per_s` naar `geluk_basis` - `druk_gewicht` x prijsdruk,
+##   prijsdruk = gemiddelde over de waren van prijs / basis - 1 (-1 alles gratis, 0 basis, +1 alles op het maximum).
+##   Hint 2-3: hoge prijzen maken ontevreden en ontevreden
 ##   mensen leven korter (dat laatste doet sim/leven.gd met leven.ongeluk_versnelt). Elke misdaad kost iedereen
 ##   `misdaad_ongeluk` (hint 13-4: misdaad maakt de dorpelingen ongelukkig tot je er iets aan doet).
 ## - Misdaad, alleen als de missie `misdaad.aan` heeft (origineel pas in missie 13, met gevangenis en pikenier): elke
@@ -25,36 +28,54 @@ var veroordelingen := 0    ## origineel Convictions; nog altijd 0 (geen gevangen
 var inkomsten := 0         ## kas uit verkoop (origineel Trade/Income)
 var _c: Dictionary = {}
 var _t := 0.0
-var _start := 3            ## startprijs: economie.prijs_per_stuk (beasts-src VISIT_PRICE)
 var rng := RandomNumberGenerator.new()
 
 
 func _init(w: Wereld) -> void:
 	_c = w.spel.get("handel", {})
 	rng.seed = 7
-	_start = int(w.spel["economie"].get("prijs_per_stuk", 3))
 	for waar in Wereld.WAREN:
-		prijzen[waar] = _start
+		prijzen[waar] = basis(waar)
 	for s in SOORTEN:
 		misdaden[s] = 0
 
 
-func prijs_min() -> int:
-	return int(_c.get("prijs", [1, 9])[0])
+## Basisprijs (startwaarde, midden van de schuif) van een waar; origineel per waar uit BEASTS.EXE.
+func basis(waar: String) -> int:
+	return maxi(1, int(_c.get("basis", {}).get(waar, 50)))
 
 
-func prijs_max() -> int:
-	return int(_c.get("prijs", [1, 9])[1])
+func prijs_min(waar: String) -> int:
+	return roundi(float(basis(waar)) * float(_c.get("bereik", [0, 2])[0]))
+
+
+func prijs_max(waar: String) -> int:
+	return roundi(float(basis(waar)) * float(_c.get("bereik", [0, 2])[1]))
+
+
+## Wat - / + in het scherm verschuift (eigen keuze; de schuif zelf is per pixel, origineel basis / 41).
+func stap(waar: String) -> int:
+	return maxi(1, roundi(float(basis(waar)) * float(_c.get("knop_stap", 0.1))))
 
 
 func prijs(waar: String) -> int:
-	return int(prijzen.get(waar, _start))
+	return int(prijzen.get(waar, basis(waar)))
 
 
-## Zet de prijs (begrensd op [min, max]); geeft de nieuwe prijs.
+## Zet de prijs (begrensd op [min, max] van die waar); geeft de nieuwe prijs.
 func zet_prijs(waar: String, p: int) -> int:
-	prijzen[waar] = clampi(p, prijs_min(), prijs_max())
+	prijzen[waar] = clampi(p, prijs_min(waar), prijs_max(waar))
 	return prijzen[waar]
+
+
+## Zet de prijs als deel `f` van de schuif (0 = min, 1 = max), zoals klikken op de balk.
+func zet_deel(waar: String, f: float) -> int:
+	return zet_prijs(waar, prijs_min(waar) + roundi(clampf(f, 0.0, 1.0) * float(prijs_max(waar) - prijs_min(waar))))
+
+
+## Waar de schuif staat, 0 (min) .. 1 (max).
+func deel(waar: String) -> float:
+	return float(prijs(waar) - prijs_min(waar)) / float(maxi(1, prijs_max(waar) - prijs_min(waar)))
 
 
 ## Een verkoop: de prijs voor de kas.
@@ -64,17 +85,16 @@ func verkoop(waar: String) -> int:
 	return p
 
 
-## 0 (alles op het minimum) .. 1 (alles op het maximum).
+## Gemiddelde over de waren van prijs / basis - 1: -1 (alles gratis), 0 (alles op de basis), +1 (bij bereik [0, 2] alles op het maximum).
 func prijsdruk() -> float:
-	var span := float(maxi(1, prijs_max() - prijs_min()))
 	var som := 0.0
 	for waar in prijzen:
-		som += float(prijzen[waar] - prijs_min()) / span
+		som += float(prijzen[waar]) / float(basis(waar)) - 1.0
 	return som / maxf(1.0, float(prijzen.size()))
 
 
 func geluk_doel() -> float:
-	return clampf(1.0 - prijsdruk() * float(_c.get("druk_gewicht", 1.0)), 0.0, 1.0)
+	return clampf(float(_c.get("geluk_basis", 0.75)) - prijsdruk() * float(_c.get("druk_gewicht", 0.75)), 0.0, 1.0)
 
 
 ## Gemiddeld geluk van het dorp (HUD), 0..1.

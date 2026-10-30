@@ -10,8 +10,12 @@ var fouten := 0
 func _initialize() -> void:
 	var w := Wereld.new()
 	_check(w.laad(), "missie 1 laadt")
-	var start := int(w.spel["economie"]["prijs_per_stuk"])
-	_check(w.handel.prijs("brood") == start, "startprijs brood = economie.prijs_per_stuk (%d)" % start)
+	var start := w.handel.basis("brood")
+	_check(start == 50 and w.handel.prijs("brood") == start, "startprijs brood = basis uit het origineel (%d)" % start)
+	_check(w.handel.prijs("ei") == 80 and w.handel.prijs("melk") == 100, "startprijs ei 80, melk 100 (origineel)")
+	_check(w.handel.prijs_min("ei") == 0 and w.handel.prijs_max("ei") == 160, "schuif ei 0..2 x basis (%d..%d)" % [w.handel.prijs_min("ei"), w.handel.prijs_max("ei")])
+	_check(absf(w.handel.deel("ei") - 0.5) < 0.001, "startprijs = midden van de schuif")
+	_check(absf(w.handel.prijsdruk()) < 0.001, "alles op de basis -> prijsdruk 0")
 	var molen := _bouw(w, &"molen")
 	# verkoop tegen de startprijs en tegen een hogere
 	var d: Dorpeling = w.dorpelingen[0]
@@ -20,12 +24,13 @@ func _initialize() -> void:
 	w.handel.zet_prijs("brood", start + 4)
 	var bij_hoog := _verkoop(w, d, molen)
 	_check(bij_hoog == start + 4 and bij_hoog > bij_start, "prijs omhoog -> meer kas per verkoop (%d > %d)" % [bij_hoog, bij_start])
-	_check(w.handel.zet_prijs("brood", 999) == w.handel.prijs_max(), "prijs begrensd op het maximum")
-	_check(w.handel.zet_prijs("brood", -5) == w.handel.prijs_min(), "prijs begrensd op het minimum")
+	_check(w.handel.zet_prijs("brood", 999) == w.handel.prijs_max("brood"), "prijs begrensd op het maximum")
+	_check(w.handel.zet_prijs("brood", -5) == w.handel.prijs_min("brood"), "prijs begrensd op het minimum")
+	_check(w.handel.zet_deel("melk", 1.0) == 200, "schuif helemaal rechts -> melk 2 x basis")
 
 	# geluk: twee dorpen, een met alles goedkoop en een met alles duur, 200 s
-	var goedkoop := _dorp(w.handel.prijs_min())
-	var duur := _dorp(w.handel.prijs_max())
+	var goedkoop := _dorp(0.0)
+	var duur := _dorp(1.0)
 	var g0 := goedkoop.handel.dorp_geluk(goedkoop)
 	var g1 := duur.handel.dorp_geluk(duur)
 	_check(g1 < g0 - 0.5, "hoge prijzen -> lager geluk (%.2f < %.2f)" % [g1, g0])
@@ -49,7 +54,7 @@ func _initialize() -> void:
 	_loop(goedkoop, 300.0)
 	_check(goedkoop.handel.totaal_misdaden() == 0, "misdaad aan maar tevreden dorp: geen misdaden")
 	# mishandeling raakt het slachtoffer, misdaad maakt iedereen ongelukkiger
-	var w3 := _dorp(w.handel.prijs_max())
+	var w3 := _dorp(1.0)
 	var dader: Dorpeling = null
 	var slachtoffer: Dorpeling = null
 	for x in w3.dorpelingen:
@@ -83,8 +88,9 @@ func _initialize() -> void:
 	var t := w.tijd_s
 	w.vooruit(1.0)
 	_check(w.tijd_s == t, "op pauze loopt de tijd niet")
-	scherm.zet("melk", w.handel.prijs("melk") + 1)
-	_check(w.handel.prijs("melk") == start + 1, "+ in het scherm zet de prijs")
+	var melk := w.handel.zet_prijs("melk", w.handel.basis("melk"))
+	scherm.zet("melk", melk + w.handel.stap("melk"))
+	_check(w.handel.prijs("melk") == melk + 10, "+ in het scherm zet de prijs (stap 0,1 x basis = %d)" % w.handel.stap("melk"))
 	scherm.sluit()
 	_check(not w.gepauzeerd and not scherm.visible, "scherm dicht -> sim loopt weer")
 	w.gepauzeerd = true
@@ -97,12 +103,12 @@ func _initialize() -> void:
 	quit(0 if fouten == 0 else 1)
 
 
-## Missie 1 met alle prijzen op `p`, 200 s gedraaid.
-func _dorp(p: int) -> Wereld:
+## Missie 1 met alle schuiven op deel `f` (0 = min, 1 = max), 200 s gedraaid.
+func _dorp(f: float) -> Wereld:
 	var w := Wereld.new()
 	w.laad()
 	for waar in Wereld.WAREN:
-		w.handel.zet_prijs(waar, p)
+		w.handel.zet_deel(waar, f)
 	_loop(w, 200.0)
 	return w
 
