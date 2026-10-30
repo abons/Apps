@@ -29,7 +29,8 @@ func bouw(wereld: Wereld, wereld_view: Node3D) -> void:
 
 
 func _maak(wf: Wolf) -> void:
-	var n := WolfModel.maak()
+	var soort = wf.get("soort")      # sim/wolf.gd kan een soort zetten (missie 3: donkere wolf); anders grijs
+	var n := WolfModel.maak(StringName(soort) if soort != null else &"wolf")
 	n.name = "Wolf_%d" % wf.id
 	add_child(n)
 	n.position = _wereld_pos(wf, 1.0)
@@ -75,7 +76,7 @@ func _process(dt: float) -> void:
 		n.rotation.y = lerp_angle(n.rotation.y, yaw, minf(1.0, dt * 8.0))
 		# poten: een volle pas (2 PI) per ~0,9 m afgelegde grond
 		u["fase"] = float(u["fase"]) + stap / 0.9 * TAU
-		WolfModel.werk(n, wf, u["fase"], _t, dt * maxf(tempo, 0.01))
+		WolfModel.werk(n, wf, u["fase"], _t, dt * maxf(tempo, 0.01), tempo)
 		var hp := n.get_node("Hp") as Node3D
 		if hp.visible and cam != null:
 			hp.look_at(cam.global_position, Vector3.UP, true)    # quad met de voorkant (+Z) naar de camera

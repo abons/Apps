@@ -1,0 +1,32 @@
+{
+  "idle": {
+    "loop": true,
+    "duur_s": 4.0,
+    "snelheid_mps": 0.0,
+    "impact_s": null
+  },
+  "lopen": {
+    "loop": true,
+    "duur_s": 1.0833,
+    "snelheid_mps": 0.9,
+    "impact_s": null
+  },
+  "rennen": {
+    "loop": true,
+    "duur_s": 0.4583,
+    "snelheid_mps": 2.7,
+    "impact_s": null
+  },
+  "bijten": {
+    "loop": true,
+    "duur_s": 0.9167,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.375
+  },
+  "dood": {
+    "loop": false,
+    "duur_s": 1.0,
+    "snelheid_mps": 0.0,
+    "impact_s": 0.7917
+  }
+}

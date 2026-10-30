@@ -59,7 +59,8 @@ foreach ($t in Get-ChildItem (Join-Path $nat 'textures\terrein_*.jpg')) {
 Write-Host "gekopieerd: terreintexturen"
 # de wind-shader is bron in modellen/natuur; shaders/natuur_wind.gdshader is de gesynchroniseerde kopie
 Copy-Item (Join-Path $nat 'natuur_wind.gdshader') (Join-Path $PSScriptRoot 'shaders\natuur_wind.gdshader') -Force
-foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json')) {
+foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json',
+                 '..\modellen\dieren\wolf.glb', '..\modellen\dieren\donkere_wolf.glb', '..\modellen\dieren\wolf_anim.json')) {
     $src = Join-Path $PSScriptRoot $b
     if (Test-Path $src) { Copy-Item $src (Join-Path $assets (Split-Path $src -Leaf)) -Force; Write-Host "gekopieerd: assets/$(Split-Path $src -Leaf)" }
     else { Write-Host "ontbreekt (overgeslagen): $b" }

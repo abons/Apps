@@ -90,22 +90,11 @@ static func _placeholder(naam: String, ob: Dictionary) -> Node3D:
 	return n
 
 
-## Missie 2, nog zonder glb: grijze wolf uit blokken (lijf, kop, snuit, oren, poten, staart), kijkt langs +Z.
+## Wolf als kaartobject (zelden: kaartwolven worden een Wolf in de sim): het wolfmodel in rust, zonder hp-balkje.
 static func _wolf(n: Node3D) -> void:
-	var m := _mat(Color(0.42, 0.40, 0.38), 0.95)
-	var delen := [[Vector3(0.32, 0.30, 0.85), Vector3(0, 0.55, 0)], [Vector3(0.28, 0.26, 0.30), Vector3(0, 0.72, 0.52)],
-		[Vector3(0.14, 0.12, 0.20), Vector3(0, 0.66, 0.74)], [Vector3(0.07, 0.12, 0.05), Vector3(-0.09, 0.90, 0.50)],
-		[Vector3(0.07, 0.12, 0.05), Vector3(0.09, 0.90, 0.50)], [Vector3(0.08, 0.40, 0.08), Vector3(-0.11, 0.2, 0.3)],
-		[Vector3(0.08, 0.40, 0.08), Vector3(0.11, 0.2, 0.3)], [Vector3(0.08, 0.40, 0.08), Vector3(-0.11, 0.2, -0.3)],
-		[Vector3(0.08, 0.40, 0.08), Vector3(0.11, 0.2, -0.3)], [Vector3(0.08, 0.08, 0.40), Vector3(0, 0.62, -0.58)]]
-	for dl in delen:
-		var b := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = dl[0]
-		b.mesh = bm
-		b.material_override = m
-		b.position = dl[1]
-		n.add_child(b)
+	var w := WolfModel.maak()
+	(w.get_node("Hp") as Node3D).visible = false
+	n.add_child(w)
 
 
 ## Goudbuidel (origineel `gold`): bruine zak met een paar munten.

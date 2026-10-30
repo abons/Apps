@@ -1,9 +1,15 @@
 class_name WolfModel
 extends RefCounted
-## Wolf-placeholder (missie 2) tot er een wolf-glb is: een handvol meshes in de kleuren van het goedgekeurde concept
-## (lokaal/concept/img/wolf.jpg: grijs, lichte keel en snuit, zwarte neus, rode ogen). Kijkt langs +Z, zoals Bumpkin.
-## `werk()` beweegt hem uit de sim-toestand (sim/wolf.gd): poten op de loopsnelheid, kop naar voren bij een beet,
-## omvallen bij DYING, wegzakken als het karkas vergaat. Schoft ~0,65 m (een volwassen Bumpkin is 1,37 m).
+## De wolf (missie 2 en 3): assets/wolf.glb of assets/donkere_wolf.glb + wolf_anim.json (uit modellen/dieren/wolf.py;
+## clips idle, lopen, rennen, bijten, dood). Kijkt langs +Z, zoals Bumpkin. `werk()` kiest de clip uit de sim-toestand
+## (sim/wolf.gd): lopen/rennen op de loopsnelheid, bijten en dood op `slag` (deterministisch, zoals de sim), en het karkas
+## zakt weg als het vergaat. Zonder glb (assets/ staat niet in git) de oude placeholder uit meshes.
+## Soorten: &"wolf" (grijs) en &"donkere_wolf" (zwart met witte borst, sprites dw_*; iets groter).
+
+const GLB := {&"wolf": "res://assets/wolf.glb", &"donkere_wolf": "res://assets/donkere_wolf.glb"}
+const ANIM := "res://assets/wolf_anim.json"
+const SCHAAL := {&"wolf": 1.0, &"donkere_wolf": 1.08}
+const REN_MPS := 1.5            ## boven deze sim-snelheid de galop
 
 const GRIJS := Color(0.47, 0.47, 0.46)
 const DONKER := Color(0.33, 0.33, 0.33)
@@ -62,7 +68,39 @@ static func _kegel(r: float, h: float) -> CylinderMesh:
 	return c
 
 
-static func maak() -> Node3D:
+static func maak(soort: StringName = &"wolf") -> Node3D:
+	var pad: String = GLB.get(soort, GLB[&"wolf"])
+	if not ResourceLoader.exists(pad):
+		return _placeholder()
+	var n := Node3D.new()
+	n.name = "Wolf"
+	var lijf: Node3D = (load(pad) as PackedScene).instantiate()
+	lijf.name = "Lijf"
+	lijf.scale = Vector3.ONE * float(SCHAAL.get(soort, 1.0))
+	n.add_child(lijf)
+	var ap := _speler(lijf)
+	if ap:
+		var d = Gegevens.lees(ANIM)
+		for naam in ap.get_animation_list():
+			if d is Dictionary and d.has(naam) and d[naam].get("loop", false):
+				ap.get_animation(naam).loop_mode = Animation.LOOP_LINEAR
+		ap.play(&"idle")
+	_hp(n)
+	return n
+
+
+static func _speler(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n
+	for c in n.get_children():
+		var r := _speler(c)
+		if r:
+			return r
+	return null
+
+
+## Blokken-wolf zonder glb (poten aan scharnieren, zie werk_placeholder).
+static func _placeholder() -> Node3D:
 	var n := Node3D.new()
 	n.name = "Wolf"
 	var lijf := Node3D.new()          # alles behalve het hp-balkje: kantelt bij het omvallen
@@ -112,7 +150,12 @@ static func maak() -> Node3D:
 	st.position = Vector3(0, 0.68, -0.5)
 	lijf.add_child(st)
 	_mesh(st, _capsule(0.075, 0.5), donker, Vector3(0, -0.12, -0.18), Vector3(-2.4, 0, 0))
-	# hp-balkje (WolvenView draait het naar de camera)
+	_hp(n)
+	return n
+
+
+## Hp-balkje (WolvenView draait het naar de camera).
+static func _hp(n: Node3D) -> void:
 	var hp := Node3D.new()
 	hp.name = "Hp"
 	hp.position = Vector3(0, 1.25, 0)
@@ -138,11 +181,60 @@ static func maak() -> Node3D:
 	var vul := _mesh(hp, q2, vg, Vector3(-0.29, 0, 0.001))
 	vul.name = "Vul"
 	vul.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return n
 
 
-## Eén frame: `fase` loopt mee met de afgelegde weg (poten), `t` is de view-tijd (staart, adem).
-static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float) -> void:
+## Eén frame. `tempo` = speltempo (0 bij pauze); `fase`/`t`/`dt` alleen voor de placeholder.
+static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float, tempo := 1.0) -> void:
+	var lijf := n.get_node("Lijf") as Node3D
+	var ap := _speler(lijf)
+	if ap == null:
+		_werk_placeholder(n, wf, fase, t, dt)
+	else:
+		_werk_glb(ap, lijf, wf, tempo)
+	var hp := n.get_node("Hp") as Node3D
+	hp.visible = wf.leeft() and (wf.hp < wf.hp_max or wf.geraakt < 3.0)
+	if hp.visible:
+		(hp.get_node("Vul") as Node3D).scale.x = maxf(0.001, float(wf.hp) / float(wf.hp_max))
+
+
+static func _clip_v(naam: String) -> float:
+	var d = Gegevens.lees(ANIM)
+	return float(d[naam]["snelheid_mps"]) if d is Dictionary and d.has(naam) else 1.0
+
+
+## Clip op een vaste plek (bijten/dood volgen `slag` van de sim, dus geen eigen klok).
+static func _zet(ap: AnimationPlayer, naam: StringName, u: float) -> void:
+	if ap.current_animation != naam:
+		ap.play(naam, 0.12)
+	ap.speed_scale = 0.0
+	ap.seek(clampf(u, 0.0, 1.0) * ap.get_animation(naam).length, true)
+
+
+static func _speel(ap: AnimationPlayer, naam: StringName, snelheid: float) -> void:
+	if ap.current_animation != naam:
+		ap.play(naam, 0.25)
+	ap.speed_scale = snelheid
+
+
+static func _werk_glb(ap: AnimationPlayer, lijf: Node3D, wf: Wolf, tempo: float) -> void:
+	lijf.position.y = 0.0
+	match wf.toestand:
+		Wolf.DYING:
+			_zet(ap, &"dood", wf.slag)
+		Wolf.DEAD:
+			_zet(ap, &"dood", 1.0)
+			lijf.position.y = -0.5 * clampf((wf.slag - 0.7) / 0.3, 0.0, 1.0)   # laatste 30 %: zakt weg
+		Wolf.ATTACK:
+			_zet(ap, &"bijten", wf.slag)
+		_:
+			if wf.snelheid_mps > 0.05:
+				var clip := &"rennen" if wf.snelheid_mps > REN_MPS else &"lopen"
+				_speel(ap, clip, wf.snelheid_mps * tempo / _clip_v(String(clip)))
+			else:
+				_speel(ap, &"idle", tempo)
+
+
+static func _werk_placeholder(n: Node3D, wf: Wolf, fase: float, t: float, dt: float) -> void:
 	var lijf := n.get_node("Lijf") as Node3D
 	var kop := lijf.get_node("Kop") as Node3D
 	var st := lijf.get_node("Staart") as Node3D
@@ -180,7 +272,3 @@ static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float) -> void:
 			lijf.position.y = 0.19 - 0.5 * clampf((wf.slag - 0.7) / 0.3, 0.0, 1.0)   # laatste 30 %: zakt weg
 		_:
 			lijf.rotation.z = 0.0
-	var hp := n.get_node("Hp") as Node3D
-	hp.visible = wf.leeft() and (wf.hp < wf.hp_max or wf.geraakt < 3.0)
-	if hp.visible:
-		(hp.get_node("Vul") as Node3D).scale.x = maxf(0.001, float(wf.hp) / float(wf.hp_max))
