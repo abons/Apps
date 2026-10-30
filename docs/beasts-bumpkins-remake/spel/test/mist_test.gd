@@ -2,6 +2,7 @@ extends SceneTree
 ## Headless simtest mist van oorlog (sim/mist.gd): godot --headless --path . --script res://test/mist_test.gd
 ## Start verkend rond vlag en kampvuur, ver weg nog zwart; lopen verkent en verkend blijft verkend; `leeg` wordt nooit
 ## verkend, ook niet als alles om een dorpeling heen open gaat; uit = alles zichtbaar; missie 1-3 alle drie.
+## Startgebied omvat de voorgebouwde eigen gebouwen (M2 boerderij, M3 hut/put/gilde) met een cirkel start_straal.
 
 var fouten := 0
 
@@ -9,6 +10,8 @@ var fouten := 0
 func _initialize() -> void:
 	for nr in [1, 2, 3]:
 		_test_start(nr)
+	for nr in [2, 3]:
+		_test_startgebouwen(nr)
 	_test_lopen()
 	_test_leeg()
 	_test_uit()
@@ -33,6 +36,35 @@ func _test_start(nr: int) -> void:
 		tot += w.bereik[i]
 	print("  M%d start verkend %d tegels, bereikbaar %d" % [nr, n, tot])
 	_check(n > 150 and n < tot / 2, "M%d startgebied klein maar niet leeg (%d)" % [nr, n])
+
+
+## Elke niet-lege tegel binnen start_straal - 0,5 van een voorgebouwd gebouw is verkend, en minstens een deel daarvan
+## ligt buiten de cirkels om vlag en kampvuur (anders bewijst het niets).
+func _test_startgebouwen(nr: int) -> void:
+	var w := Wereld.new()
+	w.laad("", nr)
+	var m := w.mist
+	var r := w.raster
+	var li := r.namen.find("leeg")
+	var geb := m.startgebouwen(w)
+	var verwacht := 3 if nr == 3 else 1
+	_check(geb.size() == verwacht, "M%d %d voorgebouwde eigen gebouwen gevonden (%s)" % [nr, verwacht, geb])
+	var vlag := Mist.eigen_vlag(w)
+	var s := m.start_straal - 0.5
+	var mis := 0
+	var extra := 0
+	for g in geb:
+		for dy in range(-8, 9):
+			for dx in range(-8, 9):
+				var t := g + Vector2i(dx, dy)
+				if Vector2(dx, dy).length() > s or not r.in_kaart(t.x, t.y) or r.soort[r.idx(t.x, t.y)] == li:
+					continue
+				if not m.is_verkend(t):
+					mis += 1
+				if Vector2(t - vlag).length() > m.start_straal + 0.5 and Vector2(t - w.kampvuur).length() > m.start_straal + 0.5:
+					extra += 1
+	_check(mis == 0, "M%d cirkel om elk voorgebouwd gebouw verkend (%d missen)" % [nr, mis])
+	_check(extra > 0, "M%d gebouwcirkels reiken voorbij vlag en kampvuur (%d tegels)" % [nr, extra])
 
 
 func _test_lopen() -> void:

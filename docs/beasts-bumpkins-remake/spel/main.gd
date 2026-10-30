@@ -1,7 +1,7 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend
-## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*-scenario's, uit in de
+## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kippen|bouwer|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart
+## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
 
@@ -16,6 +16,7 @@ var scenario := ""
 var voorwerpen: Node3D            # view/voorwerpen_view.gd
 var hints: Hints                  # sim/hints.gd, alleen in gewoon spel en --scenario=hints
 var szt := 0.0
+const RAND_M := 12.0              ## m marge buiten het 192x192-raster voor de camera (alleen met mist)
 var _stap := 0
 
 
@@ -38,7 +39,7 @@ func _ready() -> void:
 	if opt.has("regen"):
 		w.regen_handmatig = 1
 	scenario = opt.get("scenario", "")
-	var mist_aan := scenario == "" or scenario.begins_with("mist")
+	var mist_aan := scenario == "" or scenario.begins_with("mist") or scenario == "minikaart"
 	if opt.has("mist"):
 		mist_aan = opt["mist"] != "uit"
 	w.mist.zet_aan(mist_aan)
@@ -72,6 +73,8 @@ func _ready() -> void:
 	var e := w.eiland
 	var m := w.tegel_m
 	cam.grens = Rect2(e.position.x * m - 6.0, e.position.y * m - 6.0, e.size.x * m + 12.0, e.size.y * m + 12.0)
+	if w.mist.aan:   # het origineel liet je ver het zwart in scrollen: het hele raster plus marge (mist maakt alles zwart)
+		cam.grens = Rect2(-RAND_M, -RAND_M, w.raster.kolommen * m + 2.0 * RAND_M, w.raster.rijen * m + 2.0 * RAND_M)
 	var vuur := view.terrein.tegel_midden(w.kampvuur)
 	cam.zet_direct(vuur, 0.6, deg_to_rad(38), 24.0)
 	cam.make_current()
@@ -173,6 +176,16 @@ func _start_scenario() -> void:
 			bestuur.geef_loopbevel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(22, -4)))
 			w.tempo = 4.0
 			cam.zet_direct(vuur + Vector3(16, 0, -4), 0.6, deg_to_rad(52), 62.0)
+		"minikaart":
+			# gewone startcamera; alle dorpelingen lopen 22 tegels naar het oosten (4x); na 8 s een klik op de minikaart
+			# op de voorste dorpeling: de camera springt erheen (view/minikaart.gd)
+			bestuur.gekozen = w.dorpelingen.map(func(d: Dorpeling) -> int: return d.id)
+			bestuur.geef_loopbevel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(22, -4)))
+			w.tempo = 4.0
+			cam.zet_direct(vuur, 0.6, deg_to_rad(40), 26.0)
+		"mist_rand":
+			# de camera in de hoek van het raster (grens met mist: raster + RAND_M), van ver: alleen zwart
+			cam.zet_direct(Vector3(-RAND_M, 0, -RAND_M), 0.6, deg_to_rad(30), 125.0)
 		"overzicht":
 			cam.zet_direct(eiland_m, 0.5, deg_to_rad(52), 125.0)
 		"kaart":
@@ -470,6 +483,26 @@ func _scenario_stap() -> void:
 	match scenario:
 		"hints":
 			_hints_stap()
+		"minikaart":
+			if _stap == 0 and szt >= 8.0:
+				_stap = 1
+				var mk := hud.minikaart
+				var voor: Dorpeling = w.dorpelingen[0]
+				for d in w.dorpelingen:
+					if d.pos.x > voor.pos.x:
+						voor = d
+				var p := mk.global_position + Vector2(Minikaart.RAND, Minikaart.RAND) + mk.naar_venster(voor.pos)
+				for druk in [true, false]:
+					var e := InputEventMouseButton.new()
+					e.button_index = MOUSE_BUTTON_LEFT
+					e.pressed = druk
+					e.position = p
+					e.global_position = p
+					Input.parse_input_event(e)
+				print("[scenario] klik minikaart op ", voor.tegel(), " (", p, ")")
+			elif _stap == 1 and szt >= 8.5:
+				_stap = 2
+				print("[scenario] camerabrandpunt nu tegel ", Vector2(cam.focus.x, cam.focus.z) / w.tegel_m)
 		"beker":
 			if _wolf_man == null or Voorwerpen.alle(w).is_empty():
 				return

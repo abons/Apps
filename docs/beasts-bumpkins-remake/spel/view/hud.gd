@@ -1,10 +1,12 @@
 class_name Hud
 extends CanvasLayer
-## Minimale HUD: tijd, seizoen, weer, selectie, tempo. Rechtsonder de besturing.
+## Minimale HUD: linksboven de minikaart (view/minikaart.gd, zoals het origineel), daaronder tijd, seizoen, weer,
+## selectie, tempo. Linksonder de besturing.
 
 var w: Wereld
 var bestuur: Bestuur
 var label: Label
+var minikaart: Minikaart
 var hulp: Label
 var kader: Control
 var uitslag: Label
@@ -18,8 +20,11 @@ var _pauzeerde := false          ## de briefing zette de sim op pauze
 func bouw(wereld: Wereld, b: Bestuur) -> void:
 	w = wereld
 	bestuur = b
+	minikaart = Minikaart.new()
+	add_child(minikaart)
+	minikaart.bouw(w, b.cam, b.view.terrein if b.view != null else null)
 	var pc := PanelContainer.new()
-	pc.position = Vector2(12, 12)
+	pc.position = Vector2(12, minikaart.position.y + minikaart.size.y + 8)
 	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc.add_theme_stylebox_override("panel", _stijl())
 	label = Label.new()

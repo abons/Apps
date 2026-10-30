@@ -1,5 +1,6 @@
 extends Camera3D
-## RTS-camera: draaien om een brandpunt, pannen, zoomen van deurhoogte (~2 m) tot eilandoverzicht (~130 m), begrensd tot het eiland.
+## RTS-camera: draaien om een brandpunt, pannen, zoomen van deurhoogte (~2 m) tot eilandoverzicht (~130 m), begrensd
+## tot `grens` (main.gd: met mist het hele raster plus marge, zoals het origineel ver het zwart in liet scrollen).
 ## Alle invoer zet doelwaarden; _process loopt er zacht naartoe.
 
 const AFSTAND_MIN := 2.0
@@ -18,7 +19,7 @@ var yaw := doel_yaw
 var pitch := doel_pitch
 var afstand := doel_afstand
 
-var grens := Rect2(-1e6, -1e6, 2e6, 2e6)   # m (x,z): waar het brandpunt mag komen, door main.gd op het eiland gezet
+var grens := Rect2(-1e6, -1e6, 2e6, 2e6)   # m (x,z): waar het brandpunt mag komen, door main.gd gezet
 var invoer_aan := true
 var rand_pannen := true
 var _draaien := false
@@ -35,6 +36,16 @@ func zet_direct(f: Vector3, y: float, p: float, a: float) -> void:
 	doel_focus = f; doel_yaw = y; doel_pitch = p; doel_afstand = a
 	focus = f; yaw = y; pitch = p; afstand = a
 	_plaats()
+
+
+## Brandpunt direct naar `f` (minikaart: klik = springen), binnen `grens`; hoek en zoom blijven.
+func spring_naar(f: Vector3) -> void:
+	f.x = clampf(f.x, grens.position.x, grens.end.x)
+	f.z = clampf(f.z, grens.position.y, grens.end.y)
+	doel_focus = f
+	focus = f
+	if is_inside_tree():
+		_plaats()
 
 
 func _unhandled_input(e: InputEvent) -> void:

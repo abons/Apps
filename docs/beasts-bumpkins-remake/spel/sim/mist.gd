@@ -2,8 +2,9 @@ class_name Mist
 extends RefCounted
 ## Mist van oorlog (fog of war), zoals het origineel (../mist.md): twee standen per tegel, onverkend (zwart) of
 ## verkend. Wat eenmaal verkend is blijft zichtbaar, ook als er niemand meer staat (het origineel kent geen grijze
-## "niet meer in zicht"-laag). Start: verkend rond de eigen vlag en het kampvuur (`mist.start_straal`), plus het zicht
-## van de startdorpelingen. Daarna verkent elke dorpeling binnen `mist.dorpeling` tegels en elk afgebouwd gebouw
+## "niet meer in zicht"-laag). Start: verkend rond het gebouwde gebied (gebruiker 2026-10-30): een cirkel
+## `mist.start_straal` om de eigen vlag, het kampvuur en elk voorgebouwd eigen gebouw (Wereld.voorgebouwd: hut, boerderij;
+## en eigen objecten uit `mist.start_objecten`: put, gilde), plus het zicht van de startdorpelingen. Daarna verkent elke dorpeling binnen `mist.dorpeling` tegels en elk afgebouwd gebouw
 ## binnen `mist.gebouw`. Tegel `leeg` (het buitengebied) wordt nooit verkend. Leest de wereld, schrijft er niets in;
 ## de view (view/mist_view.gd) leest `verkend` en `versie`.
 
@@ -13,6 +14,7 @@ var versie := 0                    ## telt op bij elke wijziging (view: textuur 
 var start_straal := 8.0
 var zicht_dorpeling := 4.0
 var zicht_gebouw := 4.0
+var start_objecten: Array = ["put", "voetvolkgilde"]
 var _laatst := {}                  ## dorpeling-id -> tegel waarop hij het laatst verkende
 var _gebouwd := {}                 ## Plan -> true: al verkend
 var _leeg := -1
@@ -26,6 +28,7 @@ func start(w: Wereld) -> void:
 	start_straal = float(def.get("start_straal", start_straal))
 	zicht_dorpeling = float(def.get("dorpeling", zicht_dorpeling))
 	zicht_gebouw = float(def.get("gebouw", zicht_gebouw))
+	start_objecten = def.get("start_objecten", start_objecten)
 	verkend.resize(_r.kolommen * _r.rijen)
 	verkend.fill(0)
 	_laatst.clear()
@@ -34,7 +37,21 @@ func start(w: Wereld) -> void:
 	var vlag := eigen_vlag(w)
 	if vlag.x >= 0:
 		onthul(vlag, start_straal)
+	for t in startgebouwen(w):
+		onthul(t, start_straal)
 	tik(w)
+
+
+## Tegels van de voorgebouwde eigen gebouwen bij de start: Wereld.voorgebouwd (nog voor plaats_voorgebouwd, de tegel
+## ligt in de latere voetafdruk) en eigen objecten (eigenaar 0) met een naam uit `start_objecten`.
+func startgebouwen(w: Wereld) -> Array[Vector2i]:
+	var uit: Array[Vector2i] = []
+	for vg in w.voorgebouwd:
+		uit.append(vg["tegel"])
+	for ob in w.objecten:
+		if int(ob.get("owner", 0)) == 0 and ob.get("naam", "") in start_objecten:
+			uit.append(Vector2i(int(ob["x"]), int(ob["y"])))
+	return uit
 
 
 ## Tegel van de eigen vlag (object "vlag", eigenaar 0) die het dichtst bij het kampvuur staat, (-1,-1) als er geen is.
