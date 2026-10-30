@@ -5,6 +5,8 @@ want die kunnen alleen op een telefoon of emulator opgenomen worden.
 
 ## Hier begint de volgende sessie
 
+- [ ] **Gebruiker zoekt uit (B&B):** gaf de kelk in missie 3 alleen +7.000, of ook de tweede regel +6.000 (M3.MIS heeft er twee; nu alleen +7.000)?
+
 Beasts & Bumpkins-remake (`docs/beasts-bumpkins-remake/`, stand in de README daar; originele data lokaal in `lokaal/`, niet in git):
 
 0. ⚠️ **Onafgemaakt werk in de werkmap (2026-10-30, 5 agents gestopt op budget, niets gecommit, niet getest):** M2- en M3-gameplay is gecommit (`35b8b3d`: leven/dood, wolven bijten, vluchten, levensloop, kas-beloningen, voetvolkgilde max 6, zwaard, put + dorst, donkere wolf = sex 29; sex 24 is een wesp, nog als wolf; tweede kelkregel +6.000 vuurt bewust niet; dorst verlengt het leven nog niet; frames `missie2_wolf.jpg`, `missie3_soldaat.jpg`, `missie3_put.jpg`), assets (wolf + donkere wolf, voetvolkgilde v3, voetsoldaat; typfout in `koepel`), APK (gecommit; Mobile/Vulkan op de emulator zwart na 3 pogingen, Compatibility-rooktest met `--mist=uit` speelt wel; nu de Motorola: zie `mobiel.md` "Stand APK"). Alle wijzigingen staan door elkaar in `spel/` (`git status`): eerst alle tests draaien, fouten herstellen, dan per onderwerp committen. Klaar gekomen na het stoppen: voetsoldaat-model (`15e8329`) en wolf + donkere wolf (`cc44598`; doodpose matig; de bruine koepel was een paddenstoel (klasse 83, schaal 2,3, bijna mensgroot) onder de scenario-koe). Prijzen/geluk/misdaad is gecommit (prijzenscherm, `--scenario=prijzen`, `test/economie_test.gd`). Nog geen missie met `misdaad.aan` (origineel M13), geen straf-schuiven per misdaad. Open vragen gebruiker: minikaartkader beoordelen tijdens spelen.
