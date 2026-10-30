@@ -30,6 +30,7 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	terrein.name = "Terrein_Wereld"
 	add_child(terrein)
 	terrein.bouw(w)
+	Prestatie.merk(" terrein")
 	_vuur = terrein.kampvuur_node
 	wegen = Wegen.new()
 	add_child(wegen)
@@ -39,6 +40,7 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	add_child(voorraad)
 	voorraad.bouw(w, terrein)
 
+	Prestatie.merk(" wegen + voorraad")
 	_ring_mesh = TorusMesh.new()
 	_ring_mesh.inner_radius = 0.50
 	_ring_mesh.outer_radius = 0.64
@@ -51,6 +53,7 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 
 	for d in w.dorpelingen:
 		_maak_unit(d)
+	Prestatie.merk(" dorpelingen")
 	w.dorpeling_erbij.connect(_maak_unit)
 	w.rol_veranderd.connect(func(d: Dorpeling) -> void: _zet_rol(d))
 	w.volwassen_geworden.connect(_wissel_model)    # jongen/meisje-glb wordt man/vrouw

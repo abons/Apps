@@ -42,10 +42,14 @@ func bouw(wereld: Wereld) -> void:
 	br = mini(e.end.x, w.raster.kolommen) - x0
 	ho = mini(e.end.y, w.raster.rijen) - y0
 	_bouw_terrein()
+	Prestatie.merk("  terrein-mesh")
 	_bouw_water()
 	_bouw_objecten()
+	Prestatie.merk("  water + kaartobjecten")
 	_bouw_bomen()
+	Prestatie.merk("  bomen")
 	_bouw_decoratie()
+	Prestatie.merk("  decoratie")
 	zet_sneeuwlaag(false, true)
 	print("[terrein] ", aantallen)
 
@@ -244,9 +248,13 @@ func _bouw_terrein() -> void:
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	terrein_mat = ShaderMaterial.new()
-	terrein_mat.shader = load("res://shaders/terrein.gdshader")
-	for soort in ["kleur", "normaal", "ruw"]:
-		terrein_mat.set_shader_parameter(soort + "_tex", _texturenset(soort))
+	if Prestatie.mobiel_beeld:   # telefoon: goedkope shader, alleen de kleurset (shaders/terrein_mobiel.gdshader)
+		terrein_mat.shader = load("res://shaders/terrein_mobiel.gdshader")
+		terrein_mat.set_shader_parameter("kleur_tex", _texturenset("kleur"))
+	else:
+		terrein_mat.shader = load("res://shaders/terrein.gdshader")
+		for soort in ["kleur", "normaal", "ruw"]:
+			terrein_mat.set_shader_parameter(soort + "_tex", _texturenset(soort))
 	m.surface_set_material(0, terrein_mat)
 	var mi := MeshInstance3D.new()
 	mi.name = "Terrein"

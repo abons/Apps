@@ -21,12 +21,15 @@ var _stap := 0
 
 
 func _ready() -> void:
+	Prestatie.merk("main _ready")
 	var opt := _opties()
 	w = Wereld.new()
 	if not w.laad("", int(opt.get("missie", "1"))):
 		push_error("main: wereld laden mislukt (draai sync.ps1 en --import)")
 		get_tree().quit(1)
 		return
+	Prestatie.merk("wereld geladen (sim)")
+	Voorladen.start(w.missie_nr)       # alleen mobiel: glb's parallel lezen (view/voorladen.gd)
 	if opt.has("seizoen"):
 		var i: int = Wereld.SEIZOENEN.find(opt["seizoen"])
 		if i >= 0:
@@ -57,10 +60,12 @@ func _ready() -> void:
 	licht = Licht.new()
 	licht.name = "Licht"
 	add_child(licht)
+	Prestatie.merk("licht")
 	view = WereldView.new()
 	view.name = "WereldView"
 	add_child(view)
 	view.bouw(w, licht)
+	Prestatie.merk("wereldview gebouwd")
 	voorwerpen = preload("res://view/voorwerpen_view.gd").new()   # beker, kelk: op de grond en in de hand
 	add_child(voorwerpen)
 	voorwerpen.bouw(w, view)
@@ -68,6 +73,7 @@ func _ready() -> void:
 	add_child(mist_view)
 	mist_view.bouw(w)
 
+	Prestatie.merk("voorwerpen + mist")
 	cam = Camera3D.new()
 	cam.set_script(load("res://rts_camera.gd"))
 	cam.name = "Camera"
@@ -96,6 +102,7 @@ func _ready() -> void:
 	if scenario == "" or scenario == "hints":   # briefing en hints (sim/hints.gd); andere scenario's houden hun frames
 		hints = Hints.new().bouw(w)
 		hud.zet_hints(hints)
+	Prestatie.merk("camera, bestuur, hud, hints")
 	bouwmenu = Bouwmenu.new()
 	bouwmenu.name = "Bouwmenu"
 	bouwmenu.terrein = view.terrein
@@ -105,13 +112,22 @@ func _ready() -> void:
 	# een vinger slepen in de bouwmodus schuift de ghost (muisstijl) en pant niet; met touch-bouwen sleept alleen een
 	# vinger op de ghost hem (Bouwmenu vangt die af), de rest pant
 	cam.pan_blokkade = func() -> bool: return bouwmenu.actief and not Bouwmenu.touch
+	Prestatie.merk("bouwmenu")
 	var geluid: Node3D = preload("res://view/geluid.gd").new()   # stemmen, werk, dieren, omgeving (view/geluid.gd)
 	add_child(geluid)
 	geluid.bouw(w, view, cam, bestuur)
+	Prestatie.merk("geluid")
 	w.plaats_voorgebouwd()          # na view en bouwmenu: die tekenen het via plan_gezet/plan_klaar
+	Prestatie.merk("voorgebouwd")
 	if scenario != "":
 		cam.invoer_aan = false
 		_start_scenario()
+	if OS.has_feature("mobile") or opt.has("prestatie"):   # mobiele beeldinstellingen + fps-log (view/prestatie.gd)
+		_prestatie = Prestatie.new()
+		_prestatie.name = "Prestatie"
+		add_child(_prestatie)
+		_prestatie.bouw(self)
+	Prestatie.merk("main _ready klaar")
 	print("[spel] missie ", w.missie_nr, " (", w.missie.get("naam", "?"), ") eiland ", w.eiland, " dorpelingen ", w.dorpelingen.size(), " objecten ", w.objecten.size(), " seizoen ", w.seizoen_naam())
 
 
@@ -127,6 +143,7 @@ func _opties() -> Dictionary:
 var _trace := false
 var _camwolf := 0.0
 var _fps_aan := false
+var _prestatie: Prestatie
 var _fps_n := 0
 var _fps_som := 0.0
 var _fps_max := 0.0
@@ -143,7 +160,12 @@ func _process(dt: float) -> void:
 		if _fps_som >= 3.0:
 			print("[fps] gem %.1f  langste frame %.1f ms  frames >25 ms: %d van %d" % [_fps_n / _fps_som, _fps_max * 1000.0, _fps_trage, _fps_n])
 			_fps_n = 0; _fps_som = 0.0; _fps_max = 0.0; _fps_trage = 0
-	w.vooruit(dt)
+	if _prestatie != null:
+		var t0 := Time.get_ticks_usec()
+		w.vooruit(dt)
+		_prestatie.sim_us += Time.get_ticks_usec() - t0
+	else:
+		w.vooruit(dt)
 	if hints != null and not w.gepauzeerd:   # niet tijdens de briefing: 1-12 komt pas daarna
 		hints.controleer()
 	if _trace:

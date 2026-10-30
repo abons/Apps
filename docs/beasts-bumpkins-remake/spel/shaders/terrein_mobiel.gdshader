@@ -1,0 +1,77 @@
+shader_type spatial;
+// Terrein voor mobiel (view/terrein_view.gd kiest dit met OS.has_feature("mobile")): dezelfde lagen en uniforms als
+// terrein.gdshader, maar goedkoop voor een telefoon-gpu: alleen de kleurtextuur (geen normaal/ruw, geen tweede
+// macro-sample, geen triplanar), uitgerold zonder lussen of arrays, een ruis voor de overgangen in plaats van vijf en
+// een in plaats van de fbm. De pc gebruikt terrein.gdshader en ziet hier niets van.
+
+uniform sampler2DArray kleur_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform float herhaling_m = 2.8;
+uniform float droog = 0.0;
+uniform float sneeuw = 0.0;
+uniform float nat = 0.0;
+uniform vec3 gras_droog : source_color = vec3(0.95, 0.78, 0.36);
+uniform vec3 pad_kleur : source_color = vec3(0.50, 0.36, 0.22);
+uniform vec3 aarde_kleur : source_color = vec3(0.75, 0.56, 0.40);
+uniform vec3 zeebodem : source_color = vec3(0.20, 0.25, 0.22);
+
+varying vec3 wp;
+varying vec4 vc;
+varying vec2 pa;
+varying float steil;
+
+float hash(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
+}
+float ruis(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+
+void vertex() {
+	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vc = COLOR;
+	pa = UV;
+	steil = smoothstep(0.5, 0.8, 1.0 - normalize(NORMAL).y);
+}
+
+void fragment() {
+	vec2 uv = wp.xz / herhaling_m;
+	float som = vc.x + vc.y + vc.z + vc.w;
+	float ns = 1.0 - steil;
+	vec4 w4 = vec4(vc.x * ns, vc.y * ns, max(vc.z, steil), vc.w * ns);
+	float w5 = max(0.0, 1.0 - som) * ns;
+	// overgangen scherper met een ruis, per laag verschoven
+	float n = ruis(wp.xz * 1.3);
+	vec4 nv = fract(vec4(n, n + 0.37, n + 0.61, n + 0.83)) - 0.5;
+	vec4 b4 = clamp((w4 - 0.5) * 1.9 + 0.5 + nv * 0.75, 0.0, 1.0);
+	float b5 = clamp((w5 - 0.5) * 1.9 + 0.5 + (fract(n + 0.19) - 0.5) * 0.75, 0.0, 1.0);
+	float tot = b4.x + b4.y + b4.z + b4.w + b5;
+	if (tot < 0.01) { b4 = w4; b5 = w5; tot = max(som + w5, 0.01); }
+	b4 /= tot;
+	b5 /= tot;
+	vec3 alb = texture(kleur_tex, vec3(uv, 0.0)).rgb * b4.x
+		+ texture(kleur_tex, vec3(uv, 1.0)).rgb * b4.y
+		+ texture(kleur_tex, vec3(uv, 2.0)).rgb * b4.z
+		+ texture(kleur_tex, vec3(uv, 3.0)).rgb * b4.w
+		+ texture(kleur_tex, vec3(uv, 4.0)).rgb * b5;
+	float droogw = b4.x + b4.y;
+	float g = ruis(wp.xz * 0.18);
+	alb *= 0.78 + 0.5 * g;
+	alb = mix(alb, alb * gras_droog, clamp(droog * droogw * (0.75 + 0.5 * g), 0.0, 1.0));
+	alb = mix(alb, alb * pad_kleur, clamp(pa.x, 0.0, 1.0));
+	alb = mix(alb, alb * aarde_kleur, clamp(pa.y, 0.0, 1.0));
+	float dek = clamp(sneeuw * 1.6 - 0.5 + (g - 0.5) * 0.9, 0.0, 1.0);
+	dek *= smoothstep(-0.12, 0.06, wp.y) * (1.0 - 0.8 * steil);
+	dek = smoothstep(0.1, 0.5, dek);
+	alb = mix(alb, vec3(0.90, 0.93, 0.98), dek);
+	alb *= 1.0 - 0.28 * nat;
+	float diep = smoothstep(-0.2, -1.7, wp.y);
+	alb = mix(alb, zeebodem, diep);
+	ALBEDO = alb;
+	ROUGHNESS = mix(mix(0.85, 0.8, dek) * mix(1.0, 0.7, nat), 1.0, diep);
+	SPECULAR = 0.15;
+}
