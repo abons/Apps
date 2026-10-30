@@ -14,6 +14,8 @@ hun eigen UV's op de atlassen `steen` en `hout`:
 - dakspanten, ladder en paaltjes zijn geschaalde kopieen van een stijl (zelfde hout op de atlas), het touw
   pakt de kleur van een sjorring van het hek.
 Stand 1 heeft de aangestampte aarde als eigen tegelbaar materiaal (farm_soil, zoals de akker in natuur/props.py).
+De gedeelde snij-code staat in gebouwen/standen_lib.py (ook voor de gebouwen, gebouwen/standen.py); hier staat
+alleen wat de hut eigen is (indeling, binnenstenen, kernen, dakkegel, ladder).
 
 Draaien (headless):
   blender -b -P peasant_hut_standen.py -- [standen=1,2,3] [preview] [alleen_preview]
@@ -33,6 +35,10 @@ from mathutils import Matrix, Vector, noise
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "natuur"))
+sys.path.insert(0, os.path.join(HERE, "gebouwen"))
+import standen_lib as L                            # noqa: E402  gedeelde snij-code (ook voor de gebouwen)
+from standen_lib import (Bron, bovenkant_licht, decimeer, exporteer, faces, kap, kopie, log,  # noqa: E402
+                         naar_obj, sluit, snij, touw, tris)
 RT_BLEND = os.path.join(HERE, "peasant_hut_rt.blend")
 HUT_BLEND = os.path.join(HERE, "peasant_hut.blend")
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -53,10 +59,6 @@ SNIJ = {2: 0.72, 3: 1.92}                         # bovenkant muur per stand (ke
 KAP_B = 0.11                                      # halve breedte van de afdekstrook op de muur
 
 
-def log(*a):
-    print("[standen]", *a, flush=True)
-
-
 def kern_r(z):
     return HUT_R - 0.04 - 0.02 * min(max(z / (WALL_H + 0.2), 0.0), 1.0)
 
@@ -67,163 +69,6 @@ def hoek(p):
 
 def straal(p):
     return math.hypot(p[0] - HX, p[1] - HY)
-
-
-# --- Eilanden ----------------------------------------------------------------------------
-class Bron:
-    """Een bronmesh als bmesh met zijn losse eilanden (midden, grenzen, vlakken)."""
-
-    def __init__(self, ob):
-        self.bm = bmesh.new()
-        self.bm.from_mesh(ob.data)
-        self.bm.faces.ensure_lookup_table()
-        self.uv = self.bm.loops.layers.uv.active
-        self.mat = ob.data.materials[0]
-        gezien, self.eil = set(), []
-        for f in self.bm.faces:
-            if f.index in gezien:
-                continue
-            stapel, fs = [f], []
-            gezien.add(f.index)
-            while stapel:
-                g = stapel.pop()
-                fs.append(g)
-                for e in g.edges:
-                    for h in e.link_faces:
-                        if h.index not in gezien:
-                            gezien.add(h.index)
-                            stapel.append(h)
-            co = np.array([v.co[:] for v in {v for g in fs for v in g.verts}])
-            self.eil.append({"f": fs, "c": Vector(co.mean(0)), "lo": Vector(co.min(0)), "hi": Vector(co.max(0)),
-                             "n": sum(len(g.verts) - 2 for g in fs)})
-
-
-def kopie(dst, bron, faces, f=None, flip=False):
-    """Vlakken van een bron in dst, met UV; f(Vector) -> Vector op elk hoekpunt, flip draait de winding om."""
-    uvd = dst.loops.layers.uv.verify()
-    vmap = {}
-    for fc in faces:
-        vs = []
-        for v in fc.verts:
-            nv = vmap.get(v)
-            if nv is None:
-                nv = dst.verts.new(f(v.co.copy()) if f else v.co.copy())
-                vmap[v] = nv
-            vs.append(nv)
-        uvs = [l[bron.uv].uv.copy() for l in fc.loops]
-        if flip:
-            vs, uvs = vs[::-1], uvs[::-1]
-        try:
-            nf = dst.faces.new(vs)
-        except ValueError:
-            continue
-        nf.smooth = fc.smooth
-        for l, u in zip(nf.loops, uvs):
-            l[uvd].uv = u
-
-
-def snij(bm, z, dicht=False):
-    """Alles boven z weg; dicht = de doorsnede vullen (vlak met de UV van een buurvlak: kleur van de zijkant)."""
-    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
-    r = bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(0, 0, z), plane_no=(0, 0, 1), clear_outer=True)
-    if not dicht:
-        return
-    uv = bm.loops.layers.uv.verify()
-    rand = [e for e in bm.edges if e.is_boundary and all(abs(v.co.z - z) < 1e-4 for v in e.verts)]
-    nieuw = bmesh.ops.holes_fill(bm, edges=rand, sides=0)["faces"]
-    for f in nieuw:
-        buur = [l for l in f.verts[0].link_loops if l.face is not f]
-        u = buur[0][uv].uv.copy() if buur else Vector((0, 0))
-        for l in f.loops:
-            l[uv].uv = u
-        f.smooth = False
-
-
-def sluit(bm):
-    """Open randen dicht (de af-hut snijdt de achterkant van elke steen weg; zonder dak kijk je erin)."""
-    uv = bm.loops.layers.uv.verify()
-    rand = [e for e in bm.edges if e.is_boundary]
-    nieuw = bmesh.ops.holes_fill(bm, edges=rand, sides=0)["faces"]
-    for f in nieuw:
-        buur = [l for l in f.verts[0].link_loops if l.face is not f]
-        u = buur[0][uv].uv.copy() if buur else Vector((0, 0))
-        for l in f.loops:
-            l[uv].uv = u
-    return len(nieuw)
-
-
-def bovenkant_licht(bm, zmin):
-    """Bovenvlakken van de bovenste laag: in de af-hut lag daar de volgende laag op, dus de bake is daar
-    zwart (contactschaduw). UV per hoekpunt van een zijvlak van dezelfde steen: de kleur van de zijkant."""
-    uv = bm.loops.layers.uv.verify()
-    n = 0
-    for f in bm.faces:
-        f.normal_update()
-        if f.normal.z < 0.45 or f.calc_center_median().z < zmin:
-            continue
-        zij = {m.face for v in f.verts for m in v.link_loops if m.face.normal.z < 0.3}
-        if not zij:
-            continue
-        g = max(zij, key=lambda h: h.calc_area())          # midden van het grootste zijvlak
-        u = sum((m[uv].uv for m in g.loops), Vector((0, 0))) / len(g.loops)
-        for l in f.loops:
-            l[uv].uv = u
-        n += 1
-    return n
-
-
-def kap(bm, zmin, breed=KAP_B, zop=0.0):
-    """Afdekstrook op de open bovenrand van een specie-kern: per randstuk een quad, UV van de rand zelf."""
-    uv = bm.loops.layers.uv.verify()
-    rand = [e for e in bm.edges if e.is_boundary and all(v.co.z > zmin for v in e.verts)]
-    for e in rand:
-        l = e.link_loops[0]
-        a, b = l.vert, l.link_loop_next.vert
-        ua, ub = l[uv].uv.copy(), l.link_loop_next[uv].uv.copy()
-        d = b.co - a.co
-        d.z = 0
-        if d.length < 1e-6:
-            continue
-        n = Vector((d.y, -d.x, 0)).normalized() * breed
-        z = max(a.co.z, b.co.z) + zop
-        pa, pb = Vector((a.co.x, a.co.y, z)), Vector((b.co.x, b.co.y, z))
-        vs = [bm.verts.new(p) for p in (pa - n, pa + n, pb + n, pb - n)]
-        f = bm.faces.new(vs)
-        f.normal_update()
-        if f.normal.z < 0:
-            f.normal_flip()
-        for lp in f.loops:
-            lp[uv].uv = ua if (lp.vert is vs[0] or lp.vert is vs[1]) else ub
-        f.smooth = False
-
-
-def naar_obj(naam, bm, mat, coll):
-    me = bpy.data.meshes.new(naam)
-    bm.to_mesh(me)
-    me.materials.append(mat)
-    o = bpy.data.objects.new(naam, me)
-    coll.objects.link(o)
-    return o
-
-
-def tris(objs):
-    n = 0
-    for o in objs:
-        if o.type == "MESH":
-            o.data.calc_loop_triangles()
-            n += len(o.data.loop_triangles)
-    return n
-
-
-def decimeer(o, ratio):
-    m = o.modifiers.new("d", "DECIMATE")
-    m.ratio = ratio
-    m.use_collapse_triangulate = True
-    dg = bpy.context.evaluated_depsgraph_get()
-    me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
-    o.modifiers.clear()
-    oud, o.data = o.data, me
-    bpy.data.meshes.remove(oud)
 
 
 # --- Balken uit een stijl ----------------------------------------------------------------
@@ -251,24 +96,6 @@ class Stijl:
             l = Mi @ co
             return p0 + ax * (l.z / WALL_H * L) + ex * (l.x / 0.22 * w) + ey * (l.y / 0.20 * d)
         kopie(dst, self.hout, self.f, f)
-
-
-def touw(dst, P, uv, r=0.012, zijden=4):
-    """Dun touw langs P met een vaste UV (de kleur van een sjorring)."""
-    uvl = dst.loops.layers.uv.verify()
-    ringen = []
-    for i, p in enumerate(P):
-        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
-        x = t.cross(Vector((0, 0, 1))).normalized()
-        y = t.cross(x)
-        ringen.append([dst.verts.new(p + (x * math.cos(a) + y * math.sin(a)) * r)
-                       for a in [2 * math.pi * k / zijden for k in range(zijden)]])
-    for r0, r1 in zip(ringen, ringen[1:]):
-        for k in range(zijden):
-            f = dst.faces.new([r0[k], r0[(k + 1) % zijden], r1[(k + 1) % zijden], r1[k]])
-            f.smooth = True
-            for l in f.loops:
-                l[uvl].uv = uv
 
 
 # --- Bron indelen ------------------------------------------------------------------------
@@ -319,10 +146,6 @@ def indelen(st, hout, specie, gras):
         log(naam, {k: len(v) for k, v in D.items()})
     log("gras buiten", len(G), "van", len(gras.eil))
     return S, Hd, Sp, G
-
-
-def faces(lst):
-    return [f for e in lst for f in e["f"]]
 
 
 # --- Binnenkant van de muren -------------------------------------------------------------
@@ -391,7 +214,7 @@ def kernen(dst, sp, Sp, z):
         elif AX0 < c.x < AX1 + 0.05 and c.y > 0.9 and (straal(c) < kern_r(c.z) - 0.02 or abs(c.y - (AY0 + 0.03)) < 0.02):
             weg.append(f)                                # aanbouwkern binnen de ronde muur en zijn -Y-kant
     bmesh.ops.delete(tmp, geom=list(set(weg)), context="FACES")
-    kap(tmp, z - 0.05 if z < WALL_H else WALL_H - 0.05, zop=-0.02 if z < WALL_H else 0.0)
+    kap(tmp, z - 0.05 if z < WALL_H else WALL_H - 0.05, breed=KAP_B, zop=-0.02 if z < WALL_H else 0.0)
     kopie(tmp, sp, faces(Sp["vloer"]))
     me = bpy.data.meshes.new("_k")
     tmp.to_mesh(me)
@@ -424,43 +247,7 @@ def omtrek():
 
 
 def aarde(coll):
-    import natuur_lib as L
-    b = L.Bouwer()
-    stap = 0.12
-    xs = np.arange(-1.5, 2.95, stap)
-    ys = np.arange(-2.1, 4.1, stap)
-    idx = {}
-
-    def z_van(x, y):
-        sd = voetafdruk_sd(x, y) + 0.05 * noise.noise(Vector((x * 1.7, y * 1.7, 0.3)))
-        k = min(max(sd / 0.25, 0.0), 1.0)
-        return k * (0.018 + 0.008 * noise.noise(Vector((x * 6, y * 6, 1.1)))) - 0.004, sd
-    rand = lambda x, y: voetafdruk_sd(x, y) + 0.05 * noise.noise(Vector((x * 1.7, y * 1.7, 0.3)))
-    for j, y in enumerate(ys):
-        for i, x in enumerate(xs):
-            sd = sd0 = rand(x, y)
-            if sd < 0:                                   # buiten: op de rand leggen (geen trapjes)
-                for _ in range(3):
-                    gx = (rand(x + 0.01, y) - rand(x - 0.01, y)) / 0.02
-                    gy = (rand(x, y + 0.01) - rand(x, y - 0.01)) / 0.02
-                    g2 = gx * gx + gy * gy or 1.0
-                    sd = rand(x, y)
-                    x, y = x - sd * gx / g2, y - sd * gy / g2
-            z, _ = z_van(x, y)
-            idx[i, j] = (b.v((x, y, max(z, -0.004))), sd0)
-    for j in range(len(ys) - 1):
-        for i in range(len(xs) - 1):
-            q = [idx[i, j], idx[i + 1, j], idx[i + 1, j + 1], idx[i, j + 1]]
-            if max(s for _, s in q) < 0:
-                continue
-            b.f([v for v, _ in q], [(b.V[v][0] / 1.6, b.V[v][1] / 1.6) for v, _ in q], 0)
-    grond = L.ph("farm_soil", "bouwgrond", factor=(0.74, 0.69, 0.62))
-    o = L.obj("bouwgrond", b.mesh("bouwgrond", [grond]), coll)
-    for a in [a.name for a in o.data.color_attributes]:
-        o.data.color_attributes.remove(o.data.color_attributes[a])
-    if "wind" in o.data.uv_layers:
-        o.data.uv_layers.remove(o.data.uv_layers["wind"])
-    return o
+    return L.aarde(coll, voetafdruk_sd, np.arange(-1.5, 2.95, 0.12), np.arange(-2.1, 4.1, 0.12))
 
 
 def bouw_stand(s, B, coll):
@@ -581,18 +368,6 @@ def bouw_stand(s, B, coll):
     return objs
 
 
-def exporteer(pad, objs):
-    for o in bpy.context.view_layer.objects:
-        o.select_set(False)
-    for o in objs:
-        o.select_set(True)
-    bpy.ops.export_scene.gltf(filepath=pad, export_format="GLB", use_selection=True, export_apply=True,
-                              export_tangents=True, export_image_format="AUTO", export_cameras=False,
-                              export_lights=False, export_extras=False, export_animations=False,
-                              export_vertex_color="NONE")
-    log("export", os.path.basename(pad), f"{os.path.getsize(pad) / 1e6:.1f} MB", tris(objs), "tris")
-
-
 def bouw():
     bpy.ops.wm.open_mainfile(filepath=RT_BLEND)
     sc = bpy.context.scene
@@ -624,50 +399,8 @@ def bouw():
 
 # --- Preview: vier standen naast elkaar ----------------------------------------------------
 def preview():
-    bpy.ops.wm.open_mainfile(filepath=HUT_BLEND)
-    sc = bpy.context.scene
-    for o in [o for o in sc.objects if o.type in ("MESH", "CURVES")]:
-        bpy.data.objects.remove(o)
-    for n in ("zon_grond", "vul_grond"):
-        if n in sc.objects:
-            bpy.data.objects.remove(sc.objects[n])
-    for n in ("zon", "vul"):
-        sc.objects[n].light_linking.receiver_collection = None
-        sc.objects[n].light_linking.blocker_collection = None
-    sc.render.engine = "BLENDER_EEVEE"
-    sc.eevee.taa_render_samples = 64
-    try:
-        sc.eevee.use_raytracing = True
-        sc.eevee.use_shadows = True
-    except AttributeError:
-        pass
-    sc.render.film_transparent = True
-    panelen = []
-    for pad in [GLB(1), GLB(2), GLB(3), os.path.join(HERE, "peasant_hut_rt.glb")]:
-        voor = set(sc.objects)
-        bpy.ops.import_scene.gltf(filepath=pad)
-        nieuw = [o for o in sc.objects if o not in voor]
-        sc.render.filepath = os.path.join(bpy.app.tempdir, f"_stand_{len(panelen)}.png")
-        bpy.ops.render.render(write_still=True)
-        panelen.append(sc.render.filepath)
-        for o in nieuw:
-            bpy.data.objects.remove(o)
-    rijen = []
-    bg = np.array([0.32, 0.36, 0.30])
-    for p in panelen:
-        img = bpy.data.images.load(p, check_existing=False)
-        a = np.array(img.pixels[:], np.float32).reshape(img.size[1], img.size[0], 4)
-        bpy.data.images.remove(img)
-        rijen.append(a[..., :3] * a[..., 3:4] + bg * (1 - a[..., 3:4]))
-    h = min(r.shape[0] for r in rijen)
-    out = np.concatenate([r[:h] for r in rijen], axis=1)
-    img = bpy.data.images.new("hut_standen", out.shape[1], out.shape[0])
-    img.pixels.foreach_set(np.concatenate([out, np.ones((*out.shape[:2], 1))], 2).astype(np.float32).ravel())
-    os.makedirs(os.path.join(HERE, "render"), exist_ok=True)
-    img.filepath_raw = os.path.join(HERE, "render", "hut_standen.png")
-    img.file_format = "PNG"
-    img.save()
-    log("preview ->", img.filepath_raw)
+    L.plaat(HUT_BLEND, [GLB(1), GLB(2), GLB(3), os.path.join(HERE, "peasant_hut_rt.glb")],
+            os.path.join(HERE, "render", "hut_standen.png"), weg_namen=("zon_grond", "vul_grond"))
 
 
 if __name__ == "__main__":

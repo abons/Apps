@@ -111,11 +111,55 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
 | gereedschapsloods | ~79k | ~0,4k |
 | molen | ~75k | ~0,5k |
 
-## Bouwstanden van de hut (`../peasant_hut_standen.py`)
+## Bouwstanden (`standen.py`, `standen_lib.py`, hut: `../peasant_hut_standen.py`)
 
-- `blender -b -P peasant_hut_standen.py -- [standen=1,2,3] [preview]` (eerst `peasant_hut_realtime.py`): gesneden uit
-  `peasant_hut_rt.blend`, zelfde oorsprong en atlassen; stand 4 = `peasant_hut_rt.glb`. Preview: `../render/hut_standen.png`.
-- Driehoeken: stand 1 5,9k (aarde, paaltjes, touw), 2 29k (muren 0,72 m), 3 87k (volle muren, spanten, ladder,
-  halve schoorsteen); af-hut 112k. Geen LOD1. Ankers: `deur_voor_drempel`, `deur_aanbouw_drempel`.
-- Nog mis: de muurkop is een vlakke specie-strook; binnenstenen zijn kopieen (herhaling zichtbaar); stand 1-aarde
-  is egaal en roodbruin; de vloer van de aanbouw draagt de gebakken afdruk van kist en ton.
+Standen 1-3 worden UIT de af-glb gesneden (besluit 2026-10-30): de gebakken eilanden van `<naam>_rt.blend` met
+hun eigen UV's, dus muren, ramen en deuren lopen in elke stand gelijk door en de atlassen zijn die van de af-glb.
+Stand 4 = `<naam>_rt.glb`. Oorsprong, schaal, assen en alle ankers (lege nodes, zelfde namen en plek) zijn gelijk:
+in Godot op exact dezelfde transform omwisselen. Geen LOD1. Deurbladen en wieken (meshes onder een scharnier)
+zitten in geen stand; de lege `deur`/`wieken`-nodes wel.
+
+- Gedeelde code: `standen_lib.py` (eilanden, kopie, snij, sluit, hol, gaten, balk-sjabloon, touw, aarde,
+  export, previewplaat). De hut gebruikt hem met zijn eigen indeling en komt er byte-gelijk uit (md5 van
+  stand 1-3 voor en na gelijk, 2026-10-30).
+- Gebouwen: `blender -b -P standen.py -- naam=<gebouw> [standen=1,2,3] [preview] [procent=100]` (eerst de
+  rt-stap). Geeft `<naam>_stand1..3.glb` en `../render/<naam>_standen.png` (1 | 2 | 3 | af, EEVEE, camera en
+  licht van `<naam>.blend`). Hut: `blender -b -P peasant_hut_standen.py -- [preview]`, plaat `../render/hut_standen.png`.
+- Hoe: elk eiland krijgt de naam van het bronobject in `<naam>.blend` waarvan de bbox het best past. `CFG` in
+  `standen.py` zegt per naam wat stand 2 en 3 doen: `weg`, `heel`, `auto` (kleine eilanden heel/weg op hun
+  midden, zodat de muurkop rafelig blijft; grote doorgesneden op de muurhoogte en dichtgemaakt in de kleur van
+  hun zijkant), `hol` (dichte kern wordt muurschil met binnenkant, muurkop en deuropeningen), `steen@z`/`snij@z`
+  (eigen hoogte). Deuropeningen = bbox van het deurblad, dwars verlengd. Stand 1 = aarde (farm_soil) op de
+  veelhoek `voet` met paaltjes (sjabloon: een paal uit de af-glb) en touw. Dakgeraamte in stand 3: doorsnedes
+  van de dakmesh, de balken volgen de onderkant van het dak (`spanten`: as, posities, bereik).
+- Muurhoogte stand 2: 0,7 m; stand 3: volle muren.
+
+| gebouw | stand 1 | 2 | 3 | af | glb 1 / 2 / 3 / af (MB) |
+| --- | --- | --- | --- | --- | --- |
+| hut | 5,9k | 29k | 87k | 112k | 6,4 / 10,1 / 12,7 / 25,1 |
+| gereedschapsloods | 1,7k | 2,5k | 11,7k | 79k | 13,6 / 18,1 / 21,0 / 30,3 |
+| molen | 4,9k | 6,1k | 43k | 75k | 10,9 / 16,4 / 19,0 / 31,7 |
+| melkerij_boerderij | 7,1k | 11,3k | 41k | 51k | 4,9 / 2,8 / 3,9 / 6,3 |
+| kippenhok | 1,4k | 6,6k | 14,5k | 15,7k | 4,9 / 3,7 / 4,1 / 6,5 |
+
+- ⚠️ De atlassen zitten in elke glb opnieuw (glb sluit alles in): per stand alleen de materialen die erin zitten,
+  maar loods en molen dragen 2048-atlassen, dus 11-21 MB per stand. Delen kan alleen met `.gltf` + losse
+  beelden (zelfde bestanden als de af-glb) of door in Godot de materialen van de af-glb op naam te hergebruiken.
+- Per gebouw:
+  - Gereedschapsloods: 2 = stenen voet tot 0,7 m met stijlen, holle kern met deuropening; 3 = begane grond,
+    verdieping (vakwerk, pleister, raam), gevelpunten, windveren, spanten + gordingen; geen pannen/beschot/nok,
+    geen aambeeld (hoorn, lijf, hiel) en geen bloembak.
+  - Molen: 2 = L-vormige muren 0,7 m (planken, stenen, holle kernen) met beide deuropeningen; 3 = volle muren,
+    gevel tot 3,06 m, schoorsteen, stenen voet (kern omlaag gerekt tot de muurkop, in de af-molen staat hij op
+    het riet), kap zonder dakplanken, de as; geen riet, wieken, klimop, zakken. Spanten volgen het L-dak.
+  - Melkerij: 2 = muren 0,7 m (pleister, stijlen), holle binnenkern met vloer en deuropening, varkenshok heel
+    (laag); 3 = volle muren, voorgevel, ramen, ronde spanten + gordingen, halve schoorsteen (3,5 m); geen riet,
+    dakkapel, bloembakken, varken. Binnenkern dicht (plafond op 2,6 m).
+  - Kippenhok: drie standen, ze zijn te onderscheiden: 1 = aarde met paaltjes (28 cm), 2 = stromat, stenen voet,
+    hoekstijlen, regels, kozijn en dakgeraamte (geen planken), 3 = planken, gevels, loopplank, legnest, trog,
+    hek en spanten; geen riet, eieren, korrels.
+- Nog mis: muurkoppen en binnenkant van holle kernen zijn egaal (kleur van de zijkant, leest als beton bij
+  molen en loods); binnenmuren van de melkerij zijn donker (gebakken AO); losse stenen/planken rond de bouw
+  ontbreken (de hut heeft ze); de schoorsteenstomp van de melkerij staat op het plafond; stand 1-aarde is
+  egaal roodbruin; alleen de hut heeft binnenstenen. De hut houdt een oude rijfout in `aarde` (`rij_vast=False`)
+  zodat hij byte-gelijk blijft.
