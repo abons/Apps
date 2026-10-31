@@ -14,8 +14,6 @@ func start(main: Node) -> Node:
 	m = main
 	m.w.alles_open = true
 	m.w.tempo = 2.0
-	for s in m.bouwmenu.knoppen:
-		m.bouwmenu.knoppen[s].visible = true
 	m.cam.zet_direct(m.view.terrein.tegel_midden(Vector2i(109, 70)) + Vector3(0, 0.4, 0), 0.35, deg_to_rad(42), 24.0)
 	return self
 

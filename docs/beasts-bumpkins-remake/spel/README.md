@@ -26,6 +26,8 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken, muziekspeler
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
+"$G" --headless --path . --script res://test/bouwpaneel_test.gd  # bouwmenu A: tabbladen, op slot/te duur + melding, hamer/paneel, kiezen = ghost, weg aantal x prijs
+"$G" --path . -s tools/maak_ikonen.gd                         # bouwmenu-ikonen uit de spel-glb's -> ikonen/bouw/ (met GPU); frames: bash test/bouwmenu_frames.sh
 "$G" --headless --path . --script res://test/menu_test.gd        # startmenu, pauzemenu, opnieuw, andere/volgende missie
 "$G" --headless --path . --script res://test/ghost_test.gd       # bouw-ghost: gebouw-glb, groen/rood, deurpijl, = gebouwd
 "$G" --headless --path . --script res://test/bouw_plek_test.gd   # bouwers: elk een eigen plek, zagen bij de zaagbok, hakken bij de steenhoop

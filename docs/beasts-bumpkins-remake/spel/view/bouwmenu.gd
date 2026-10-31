@@ -20,9 +20,15 @@ extends Node
 ## pant de camera, een tik ernaast zet de ghost daar. Weg/hek: tik = begin, sleep vanaf begin of eind = dat einde
 ## verschuift (de rij volgt), Bouwen legt de rij en het eind wordt het nieuwe begin. Knoppen onderin: Draai, Bouwen
 ## (alleen als het kan), Annuleer; >= 48 dp. De muis-/toetsenbordbesturing hierboven is op de pc ongewijzigd.
-## Staand (view/scherm.gd, 2026-10-30): de bouwknoppen zitten in een lade onderin die de knop Gebouwen (rechtsboven)
-## opent en een keuze weer sluit; hint, Draai/Stop en de touchbalk staan onderin, de balk past in de breedte. Liggend
-## is de indeling zoals ze was. `_indeling` loopt bij elke size_changed.
+## Menu = variant A uit lokaal/concept/bouwmenu_schets.html (besluit gebruiker 2026-10-31): vier tabbladen (Wonen,
+## Voedsel, Gilden, Wegen; CATEGORIE) met per gebouw een tegel: ikoon (ikonen/bouw/<soort>.png, gerenderd uit de eigen
+## glb door tools/maak_ikonen.gd) en de prijs eronder. Op slot (Wereld.ONTGRENDEL / VANAF_MISSIE) = grijs met slotje en
+## de reden ("na Loods", "missie 3"); te duur = prijs rood. Tikken op zo'n tegel geeft een melding (signaal `melding`,
+## main.gd -> Hud.toon_melding) in plaats van de bouwmodus. Paneelmodus (touch, of staand op de pc): hamerknop
+## rechtsonder (duimzone) opent het paneel onderin, 3 tegels breed staand, 4 liggend; een keuze sluit het, daarna de
+## ghost en de balk Draai/Bouwen/Annuleer; weg/hek: Bouwen toont aantal x prijs. Telefoon: alleen ikonen en prijs, geen
+## kleine tekst (de reden van het slot wel). Pc liggend: het paneel staat altijd open als een rij onderin het midden,
+## met naam en lettertoets per tegel; hint, Draai en Stop erboven. `_indeling` loopt bij elke size_changed.
 
 const GROND_Y := 0.25
 const KLIK_DREMPEL := 6.0
@@ -46,7 +52,16 @@ const GEBOUWEN := {
 }
 const RIJ_SOORTEN := [&"weg", &"hek"]     ## slepen = een rij (BouwRij); draaien doet er niet toe
 const KNOP_H := 44.0                      ## knophoogte in px: met een vinger te raken
-const MENU_LINKS := 760.0                 ## px: het menu begint rechts van de stand linksboven (Hud)
+## Tabbladen van het paneel (schets variant A): naam en het ikoon van het tabblad (touch: alleen het ikoon).
+const CATEGORIEEN := [{"k": "wonen", "n": "Wonen", "ik": &"hut"}, {"k": "voedsel", "n": "Voedsel", "ik": &"molen"},
+	{"k": "gilden", "n": "Gilden", "ik": &"gereedschapsloods"}, {"k": "wegen", "n": "Wegen", "ik": &"weg"}]
+## Tabblad per soort, in de volgorde van de tegels (schets: wonen hut, put; voedsel kippenhok, akker, molen, melkerij;
+## gilden loods, voetvolkgilde; wegen weg, hek, poort).
+const CATEGORIE := {&"hut": "wonen", &"put": "wonen", &"kippenhok": "voedsel", &"akker": "voedsel", &"molen": "voedsel",
+	&"melkerij": "voedsel", &"gereedschapsloods": "gilden", &"voetvolkgilde": "gilden", &"weg": "wegen", &"hek": "wegen",
+	&"poort": "wegen"}
+const IKONEN := "res://ikonen/bouw/"      ## <soort>.png, tools/maak_ikonen.gd
+const PC_TEGEL := Vector2(112, 132)       ## pc: tegel bij 1080 px hoogte (schaalt mee)
 const KLEUR_KAN := Color(0.3, 1.0, 0.3, 0.45)
 const KLEUR_NIET := Color(1.0, 0.1, 0.1, 0.55)
 const KLEUR_BESTAAT := Color(0.85, 0.85, 0.85, 0.25)
@@ -104,13 +119,19 @@ var hint: Label
 var _hint_basis := ""        ## hinttekst van de modus; _toon_ghost zet er de reden achter als de ghost rood is
 static var touch := OS.has_feature("mobile") or "--touch" in OS.get_cmdline_user_args()   ## touch-bouwen (zie boven)
 var knop_h := KNOP_H        ## touch: >= 48 dp (bouw())
-var kolom: VBoxContainer   ## liggend rechtsboven (knoppen, hint, Draai, Stop); staand onderin (lade, hint, Draai, Stop)
-var rij: HFlowContainer    ## de bouwknoppen
+var kolom: VBoxContainer   ## hint (en op de pc Draai en Stop): pc liggend boven het paneel, anders onderin
 var rij2: HBoxContainer    ## hint (en op de pc Draai en Stop)
 var balk: HBoxContainer    ## touch: Draai, Bouwen, Annuleer
-var knop_lade: Button      ## staand: Gebouwen (lade open/dicht)
-var lade_open := false
+var paneel: PanelContainer ## tabbladen + tegels (pc liggend altijd open onderin, anders achter de hamerknop)
+var tabs: HBoxContainer
+var tab_knoppen := {}      ## categorie -> Button
+var knop_dicht: Button     ## paneelmodus: x sluit het paneel
+var rooster: GridContainer ## de tegels van het open tabblad
+var tab := "wonen"
+var knop_hamer: Button     ## paneelmodus: rechtsonder, opent het paneel
+var paneel_open := false   ## paneelmodus: paneel open
 var _staand := false
+signal melding(tekst: String)   ## op slot of te duur gekozen: Hud.toon_melding (main.gd)
 var _t_tegel := Vector2i(-1, -1)   ## touch: gebouw = tegel zoals _plan_onder hem geeft; weg/hek = begintegel
 var _t_eind := Vector2i(-1, -1)    ## touch, weg/hek: eindtegel
 var _t_vinger := -1                ## touch: vinger die de ghost (of een rij-einde) vasthoudt
@@ -142,38 +163,14 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 		knop_h = touch_knop_h()
 	var laag := CanvasLayer.new()
 	add_child(laag)
-	# rechtsboven, rechts van de stand (linksboven): de knoppen lopen door op een tweede regel als het niet past,
-	# daaronder hint, Draai en Stop. Onder staat de hulptekst.
+	# hint, Draai en Stop: pc liggend boven het paneel, anders onderin boven de touchbalk (_indeling)
 	kolom = VBoxContainer.new()
-	kolom.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	kolom.offset_left = MENU_LINKS
-	kolom.offset_top = 12
-	kolom.offset_right = -16
 	kolom.add_theme_constant_override("separation", 8)
 	kolom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	laag.add_child(kolom)
-	rij = HFlowContainer.new()
-	rij.add_theme_constant_override("h_separation", 8)
-	rij.add_theme_constant_override("v_separation", 8)
-	rij.alignment = FlowContainer.ALIGNMENT_END
-	rij.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	kolom.add_child(rij)
-	for s: StringName in GEBOUWEN:
-		var g: Dictionary = GEBOUWEN[s]
-		var k := _knop(("%s %d" % [g["tekst"], w.prijs(s)]) if touch \
-				else ("%s %d (%s)" % [g["tekst"], w.prijs(s), OS.get_keycode_string(g["toets"])]))
-		k.toggle_mode = true
-		k.toggled.connect(func(aan: bool) -> void: kies(s, aan))
-		rij.add_child(k)
-		knoppen[s] = k
-		k.visible = w.ontgrendeld(s)
-	w.plan_klaar.connect(func(_p: Plan) -> void:       # nieuwe knoppen na een loods of molen
-		for s2 in knoppen:
-			(knoppen[s2] as Button).visible = w.ontgrendeld(s2))
-	# draaien en stoppen ook zonder toets, wiel of rechterknop (touch): twee knoppen onder het menu, alleen in de modus
 	rij2 = HBoxContainer.new()
 	rij2.add_theme_constant_override("separation", 8)
-	rij2.alignment = BoxContainer.ALIGNMENT_END
+	rij2.alignment = BoxContainer.ALIGNMENT_CENTER
 	rij2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kolom.add_child(rij2)
 	hint = Label.new()
@@ -194,18 +191,129 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 		knop_stop.custom_minimum_size.x = 130
 		knop_stop.pressed.connect(func() -> void: zet_actief(false))
 		rij2.add_child(knop_stop)
-	knop_lade = _knop("Gebouwen")
-	knop_lade.toggle_mode = true
-	knop_lade.visible = false
-	knop_lade.toggled.connect(zet_lade)
-	laag.add_child(knop_lade)
-	kolom.draw.connect(_teken_lade)
+	_bouw_paneel(laag)
+	knop_hamer = HamerKnop.new()
+	knop_hamer.name = "Hamer"
+	knop_hamer.tooltip_text = "bouwen"
+	knop_hamer.pressed.connect(func() -> void: zet_paneel(not paneel_open))
+	laag.add_child(knop_hamer)
 	zet_actief(false)
 	get_viewport().size_changed.connect(_indeling)
 	_indeling()
 	match Scherm.optie("proef"):     # alleen voor frames (view/scherm.gd)
 		"bouw": _proef_bouw.call_deferred()
-		"lade": zet_lade.call_deferred(true)
+		"lade", "paneel": _proef_paneel.call_deferred()
+		"rij": _proef_rij.call_deferred()
+
+
+## Het paneel: tabbladen en een rooster met een tegel per soort (in CATEGORIE-volgorde; alleen die van het open tabblad
+## zijn zichtbaar).
+func _bouw_paneel(laag: CanvasLayer) -> void:
+	paneel = PanelContainer.new()
+	paneel.name = "Paneel"
+	paneel.mouse_filter = Control.MOUSE_FILTER_STOP      # een klik op de achtergrond is geen loopbevel
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.094, 0.082, 0.067, 0.92)
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(8)
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 6
+	paneel.add_theme_stylebox_override("panel", sb)
+	laag.add_child(paneel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	paneel.add_child(vb)
+	tabs = HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	tabs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vb.add_child(tabs)
+	for c: Dictionary in CATEGORIEEN:
+		var t := Button.new()
+		t.toggle_mode = true
+		t.focus_mode = Control.FOCUS_NONE
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if touch:       # geen kleine tekst op de telefoon: alleen het ikoon
+			t.icon = _ikoon_van(c["ik"])
+			t.expand_icon = true
+			t.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		else:
+			t.text = c["n"]
+		t.tooltip_text = c["n"]
+		_tab_stijl(t)
+		t.pressed.connect(zet_tab.bind(String(c["k"])))
+		tabs.add_child(t)
+		tab_knoppen[c["k"]] = t
+	knop_dicht = Button.new()
+	knop_dicht.focus_mode = Control.FOCUS_NONE
+	knop_dicht.icon = _ikoon(false)
+	knop_dicht.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	knop_dicht.tooltip_text = "dicht"
+	_tab_stijl(knop_dicht)
+	knop_dicht.pressed.connect(func() -> void: zet_paneel(false))
+	tabs.add_child(knop_dicht)
+	rooster = GridContainer.new()
+	rooster.add_theme_constant_override("h_separation", 8)
+	rooster.add_theme_constant_override("v_separation", 8)
+	rooster.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rooster.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(rooster)
+	for s: StringName in CATEGORIE:
+		var g: Dictionary = GEBOUWEN[s]
+		var tg := BouwTegel.new()
+		tg.name = "Tegel_" + String(s)
+		tg.soort = s
+		tg.ikoon = _ikoon_van(s)
+		tg.prijs = w.prijs(s)
+		tg.naam = g["tekst"]
+		tg.pc = not touch
+		tg.toets = OS.get_keycode_string(g["toets"])
+		tg.tooltip_text = "%s %d (%s)" % [g["tekst"], tg.prijs, tg.toets] if not touch else ""
+		tg.pressed.connect(kies_tegel.bind(s))
+		rooster.add_child(tg)
+		knoppen[s] = tg
+	_werk_tegels()
+
+
+func _tab_stijl(t: Button) -> void:
+	for st in ["normal", "hover", "pressed", "hover_pressed"]:
+		var sb := StyleBoxFlat.new()
+		var aan: bool = st.contains("pressed")
+		sb.bg_color = Color(0.35, 0.29, 0.16) if aan else Color(1, 1, 1, 0.13 if st == "hover" else 0.07)
+		if aan:
+			sb.border_color = Color(0.95, 0.76, 0.31)
+			sb.border_width_bottom = 3
+		sb.set_corner_radius_all(6)
+		sb.set_content_margin_all(4)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		t.add_theme_stylebox_override(st, sb)
+	t.add_theme_font_size_override("font_size", 16)
+
+
+## Bouwmenu-ikoon van een soort (ikonen/bouw/<soort>.png). Niet geimporteerd (headless zonder --import): de png
+## rechtstreeks; ontbreekt hij: null (de tegel tekent dan een kist).
+static var _ikonen := {}
+
+
+static func _ikoon_van(s: StringName) -> Texture2D:
+	if _ikonen.has(s):
+		return _ikonen[s]
+	var pad := IKONEN + String(s) + ".png"
+	var t: Texture2D = null
+	if ResourceLoader.exists(pad):
+		t = load(pad) as Texture2D
+	if t == null and FileAccess.file_exists(pad):
+		var img := Image.load_from_file(ProjectSettings.globalize_path(pad))
+		if img != null and not img.is_empty():
+			t = ImageTexture.create_from_image(img)
+	_ikonen[s] = t
+	return t
+
+
+## Paneelmodus: touch, of staand op de pc. Anders (pc liggend) staat het paneel altijd open als een rij onderin.
+func paneel_modus() -> bool:
+	return touch or _staand
 
 
 ## 48 dp met een marge; de Motorola (~400 dpi) geeft ~130 px.
@@ -213,10 +321,12 @@ static func touch_knop_h() -> float:
 	return clampf(52.0 * DisplayServer.screen_get_dpi() / 160.0, 110.0, 180.0)
 
 
-## Legt het menu neer voor de huidige viewport: liggend zoals altijd (rechtsboven), staand de lade onderin.
+## Legt het menu neer voor de huidige viewport: pc liggend de rij onderin met hint/Draai/Stop erboven; in de
+## paneelmodus de hamer rechtsonder, het paneel onderin (3 breed staand, 4 liggend) en de touchbalk onderin het midden.
 func _indeling() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_staand = Scherm.staand(vp)
+	var pm := paneel_modus()
 	var onder := 12.0
 	if balk != null:
 		var sep := int(knop_h * 0.3)
@@ -229,54 +339,167 @@ func _indeling() -> void:
 		balk.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		balk.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		onder = knop_h * 1.25 + 12.0
-	if _staand:
+	# tegelmaat
+	var gap := 8.0
+	var tb: Vector2
+	var tab_h: float
+	if pm:
+		var kol := 3 if _staand else 4
+		var b := floorf((vp.x - 24.0 - 16.0 - (kol - 1) * gap) / kol) if _staand else roundf(knop_h * 2.0)
+		tb = Vector2(b, roundf(b * 1.12))
+		tab_h = maxf(knop_h * 0.9, 44.0) if touch else maxf(44.0, b * 0.32)
+	else:
+		var k := clampf(vp.y / 1080.0, 0.8, 1.4)
+		tb = (PC_TEGEL * k).round()
+		tab_h = roundf(34.0 * k)
+	for s in knoppen:
+		(knoppen[s] as Control).custom_minimum_size = tb
+	for t: Button in tab_knoppen.values() + [knop_dicht]:
+		t.custom_minimum_size = Vector2(tab_h * (1.0 if t == knop_dicht else 1.6), tab_h)
+		t.add_theme_font_size_override("font_size", int(tab_h * 0.45))
+	knop_dicht.visible = pm
+	# hamer: rechtsonder, duimzone
+	var hk := roundf(maxf(knop_h * 1.4, vp.x * 0.16 if _staand else 0.0))
+	knop_hamer.custom_minimum_size = Vector2(hk, hk)
+	knop_hamer.size = knop_hamer.custom_minimum_size
+	var hm := roundf(maxf(12.0, hk * 0.2))
+	knop_hamer.position = vp - knop_hamer.size - Vector2(hm, hm)
+	# hint/Draai/Stop
+	if pm:
 		kolom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		kolom.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		kolom.offset_left = 12
 		kolom.offset_right = -12
-		kolom.offset_bottom = -onder
-		kolom.offset_top = -onder
-		rij.alignment = FlowContainer.ALIGNMENT_CENTER
-		rij2.alignment = BoxContainer.ALIGNMENT_CENTER
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		knop_lade.visible = true
-		knop_lade.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 12)
-		knop_lade.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	else:
-		kolom.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		kolom.grow_vertical = Control.GROW_DIRECTION_END
-		kolom.offset_left = MENU_LINKS
-		kolom.offset_top = 12
-		kolom.offset_right = -16
-		kolom.offset_bottom = 12
-		rij.alignment = FlowContainer.ALIGNMENT_END
-		rij2.alignment = BoxContainer.ALIGNMENT_END
+		kolom.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		kolom.offset_left = 0
+		kolom.offset_right = 0
 		hint.autowrap_mode = TextServer.AUTOWRAP_OFF
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		hint.size_flags_horizontal = Control.SIZE_FILL
-		knop_lade.visible = false
-	rij.visible = lade_open or not _staand
-	kolom.queue_redraw()
+	kolom.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	kolom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	zet_tab(tab)
+	if pm:
+		kolom.offset_bottom = -onder
+		kolom.offset_top = -onder
+	else:
+		var top := paneel.position.y - 8.0
+		kolom.offset_bottom = top - vp.y
+		kolom.offset_top = top - vp.y
+	_zichtbaar()
 
 
-## Staand: de lade met bouwknoppen open of dicht (knop Gebouwen; een keuze sluit hem).
-func zet_lade(open: bool) -> void:
-	lade_open = open
-	if knop_lade.button_pressed != open:
-		knop_lade.set_pressed_no_signal(open)
-	rij.visible = open or not _staand
-	kolom.queue_redraw()
+## Paneelmodus: het paneel open of dicht (hamerknop, x; een keuze sluit het). Pc liggend is het altijd open.
+func zet_paneel(open: bool) -> void:
+	paneel_open = open
+	if open:
+		zet_tab(tab)
+	_zichtbaar()
 
 
-## Donkere achtergrond achter de open lade (staand); liggend tekent dit niets.
-func _teken_lade() -> void:
-	if _staand and rij.visible:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0.55)
-		sb.set_corner_radius_all(8)
-		kolom.draw_style_box(sb, Rect2(rij.position, rij.size).grow(8))
+## Open tabblad `k`: alleen zijn tegels; pc liggend een rij, anders 3 (staand) of 4 breed. Het paneel krimpt mee en
+## blijft onderin het midden.
+func zet_tab(k: String) -> void:
+	tab = k
+	var n := 0
+	for s in knoppen:
+		var hier: bool = CATEGORIE[s] == k
+		(knoppen[s] as Control).visible = hier
+		n += int(hier)
+	for c in tab_knoppen:
+		(tab_knoppen[c] as Button).set_pressed_no_signal(c == k)
+	var pm := paneel_modus()
+	rooster.columns = maxi(1, (3 if _staand else 4) if pm else n)
+	if not is_inside_tree():
+		return
+	var vp := get_viewport().get_visible_rect().size
+	paneel.reset_size()
+	var marge := 0 if pm and _staand else 12
+	paneel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, marge)
+	paneel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	paneel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	if pm and _staand:      # staand: over de hele breedte
+		paneel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE, Control.PRESET_MODE_MINSIZE, 0)
+		paneel.offset_left = 0
+		paneel.offset_right = 0
+	paneel.position.y = vp.y - paneel.get_combined_minimum_size().y - marge
+
+
+func _zichtbaar() -> void:
+	var pm := paneel_modus()
+	paneel.visible = paneel_open if pm else true
+	knop_hamer.visible = pm and not actief and not paneel_open
+	knop_hamer.set_pressed_no_signal(paneel_open)
+
+
+## Een tegel gekozen (klik, tik of lettertoets): op slot of te duur = een melding; anders de bouwmodus (een keer op
+## de gekozen soort = uit).
+func kies_tegel(s: StringName) -> void:
+	if actief and soort == s:
+		zet_actief(false)
+		return
+	var st := tegel_staat(s)
+	var g: String = GEBOUWEN[s]["tekst"]
+	if st[0] == BouwTegel.SLOT:
+		var na: StringName = Wereld.ONTGRENDEL.get(s, &"")
+		melding.emit(("%s: eerst een %s bouwen" % [g, GEBOUWEN[na]["tekst"]]) if na != &"" and not Wereld.VANAF_MISSIE.has(s) \
+				else ("%s: pas vanaf missie %d" % [g, int(Wereld.VANAF_MISSIE.get(s, 0))]))
+		return
+	if st[0] == BouwTegel.DUUR:
+		melding.emit("%s: te weinig goud, nog %d" % [g, w.prijs(s) - w.kas])
+		return
+	kies(s)
+
+
+## [staat, reden] van een tegel: BouwTegel.SLOT met "na Loods" / "missie 3", DUUR (kas < prijs), of KAN.
+func tegel_staat(s: StringName) -> Array:
+	if not w.ontgrendeld(s):
+		if Wereld.VANAF_MISSIE.has(s) and w.missie_nr < int(Wereld.VANAF_MISSIE[s]):
+			return [BouwTegel.SLOT, "missie %d" % int(Wereld.VANAF_MISSIE[s])]
+		var na: StringName = Wereld.ONTGRENDEL.get(s, &"")
+		return [BouwTegel.SLOT, ("na " + String(GEBOUWEN[na]["tekst"])) if na != &"" else ""]
+	if not w.kan_betalen(s):
+		return [BouwTegel.DUUR, ""]
+	return [BouwTegel.KAN, ""]
+
+
+func _werk_tegels() -> void:
+	for s in knoppen:
+		var st := tegel_staat(s)
+		(knoppen[s] as BouwTegel).zet(st[0], st[1], actief and soort == s)
+
+
+## `--proef=rij` (frames): een weg slepen van een vrije tegel bij het kampvuur 7 tegels naar rechts en 3 omlaag (pc: de
+## knop blijft ingedrukt met de wijzer op het eind; touch: begin en eind gezet, Bouwen toont aantal x prijs).
+func _proef_rij() -> void:
+	w.kas = maxi(w.kas, 100000)
+	kies(&"weg")
+	var a := w.kampvuur + Vector2i(-3, 4)
+	var e := a + Vector2i(7, 3)
+	if bestuur.cam != null and bestuur.cam.has_method("spring_naar"):
+		bestuur.cam.spring_naar(_grond(a).lerp(_grond(e), 0.5))
+	if touch:
+		_t_tegel = a
+		_t_eind = e
+		return
+	_drukt = true
+	_sleep_start = a
+	get_tree().process_frame.connect(func() -> void:
+		if actief and _drukt and bestuur.cam != null:
+			_wijzer = bestuur.cam.unproject_position(_grond(e)))
+
+
+## `--proef=paneel` (frames): het paneel open; met `--proef_tab=` een ander tabblad, `--proef_kas=` een andere kas.
+func _proef_paneel() -> void:
+	if Scherm.optie("proef_kas") != "":
+		w.kas = int(Scherm.optie("proef_kas"))
+	if Scherm.optie("proef_tab") != "":
+		tab = Scherm.optie("proef_tab")
+	zet_paneel(true)
+	zet_tab(tab)
 
 
 ## Touch: Draai, Bouwen en Annuleer onderin het midden, groot genoeg voor een duim.
@@ -290,6 +513,8 @@ func _bouw_touch_balk(laag: CanvasLayer) -> void:
 	knop_bouw.icon = _ikoon(true)
 	knop_bouw.add_theme_color_override("font_color", Color(0.75, 1.0, 0.7))
 	knop_bouw.pressed.connect(bevestig)
+	knop_bouw.clip_text = true          # "Bouwen 12 x 20" mag de balk niet breder maken
+	knop_bouw.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	knop_stop = _knop("Annuleer")
 	knop_stop.icon = _ikoon(false)
 	knop_stop.add_theme_color_override("font_color", Color(1.0, 0.75, 0.7))
@@ -350,9 +575,11 @@ func kies(s: StringName, aan := true) -> void:
 		_wis_gmodel()
 	if aan and not soort in RIJ_SOORTEN:
 		_scene(GEBOUWEN[soort]["glb"])     # de glb alvast in de achtergrond; tot hij er is de kist
+	if aan and not paneel_modus() and CATEGORIE.get(soort, tab) != tab:
+		zet_tab(CATEGORIE[soort])     # pc: de lettertoets van een ander tabblad opent dat tabblad
+	if aan and paneel_open:
+		paneel_open = false
 	zet_actief(aan)
-	if aan and _staand and lade_open:
-		zet_lade(false)
 	if aan and touch:
 		_touch_begin()
 
@@ -371,11 +598,9 @@ func zet_actief(aan: bool) -> void:
 	_t_sleutel = []
 	_t_getoond = []
 	_toon_rij([], [])
-	for s in knoppen:
-		var k: Button = knoppen[s]
-		var moet: bool = aan and s == soort
-		if k.button_pressed != moet:
-			k.set_pressed_no_signal(moet)
+	if paneel != null:
+		_werk_tegels()
+		_zichtbaar()
 	if knop_stop != null:
 		knop_stop.visible = aan
 		knop_draai.visible = aan
@@ -458,6 +683,8 @@ func _process(_dt: float) -> void:
 			k.position.y = GROND_Y + _hoogte(p.soort) * 0.5 * k.scale.y
 		(k.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.8, 0.4, 0.5).lerp(Color(0.55, 0.4, 0.25, 1.0), f)
 	_kijk_bouwers()
+	if paneel != null and paneel.visible:
+		_werk_tegels()
 	for pt in _poorten:
 		var dr: Node3D = _poorten[pt]
 		dr.rotation.y = lerp_angle(dr.rotation.y, POORT_OPEN_RAD if pt.open else 0.0, minf(1.0, _dt * 5.0))
@@ -476,7 +703,10 @@ func _process(_dt: float) -> void:
 		if sleutel != _rij_sleutel:       # A* alleen als er iets veranderd is
 			_rij_sleutel = sleutel
 			_rij = BouwRij.route(w, soort, _sleep_start, eind)
-			_toon_rij(_rij, BouwRij.statussen(w, soort, _rij))
+			var st := BouwRij.statussen(w, soort, _rij)
+			_toon_rij(_rij, st)
+			var n := st.count(BouwRij.KAN)     # aantal x prijs (besluit gebruiker 2026-10-31)
+			hint.text = "%s: %d x %d = %d   loslaten = plaatsen" % [GEBOUWEN[soort]["tekst"], n, w.prijs(soort), n * w.prijs(soort)]
 		return
 	_toon_ghost(_plan_op(_proef_tegel) if _proef_tegel.x >= 0 else _plan_onder(_wijzer))
 
@@ -1044,7 +1274,7 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
 		for s: StringName in GEBOUWEN:
 			if e.keycode == GEBOUWEN[s]["toets"]:
-				kies(s, not (actief and soort == s))
+				kies_tegel(s)
 				get_viewport().set_input_as_handled()
 				return
 		if actief and e.keycode == KEY_R:
@@ -1052,6 +1282,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif actief and e.keycode == KEY_ESCAPE:
 			zet_actief(false)
+			get_viewport().set_input_as_handled()
+		elif paneel_open and e.keycode == KEY_ESCAPE:
+			zet_paneel(false)
 			get_viewport().set_input_as_handled()
 		return
 	if touch and actief:
@@ -1099,6 +1332,7 @@ func _plaats(pos: Vector2) -> void:
 			BouwRij.zet(w, soort, BouwRij.route(w, soort, _sleep_start, eind))
 		_sleep_start = Vector2i(-1, -1)
 		_toon_rij([], [])
+		hint.text = _hint_basis
 		return
 	var p := _plan_onder(pos)
 	if p != null:
@@ -1228,8 +1462,11 @@ func _toon_touch() -> void:
 		if _t_sleutel != _t_getoond:
 			_t_getoond = _t_sleutel
 			_toon_rij(_t_rij, _t_st)
+			var n := _t_st.count(BouwRij.KAN)
+			knop_bouw.text = ("%d x %d" % [n, w.prijs(soort)]) if n > 0 else "Bouwen"   # aantal x prijs, met het vinkje: past ook staand
 		knop_bouw.disabled = not BouwRij.KAN in _t_st
 		return
+	knop_bouw.text = "Bouwen"
 	knop_bouw.disabled = not _toon_ghost(_plan_op(_t_tegel))
 
 
@@ -1268,3 +1505,122 @@ func _proef_bouw() -> void:
 		_proef_tegel = t
 	if bestuur.cam != null and bestuur.cam.has_method("spring_naar"):
 		bestuur.cam.spring_naar(_grond(t))
+
+
+# ---------------------------------------------------------------- tegel en hamer (schets variant A)
+
+## Een gebouw in het paneel: ikoon, prijs eronder (goud; rood als het te duur is), op slot grijs met een slotje en de
+## reden. Pc: ook de naam en de lettertoets linksboven. Alles zelf getekend (geen kleine Labels).
+class BouwTegel extends Button:
+	const KAN := 0
+	const DUUR := 1
+	const SLOT := 2
+	const GOUD := Color(0.95, 0.76, 0.31)
+	const ROOD := Color(1.0, 0.42, 0.36)
+	const GROEN := Color(0.37, 0.83, 0.35)
+	var soort: StringName
+	var ikoon: Texture2D
+	var prijs := 0
+	var naam := ""
+	var toets := ""
+	var pc := false
+	var staat := KAN
+	var reden := ""
+	var aan := false
+
+	func _init() -> void:
+		focus_mode = Control.FOCUS_NONE
+		flat = true
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+
+	func zet(st: int, r: String, a: bool) -> void:
+		if st == staat and r == reden and a == aan:
+			return
+		staat = st
+		reden = r
+		aan = a
+		queue_redraw()
+
+	func _draw() -> void:
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(int(size.x * 0.08))
+		sb.bg_color = Color(GROEN, 0.18) if aan else Color(1, 1, 1, 0.13 if is_hovered() else 0.07)
+		if aan:
+			sb.border_color = GROEN
+			sb.set_border_width_all(2)
+		draw_style_box(sb, Rect2(Vector2.ZERO, size))
+		var f := get_theme_default_font()
+		var fs := clampi(int(size.x * (0.14 if pc else 0.13)), 12, 48)
+		var pad := size.x * 0.06
+		var y_prijs := size.y - pad - fs * 0.2
+		var vaal := 0.5 if staat == SLOT else 1.0
+		_tekst(f, str(prijs), y_prijs, fs, Color(ROOD if staat == DUUR else GOUD, vaal))
+		var onder := y_prijs - fs * 1.05
+		if pc:
+			_tekst(f, naam, onder, int(fs * 0.95), Color(1, 1, 1, vaal))
+			onder -= fs * 1.1
+		var zijde := minf(size.x - 2.0 * pad, onder - pad)
+		var ik := Rect2(Vector2((size.x - zijde) * 0.5, pad), Vector2(zijde, zijde))
+		var mod := Color(0.4, 0.4, 0.4) if staat == SLOT else (Color(0.75, 0.68, 0.68) if staat == DUUR else Color.WHITE)
+		if ikoon != null:
+			draw_texture_rect(ikoon, ik, false, mod)
+		else:
+			draw_rect(ik.grow(-zijde * 0.2), Color(0.55, 0.4, 0.25) * mod)
+		if staat == SLOT:
+			var m := ik.get_center() - Vector2(0, zijde * 0.1)
+			var r := zijde * 0.2
+			draw_circle(m, r, Color(0, 0, 0, 0.8))
+			var sl := Color(1.0, 0.82, 0.48)
+			draw_arc(m + Vector2(0, -r * 0.12), r * 0.32, PI, TAU, 16, sl, r * 0.13)
+			draw_rect(Rect2(m + Vector2(-r * 0.45, -r * 0.12), Vector2(r * 0.9, r * 0.65)), sl)
+			draw_circle(m + Vector2(0, r * 0.18), r * 0.1, Color.BLACK)
+			if reden != "":
+				_tekst(f, reden, m.y + r + fs * 1.0, fs, sl, true)
+		if pc and toets != "":
+			var tf := int(fs * 0.8)
+			var tw := f.get_string_size(toets, HORIZONTAL_ALIGNMENT_LEFT, -1, tf)
+			var tr := Rect2(Vector2(4, 4), tw + Vector2(8, 2))
+			var tsb := StyleBoxFlat.new()
+			tsb.bg_color = Color(0, 0, 0, 0.65)
+			tsb.border_color = Color(1, 1, 1, 0.33)
+			tsb.set_border_width_all(1)
+			tsb.set_corner_radius_all(3)
+			draw_style_box(tsb, tr)
+			draw_string(f, Vector2(tr.position.x + 4, tr.position.y + tf * 0.95), toets, HORIZONTAL_ALIGNMENT_LEFT, -1, tf, Color.WHITE)
+
+	## Gecentreerde regel met de basislijn op `y`; `rand` = zwarte omlijning (over het ikoon).
+	func _tekst(f: Font, t: String, y: float, fs: int, kleur: Color, rand := false) -> void:
+		var b := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var p := Vector2((size.x - b) * 0.5, y)
+		if rand:
+			draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, fs / 6), Color(0, 0, 0, 0.9))
+		draw_string(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, kleur)
+
+
+## Ronde hamerknop (paneelmodus, rechtsonder): donker met een gouden rand, hamer zelf getekend (schets variant A).
+class HamerKnop extends Button:
+	func _init() -> void:
+		focus_mode = Control.FOCUS_NONE
+		flat = true
+		toggle_mode = true
+
+	func _draw() -> void:
+		var m := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		draw_circle(m, r - 1.0, Color(0.12, 0.1, 0.08, 0.88))
+		draw_arc(m, r - maxf(2.0, r * 0.04), 0.0, TAU, 48, Color(0.95, 0.76, 0.31), maxf(2.0, r * 0.07), true)
+		# hamer op een 24-raster (schets: SVG.hamer), 0,62 van de knop
+		var k := r * 1.24 / 24.0
+		var o := m - Vector2(12, 12) * k
+		var steel := PackedVector2Array([Vector2(13.5, 9.5), Vector2(4, 19), Vector2(6.2, 21.2), Vector2(15.7, 11.7)])
+		var kop := PackedVector2Array([Vector2(11, 4.5), Vector2(15.5, 2), Vector2(21.5, 8), Vector2(19, 12.5),
+			Vector2(17, 10.5), Vector2(14, 13.5), Vector2(10, 9.5), Vector2(13, 6.5)])
+		for poly: Array in [[steel, Color(0.69, 0.48, 0.27), Color(0.23, 0.14, 0.07)], [kop, Color(0.79, 0.81, 0.82), Color(0.2, 0.22, 0.24)]]:
+			var pts := PackedVector2Array()
+			for p: Vector2 in poly[0]:
+				pts.append(o + p * k)
+			draw_colored_polygon(pts, poly[1])
+			pts.append(pts[0])
+			draw_polyline(pts, poly[2], maxf(1.0, k), true)

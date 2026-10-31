@@ -13,7 +13,8 @@ extends CanvasLayer
 ## alleen zichtbaar met een selectie, of X: de gekozen dorpelingen blijven staan zonder eigen klussen (Wereld.geef_stilstaan).
 ## Melding (midden boven, 2,5 s): een geweigerd bevel (Wereld.bevel_geweigerd, bv. een vrouw laten bouwen).
 ## Portret (besluit gebruiker 2026-10-31, view/portret.gd): rechtsonder de (eerste) gekozen dorpeling met zijn gedachte;
-## op de pc inklapbaar (bewaard in hud.cfg), staand weg zolang het bouwmenu de onderkant gebruikt.
+## op de pc inklapbaar (bewaard in hud.cfg), weg zolang het bouwpaneel open is of de bouwmodus de onderkant gebruikt
+## (paneelmodus), links van de hamerknop, en boven de bouwrij als die er anders over zou vallen (pc).
 
 var w: Wereld
 var bestuur: Bestuur
@@ -100,7 +101,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nX / hand = stilstaan (selectie)   M = muziek aan/uit   Tab / I = details   F1 = deze uitleg"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: rij onderin of lettertoets, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nX / hand = stilstaan (selectie)   M = muziek aan/uit   Tab / I = details   F1 = deze uitleg"
 	pc2.add_child(hulp)
 	add_child(pc2)
 	knop_hulp = Button.new()
@@ -299,10 +300,18 @@ func _leg_links_neer(staand: bool) -> void:
 	else:
 		knop_hulp.position = Vector2(12, vp.y - knop_hulp.size.y - 12)
 		pc2.position = Vector2(12, knop_hulp.position.y - pc2.size.y - 6)
+		# de sneltoetsuitleg is breed: valt hij over de bouwrij (of hint/Draai/Stop erboven), dan erboven
+		if _bm != null and _bm.paneel != null and _bm.paneel.visible:
+			var top := _bm.paneel.position.y
+			if _bm.rij2.is_visible_in_tree() and _bm.hint.visible:
+				top = minf(top, _bm.kolom.get_global_rect().position.y)
+			var r := Rect2(pc2.position, pc2.size)
+			if r.end.x > _bm.paneel.position.x and r.end.y > top - 6.0:
+				pc2.position.y = top - pc2.size.y - 8.0
 
 
-## Portret van de eerste gekozen dorpeling rechtsonder; staand weg als het bouwmenu onderin bezig is (bouwmodus of
-## lade open).
+## Portret van de eerste gekozen dorpeling rechtsonder; in de paneelmodus weg als het bouwmenu onderin bezig is
+## (bouwmodus of paneel open) en anders links van de hamerknop; pc liggend boven de bouwrij als hij die zou raken.
 func _werk_portret() -> void:
 	if portret == null or bestuur == null:
 		return
@@ -319,13 +328,22 @@ func _werk_portret() -> void:
 			if c is Bouwmenu:
 				_bm = c
 	var vp := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1600, 900)
-	if _bm != null and Scherm.staand(vp) and (_bm.actief or _bm.lade_open):
+	if _bm != null and _bm.paneel != null and _bm.paneel_modus() and (_bm.actief or _bm.paneel_open):
 		d = null
 	portret.zet(d)
 	if portret.visible:
 		portret.reset_size()
 		var marge := 12.0 * maxf(1.0, schaal)
 		portret.position = vp - portret.size - Vector2(marge, marge)
+		if _bm != null and _bm.knop_hamer != null and _bm.knop_hamer.visible:
+			portret.position.x = _bm.knop_hamer.position.x - marge - portret.size.x
+			portret.position.y = vp.y - portret.size.y - marge
+		elif _bm != null and _bm.paneel != null and _bm.paneel.visible:
+			var top := _bm.paneel.position.y
+			if _bm.rij2.is_visible_in_tree() and _bm.hint.visible:
+				top = minf(top, _bm.kolom.get_global_rect().position.y)
+			if Rect2(portret.position, portret.size).intersects(Rect2(Vector2(_bm.paneel.position.x, top), Vector2(_bm.paneel.size.x, vp.y - top))):
+				portret.position.y = top - portret.size.y - marge
 
 
 ## Ingeklapt portret uit hud.cfg (pc), standaard uit.

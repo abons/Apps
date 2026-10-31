@@ -8,8 +8,10 @@ extends SceneTree
 ## Pc (2026-10-31): ook op 1600x900; standaard alleen de tellerrij en de knop "? Toetsen", en met de details (Tab) en de
 ## sneltoetsuitleg (F1) uitgeklapt, apart en samen, weer niets buiten beeld of over elkaar. De menuknop (2026-10-31) telt
 ## mee als vast deel. Start- en pauzemenu: test/menu_test.gd.
-## Portret (2026-10-31, view/portret.gd): met een gekozen dorpeling rechtsonder in beeld, zonder overlap; staand weg in de
-## bouwmodus en met de lade open.
+## Portret (2026-10-31, view/portret.gd): met een gekozen dorpeling rechtsonder in beeld, zonder overlap; in de
+## paneelmodus weg in de bouwmodus en met het paneel open.
+## Bouwmenu variant A (2026-10-31): pc liggend de rij onderin (paneel altijd open, geen hamer); touch en staand de
+## hamerknop rechtsonder die het paneel opent, een keuze sluit het. Paneel, hamer en hint/Draai/Stop tellen mee.
 
 var fouten := 0
 var cam: Camera3D
@@ -59,8 +61,7 @@ func _ronde(touch: bool) -> void:
 	var h := Hints.new().bouw(w)
 	hud.zet_hints(h)
 	b.gekozen.append(w.dorpelingen[0].id)      # portret rechtsonder
-	for s in bm.knoppen:          # alles_open: alle negen knoppen, de volste rij
-		(bm.knoppen[s] as Button).visible = w.ontgrendeld(s)
+	bm.zet_tab("voedsel")         # het breedste tabblad (4 tegels)
 
 	var naam := "touch" if touch else "pc"
 	if touch:
@@ -114,18 +115,27 @@ func _ronde(touch: bool) -> void:
 		_indeling(hud, bm, "%s bouwmodus" % tag)
 		if not touch:
 			await _inklap_standen(hud, bm, "%s bouwmodus" % tag)
-		if maat.y > maat.x:
-			_check(bm.knop_lade.visible and not bm.rij.visible, "%s: lade dicht, knop Gebouwen" % tag)
-			bm.knop_lade.button_pressed = true
+		if touch or maat.y > maat.x:
+			_check(not bm.knop_hamer.visible and not bm.paneel.visible, "%s: in de bouwmodus geen hamer en geen paneel" % tag)
+			bm.zet_actief(false)
 			await _frames(2)
-			_check(bm.rij.visible, "%s: Gebouwen opent de lade" % tag)
-			_indeling(hud, bm, "%s lade open" % tag)
-			_check(not hud.portret.visible, "%s: portret weg bij de open lade" % tag)
-			(bm.knoppen[&"kippenhok"] as Button).button_pressed = true
+			_check(bm.knop_hamer.visible and not bm.paneel.visible, "%s: paneel dicht, hamerknop" % tag)
+			if b.gekozen.is_empty():
+				b.gekozen.append(w.dorpelingen[0].id)
 			await _frames(2)
-			_check(bm.soort == &"kippenhok" and bm.actief and not bm.rij.visible, "%s: keuze in de lade sluit hem" % tag)
+			_indeling(hud, bm, "%s rust met hamer" % tag)
+			bm.knop_hamer.pressed.emit()
+			bm.zet_tab("voedsel")
+			await _frames(2)
+			_check(bm.paneel.visible and bm.paneel_open, "%s: hamer opent het paneel" % tag)
+			_indeling(hud, bm, "%s paneel open" % tag)
+			_check(not hud.portret.visible, "%s: portret weg bij het open paneel" % tag)
+			(bm.knoppen[&"kippenhok"] as Button).pressed.emit()
+			await _frames(2)
+			_check(bm.soort == &"kippenhok" and bm.actief and not bm.paneel.visible, "%s: keuze in het paneel sluit het" % tag)
 		else:
-			_check(not bm.knop_lade.visible and bm.rij.visible, "%s: knoppen rechtsboven, geen lade" % tag)
+			_check(not bm.knop_hamer.visible and bm.paneel.visible, "%s: rij onderin, geen hamer" % tag)
+			_check(bm.kolom.get_global_rect().end.y <= bm.paneel.position.y, "%s: hint/Draai/Stop boven de rij" % tag)
 		bm.zet_actief(false)
 		hud.prijzen.open()
 		await _frames(2)
@@ -191,7 +201,7 @@ func _indeling(hud: Hud, bm: Bouwmenu, wat: String) -> void:
 	_check(buiten.is_empty(), "%s: alles in beeld %s" % [wat, buiten])
 	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "menu": hud.menu_knop, "stand": hud.kop if hud.kop != null else hud.tellers,
 		"details": hud.stand, "toetsen-knop": hud.knop_hulp, "hulpregels": hud.hulp.get_parent(),
-		"lade-knop": bm.knop_lade, "portret": hud.portret, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
+		"hamer": bm.knop_hamer, "portret": hud.portret, "paneel": bm.paneel, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
 	var namen := delen.keys().filter(func(k: String) -> bool:
 		var c: Control = delen[k]
 		return c != null and c.is_visible_in_tree() and c.size.x >= 1.0 and c.size.y >= 1.0 and _heeft_inhoud(c))

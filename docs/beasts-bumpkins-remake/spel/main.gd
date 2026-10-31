@@ -152,6 +152,7 @@ func _ready() -> void:
 	bouwmenu.view = view            # bouwers kijken naar zaagbok of steenhoop
 	add_child(bouwmenu)
 	bouwmenu.bouw(w, bestuur, self)
+	bouwmenu.melding.connect(hud.toon_melding)     # op slot of te duur gekozen
 	# een vinger slepen in de bouwmodus schuift de ghost (muisstijl) en pant niet; met touch-bouwen sleept alleen een
 	# vinger op de ghost hem (Bouwmenu vangt die af), de rest pant
 	cam.pan_blokkade = func() -> bool: return bouwmenu.actief and not Bouwmenu.touch

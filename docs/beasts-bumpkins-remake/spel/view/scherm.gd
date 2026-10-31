@@ -5,7 +5,8 @@ extends RefCounted
 ## opnieuw neer bij elke `size_changed` van de viewport. Liggend op de pc is alles zoals het was.
 ## `--venster=1080x2400` (na `--`): de pc doet alsof het scherm die maat heeft (viewport op die maat, het venster
 ## geschaald zodat het op de monitor past), om staand te proberen en frames te maken.
-## `--proef=bouw|lade|prijzen` (na `--`): alleen voor frames: bouwmodus (hut) aan, de gebouwenlade open, of de prijzen open.
+## `--proef=bouw|paneel|prijzen` (na `--`): alleen voor frames: bouwmodus (hut) aan, het bouwpaneel open (`lade` mag ook;
+## `--proef_tab=voedsel`, `--proef_kas=400`), of de prijzen open.
 
 
 ## Staand = hoger dan breed.
