@@ -34,6 +34,7 @@ func _ready() -> void:
 		startmenu = Startmenu.new()
 		startmenu.name = "Startmenu"
 		add_child(startmenu)
+		Muziek.van(get_tree()).zet(&"menu")      # view/muziek.gd: menutrack (origineel cd-track 2)
 		return
 	var nr := int(opt.get("missie", "1"))
 	if uit_menu:                       # gekozen in het start- of pauzemenu: geen scenario, de opdrachtregel-missie telt niet
@@ -47,6 +48,8 @@ func _ready() -> void:
 		return
 	Prestatie.merk("wereld geladen (sim)")
 	Voorladen.start(w.missie_nr)       # alleen mobiel: glb's parallel lezen (view/voorladen.gd)
+	if not opt.has("scenario"):
+		Muziek.van(get_tree()).zet(&"briefing")   # de briefing (ook als laadscherm) heeft cd-track 3
 	var laadscherm: CanvasLayer = null
 	if Voorladen.aan or uit_menu:      # mobiel, of na een keuze in het menu: briefing als laadscherm, eerst een frame tekenen, dan opbouwen
 		set_process(false)
@@ -129,6 +132,8 @@ func _ready() -> void:
 	if scenario == "" or scenario == "hints":   # briefing en hints (sim/hints.gd); andere scenario's houden hun frames
 		hints = Hints.new().bouw(w)
 		hud.zet_hints(hints)
+	if scenario == "":
+		Muziek.van(get_tree()).volg(hud, w)      # briefing-track tot de briefing dicht is, dan stil (zoals het origineel)
 	Prestatie.merk("camera, bestuur, hud, hints")
 	bouwmenu = Bouwmenu.new()
 	bouwmenu.name = "Bouwmenu"

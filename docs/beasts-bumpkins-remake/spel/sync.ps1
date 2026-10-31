@@ -67,4 +67,6 @@ foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json
 }
 # stemmen en klanken uit beasts-src naar assets/audio/beasts/ (prive, niet in git; audio.md sectie 6)
 & (Join-Path $PSScriptRoot 'audio\haal_beasts.ps1')
+# muziek: eigen cd-rip naar assets/audio/muziek/ (prive, niet in git; audio.md sectie 7); zonder bron overgeslagen
+& (Join-Path $PSScriptRoot 'audio\haal_muziek.ps1')
 Write-Host "Daarna: Godot --headless --path . --import"

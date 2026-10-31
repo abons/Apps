@@ -20,7 +20,7 @@ Lokale kopie (niet in git): `SC/audio_origineel/{BBRBANK,BBSPRAUT,BBSUMMER,BBWIN
 | `BBRBANK.FAT` | 88 entries, **79 geëxtraheerd**. De 9 ontbrekende (2, 20, 40, 44, 55, 82, 85, 86, 87; allemaal mono, samen ca. 223 KB, ca. 5 s) zijn geldig en passen in het bestand: de map is onvolledig, **opnieuw extraheren** |
 | Overige FAT | `BBSPRAUT` 24/24, `BBSUMMER` 30/30, `BBWINTER` 16/16 compleet |
 | Vlagwoord per FAT-entry | `0x01010001` bij 86 van 88; entries 36 en 75 hebben `0x02010001` **[?]** (loop-vlag of formaat). Geen samplefrequentie in de kop: 22050 Hz is een aanname, de signaalmeting (piek 0,9 genormaliseerd, geen ruisbeeld) klopt ermee |
-| Muziek | **geen in de geëxtraheerde bestanden**. Alle FAT-klanken duren 0,04 tot 6,3 s. `QMIXER95.DLL` (Q-Sound-mixer), `MIX.DAT`, `REFLECT.DAT` zijn geen muziek. Muziek zit waarschijnlijk op de cd of in `BEASTS.EXE` **[?]**; `INTRO/OUTRO/CREDITS/EALOGO.VID` zijn 0 byte (weggelaten). Niet onderzocht: `M*.VID`/`MAP*.VID` (1 tot 3 MB, waarschijnlijk kaart-/missiebeelden, geen audio) |
+| Muziek | **cd-audio, zie sectie 7** (2026-10-31). Geen in de geëxtraheerde bestanden. Alle FAT-klanken duren 0,04 tot 6,3 s. `QMIXER95.DLL` (Q-Sound-mixer), `MIX.DAT`, `REFLECT.DAT` zijn geen muziek. Muziek zit waarschijnlijk op de cd of in `BEASTS.EXE` **[?]**; `INTRO/OUTRO/CREDITS/EALOGO.VID` zijn 0 byte (weggelaten). Niet onderzocht: `M*.VID`/`MAP*.VID` (1 tot 3 MB, waarschijnlijk kaart-/missiebeelden, geen audio) |
 
 ### 1b. Effecten: de vier banken (149 wav)
 
@@ -142,7 +142,7 @@ Aanpak: voetstap via animatie-event (`footstep_l/r`) op de loopklip, ondergrond 
 | **Winter**: stille wind, krakende sneeuw, geen insecten | P2 | 1 lus | C | `wind winter cold howl` |
 | Gras bladeren fladderen / boomkruin | P3 | 1 | C | `leaves rustle` |
 
-Geen eigen muziek in het origineel gevonden. **Muziek** (bus `Muziek`): per seizoen een rustig thema of stilte; P3, bron C (Kevin MacLeod CC-BY, Pixabay/Sonniss) of G (Suno/ElevenLabs Music) **[?]**: eerst vragen (zie 5).
+**Muziek**: het origineel had 7 cd-audiotracks; gebouwd in sectie 7.
 
 ### 3d. Koe, dier en overig
 
@@ -309,7 +309,60 @@ Eenmalige klanken (uil, vogelroep, donder) via een **scheduler** (random interva
 | Krekels (2D-lus) | nacht, niet bij regen; lente 0,35 zomer 1 herfst 0,6 winter 0 | G krekels |
 | Vogels (3D one-shot, 10 tot 25 m) | dag, niet bij regen; dichtheid 1 / 0,8 / 0,35 / 0 | G vogel_0..5 |
 | Uil (3D, 20 tot 35 m) | nacht, niet bij regen, elke 20 tot 60 s | G uil_0/1 |
+| Wolf gromt (3D) | per wolf elke 9 tot 22 s sim-tijd, en bij `wolf_erbij` | G wolf_grom_0/1 |
+| Wolf jankt | `wolf_geraakt` (pitch 1,2), `wolf_dood` (0,85) | G wolf_jank |
+| Wolf hapt | `koe_weg` (+ angstige loei, pitch 1,25), `dorpeling_geraakt` met oorzaak wolf | G wolf_hap_0/1 |
+| Steen worp / inslag | `steen_gegooid` / `Bumpkin.impact(&"steen")` bij de dichtste wolf | G worp_0/1, steen_0..2 |
+| Zwaard | `zwaard_slag` (zoef) / `impact(&"aanval_zwaard")` (klank) | G worp, zwaard_0/1 |
+| Geraakt, dood | `dorpeling_geraakt` (hoogstens 1 per 0,6 s: vuur raakt elke tik) / `dorpeling_dood` (lage klok) | G raak_0/1, dood |
+| Geboorte | `dorpeling_erbij` | G plop |
+| Drinken | `gedronken` (put, missie 3) | G water_0/1 |
+| Munten tellen | `voorwerp_afgeleverd` (5 munten, 0,09 s uit elkaar), `kas_beloning` (4, 2D) | B `voice_coin_0` |
+| Ontploffing | `ontploffing` (missie 4, alleen als het signaal bestaat) | G boem |
 
-Bron **B** = beasts-src `app/src/main/res/raw/` (privé repo; ElevenLabs-mp3, licentie open, zie 2; de 7 wav eigen werk). Gekopieerd door `spel/audio/haal_beasts.ps1` (vanuit `sync.ps1`) naar `spel/assets/audio/beasts/`, **niet in git** omdat het Apps-repo publiek is. **ffmpeg sinds 2026-10-30** (winget `Gyan.FFmpeg`): `haal_beasts.ps1` maakt van elke mp3 een `.ogg` (mono 44,1 kHz, Vorbis q4, -16 LUFS, piek -1 dBTP; 62 stuks, 2,1 MB mp3 wordt 0,9 MB ogg); `geluid.gd` neemt de ogg als die er is, anders de mp3. Bron **G** = eigen synthese, `spel/audio/maak_geluid.py` (numpy, `py -3.10`; Python 3.12 heeft geen numpy), 32 wav, 22050 Hz mono, 3,1 MB, deterministisch, lussen naadloos (circulair gefilterd), in git in `spel/audio/eigen/`. Rechtenvrij, eigen werk. **Niets uit het origineel** (niet beluisterd, niet gekopieerd). Fallback: een niet-geïmporteerd bestand laadt via `load_from_file`; een ontbrekend bestand blijft stil met één melding. Test: `test/audio_test.gd` (82 klanken).
+Bron **B** = beasts-src `app/src/main/res/raw/` (privé repo; ElevenLabs-mp3, licentie open, zie 2; de 7 wav eigen werk). Gekopieerd door `spel/audio/haal_beasts.ps1` (vanuit `sync.ps1`) naar `spel/assets/audio/beasts/`, **niet in git** omdat het Apps-repo publiek is. **ffmpeg sinds 2026-10-30** (winget `Gyan.FFmpeg`): `haal_beasts.ps1` maakt van elke mp3 een `.ogg` (mono 44,1 kHz, Vorbis q4, -16 LUFS, piek -1 dBTP; 62 stuks, 2,1 MB mp3 wordt 0,9 MB ogg); `geluid.gd` neemt de ogg als die er is, anders de mp3. Bron **G** = eigen synthese, `spel/audio/maak_geluid.py` (numpy, `py -3.10`; Python 3.12 heeft geen numpy), 32 wav, 22050 Hz mono, 3,1 MB, deterministisch, lussen naadloos (circulair gefilterd), in git in `spel/audio/eigen/` (51 wav sinds 2026-10-31, de nieuwe achteraan in `__main__` zodat de oude byte voor byte gelijk blijven). Rechtenvrij, eigen werk. **Niets uit het origineel** (niet beluisterd, niet gekopieerd). Fallback: een niet-geïmporteerd bestand laadt via `load_from_file`; een ontbrekend bestand blijft stil met één melding. Test: `test/audio_test.gd` (101 klanken met beasts-src, plus de muziekspeler).
 
-**Nog niet:** voetstappen (3b), koebel, kauwen, donder, wind door dennen, bron/waterput, schaap, baby/geboorte, eigen oudere stemmen, muziek, instellingen (volume per bus in `user://`, schakelaar origineel/eigen uit de besluiten), sidechain-ducking, mislukte plaatsing. Synthese is plaatshouder-kwaliteit; vervangen door CC0 zodra downloaden mag (5, vraag 6).
+**Nog niet:** voetstappen (3b), koebel, kauwen, donder, wind door dennen, bronklank (kabbelen), schaap, baby-gehuil, eigen oudere stemmen, stem bij geraakt/dood (origineel heeft die), volume per bus behalve muziek, schakelaar origineel/eigen uit de besluiten, sidechain-ducking, mislukte plaatsing, kasteller-tik bij elke verkoop. Synthese is plaatshouder-kwaliteit; vervangen door CC0 zodra downloaden mag (5, vraag 6).
+
+## 7. Muziek (2026-10-31)
+
+### 7a. Wat het origineel deed
+
+Bron: openbumpkins (decompilatie van `BEASTS.EXE`, GPLv3; `src/bridge/session_controls.c`, `cd_control.c`, `statistics.c`, `startup.c`, `world.c`, `native/cd.c`), RaZLeN-patch README, `onderzoek.md`. **Niets beluisterd; de cd zelf is hier niet** (laptop-share offline, geen image op deze pc).
+
+| wat | detail | zekerheid |
+| --- | --- | --- |
+| Formaat | **7 cd-audiotracks** (2 tot 8; track 1 = data), 44,1 kHz stereo, James Hannigan. Geen muziek in de spelbestanden | goed |
+| Afspelen | MCI: `open cdaudio`, `set time format tmsf`, `play cdaudio from N` (zonder `to`), `close` | goed |
+| Hoofdmenu | **track 2**, gestart bij het binnenkomen van het menu; ook de outro (campagne uit) | goed |
+| Briefing | **track 3** zolang het briefingvenster open is (`bb_mission_popup_visibility_entry`); dicht = stop | goed |
+| In de missie | **geen muziek**: alleen effecten, stemmen, omgeving | goed (geen andere aanroep gevonden) |
+| Gewonnen/verloren | geen muziek: een van drie stemfragmenten (`bb_faction_end_state_entry`) | goed |
+| Tracks 4 tot 8 | door de exe **niet** aangeroepen; vermoedelijk alleen voor een cd-speler of de FMV | **[?]** |
+| Lus | **nee**: een vaste duur per track in de exe (2: 67 s, 3: 109 s, 4..8: 100, 285, 71, 76, 59 s), daarna `stop`. Het menu viel na 67 s stil | goed |
+| Demoversie | speelt altijd track 2 | goed |
+| Volume/opties | geen muziekoptie in het spelmenu gevonden; volume via de Windows-mixer. De RaZLeN-patch heeft een "muziek uit" in zijn launcher | redelijk |
+
+### 7b. Wat er nu in zit
+
+`spel/view/muziek.gd` (`class_name Muziek`): een Node onder de **root** (niet in `main.tscn`), zodat hij het herladen van de scène door start- en pauzemenu overleeft. Twee `AudioStreamPlayer`'s op bus `Muziek` (onder Master, zelf aangemaakt), overvloeien 1,5 s. `main.gd` zet de context op drie plekken: startmenu `menu`, missie laden `briefing` (ook als laadscherm), na de HUD `volg(hud, w)`: briefing dicht = `missie`, `missie_einde` = `gewonnen`/`verloren`. Scenario's en `--write-movie`: geen muziek.
+
+| context | track | lus | origineel |
+| --- | --- | --- | --- |
+| menu | 2 | ja | 2, een keer (67 s) |
+| briefing | 3 | ja | 3, tot de briefing dicht is |
+| missie, gewonnen, verloren | stil | - | stil |
+
+Dempen: **Shift+M** altijd, gewone **M** alleen zonder bouwmenu (startmenu; in een missie is M de molen, `Bouwmenu.GEBOUWEN`), en een getekende noot-knop rechtsboven in het pauzemenu. Volumeschuif onderaan in het pauzemenu, **alleen pc** (op touch maakte de extra rij het paneel te hoog voor de 48 dp-knoppen op 1600x900; daar het toestelvolume). Volume en dempen in `user://muziek.cfg` (onleesbaar = standaard 0,7, niet gedempt).
+
+Bestanden: `spel/assets/audio/muziek/track02.ogg .. track08.ogg`, **niet in git** (`assets/` staat in `.gitignore`). `spel/audio/haal_muziek.ps1` (vanuit `sync.ps1`) zoekt de eigen cd-rip in `lokaal/muziek/` of op de laptop-share, als `TrackNN.*` (RaZLeN-naam) of `beastsNN.wav` (bchunk/openbumpkins), en maakt stereo 44,1 kHz Vorbis q5, loudnorm -18 LUFS, piek -1 dBTP. Ontbreekt een track, dan blijft die context stil met een melding. Test: `test/audio_test.gd` (stille testtracks: wissel, overvloeien, doorspelen, dempen, volume, bewaren).
+
+### 7c. Open vragen
+
+| # | vraag |
+| --- | --- |
+| 1 | **De cd-tracks**: heb je een rip (of de cd)? Zet `Track02..Track08` in `lokaal/muziek/` en draai `sync.ps1`. Niet van internet gehaald |
+| 2 | Menu en briefing **lussen** bij ons; het origineel speelde ze een keer (menu na 67 s stil). Lus houden of trouw een keer? |
+| 3 | **Tracks 4 tot 8** speelt het origineel niet. Wil je ze ergens (bijv. zacht in de missie, of bij winst)? Dat wijkt af van het origineel |
+| 4 | **M** is in een missie de molen-bouwtoets. Muziek nu op Shift+M (gewone M alleen in het startmenu). Molen naar een andere toets en M voor muziek? |
+| 5 | Voor publicatie mag het origineel er niet in: eigen of gegenereerde muziek (zie `onderzoek.md`: Stable Audio 3 lokaal of Eleven Music) |

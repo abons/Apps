@@ -7,6 +7,7 @@ extends CanvasLayer
 ## Knoppen: Hervatten, Missie opnieuw, Andere missie (terug naar het startmenu, view/startmenu.gd), Afsluiten (pc).
 ## Na de missie (`open_einde`): gewonnen = Volgende missie (als die speelbaar is), Verder spelen, Andere missie;
 ## verloren = Opnieuw, Andere missie, Bekijken. Opnieuw en een andere missie laden de hoofdscène opnieuw.
+## Rechtsboven een noot-knop: muziek aan/uit; op de pc onderaan ook een volumeschuif (view/muziek.gd, user://muziek.cfg).
 
 signal gekozen(actie: String)      ## "hervat", "opnieuw", "andere", "volgende", "afsluiten" (voor tests)
 
@@ -19,6 +20,10 @@ var kolom: VBoxContainer
 var titel: Label
 var sub: Label
 var knoppen := {}                  ## actie -> Button
+var muziek_rij: HBoxContainer      ## "Muziek" + volumeschuif (view/muziek.gd), alleen pc; niet in `knoppen`
+var muziek_knop: Button            ## noot-knop rechts in de kopregel: muziek aan/uit (ook Shift+M)
+var _kop_links: Control
+var muziek_schuif: HSlider
 var _was_gepauzeerd := false
 var _cam_invoer := true
 var open_nu := false
@@ -37,14 +42,43 @@ func _init() -> void:
 	kolom.add_theme_constant_override("separation", 10)
 	kolom.custom_minimum_size.x = 340
 	paneel.add_child(kolom)
+	# kopregel: titel in het midden, rechts de muziekknop (view/muziek.gd), links een even brede leegte
+	var kop := HBoxContainer.new()
+	kolom.add_child(kop)
+	var links := Control.new()
+	links.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kop.add_child(links)
 	titel = Perkament.label("", 28)
 	titel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	kolom.add_child(titel)
+	titel.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	titel.size_flags_vertical = Control.SIZE_FILL
+	kop.add_child(titel)
+	muziek_knop = MuziekKnop.new()
+	muziek_knop.pressed.connect(func() -> void: Muziek.van(get_tree()).wissel_stil())
+	kop.add_child(muziek_knop)
+	_kop_links = links
 	sub = Perkament.label("", 19)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sub.custom_minimum_size.x = 340          # anders meet de autowrap op breedte 0: een woord per regel, veel te hoog
 	kolom.add_child(sub)
+	# muziekvolume (alleen pc: op touch is de schuif te klein en het paneel te hoog; daar het toestelvolume), onderaan
+	muziek_rij = HBoxContainer.new()
+	muziek_rij.add_theme_constant_override("separation", 10)
+	var mlabel := Perkament.label("Muziek", 19)
+	muziek_rij.add_child(mlabel)
+	muziek_schuif = HSlider.new()
+	muziek_schuif.min_value = 0.0
+	muziek_schuif.max_value = 1.0
+	muziek_schuif.step = 0.05
+	muziek_schuif.focus_mode = Control.FOCUS_NONE
+	muziek_schuif.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	muziek_schuif.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	muziek_schuif.tooltip_text = "muziekvolume"
+	muziek_schuif.value_changed.connect(func(v: float) -> void: Muziek.van(get_tree()).zet_volume(v))
+	muziek_rij.add_child(muziek_schuif)
+	kolom.add_child(muziek_rij)
 	visible = false
 
 
@@ -93,6 +127,12 @@ func _toon(kop: String, tekst: String, acties: Array, kleur: Color) -> void:
 		b.pressed.connect(kies.bind(a[0]))
 		kolom.add_child(b)
 		knoppen[a[0]] = b
+	kolom.move_child(muziek_rij, -1)
+	muziek_rij.visible = not Bouwmenu.touch
+	var h := Perkament.knop_h()
+	muziek_knop.custom_minimum_size = Vector2(h, h)
+	_kop_links.custom_minimum_size = Vector2(h, h)
+	werk_muziek_bij()
 	if not open_nu:
 		open_nu = true
 		_was_gepauzeerd = w.gepauzeerd
@@ -104,6 +144,19 @@ func _toon(kop: String, tekst: String, acties: Array, kleur: Color) -> void:
 		bouwmenu.zet_actief(false)
 	visible = true
 	leg_neer()
+
+
+## Knoptekst en schuif volgen de muziekspeler (ook als Shift+M hem omzet terwijl het menu open is).
+func werk_muziek_bij() -> void:
+	if not is_inside_tree():
+		return
+	var m := Muziek.van(get_tree())
+	if not m.gewijzigd.is_connected(werk_muziek_bij):
+		m.gewijzigd.connect(werk_muziek_bij)
+	muziek_knop.set("uit", m.stil)
+	muziek_knop.tooltip_text = "Muziek aan (Shift+M)" if m.stil else "Muziek uit (Shift+M)"
+	muziek_knop.queue_redraw()
+	muziek_schuif.set_value_no_signal(m.volume)
 
 
 func sluit() -> void:
@@ -153,3 +206,33 @@ func _unhandled_input(e: InputEvent) -> void:
 		kies("hervat")
 	if e is InputEventKey or e is InputEventScreenTouch or e is InputEventScreenDrag:
 		get_viewport().set_input_as_handled()
+
+
+## Muziek aan/uit: een getekende dubbele noot in inkt, met een rode streep als de muziek uit staat.
+class MuziekKnop extends Button:
+	var uit := false
+
+	func _init() -> void:
+		focus_mode = Control.FOCUS_NONE
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		Perkament.stijl(self)
+
+	func _draw() -> void:
+		var s := minf(size.x, size.y)
+		var o := (size - Vector2(s, s)) * 0.5
+		var c := Brief.INKT if not uit else Color(Brief.INKT, 0.55)
+		var r := s * 0.11
+		var k1 := o + Vector2(s * 0.34, s * 0.7)
+		var k2 := o + Vector2(s * 0.66, s * 0.62)
+		for k in [k1, k2]:
+			draw_set_transform(k, -0.35, Vector2(1.25, 0.9))
+			draw_circle(Vector2.ZERO, r, c)
+		draw_set_transform(Vector2.ZERO)
+		var st := maxf(2.0, s * 0.05)
+		var t1 := k1 + Vector2(r * 1.05, -s * 0.42)
+		var t2 := k2 + Vector2(r * 1.05, -s * 0.42)
+		draw_line(k1 + Vector2(r * 1.05, 0), t1, c, st)
+		draw_line(k2 + Vector2(r * 1.05, 0), t2, c, st)
+		draw_line(t1, t2, c, st * 2.0)
+		if uit:
+			draw_line(o + Vector2(s * 0.2, s * 0.2), o + Vector2(s * 0.8, s * 0.8), Color(0.85, 0.2, 0.15), st * 1.4)

@@ -342,10 +342,104 @@ def verloren():
     schrijf("missie_verloren", galm(x, 1.0, 0.3), 0.75)
 
 
+# ---------------------------------------------------------------- wolven, gevecht, leven (2026-10-31, missie 2 en 3)
+# Achteraan de lijst in __main__: de rng loopt door, dus alles hierboven blijft byte voor byte gelijk.
+
+def zaagtand(f, duur, ruw=0.0):
+    """Zaagtand met glijdende f (array of getal) en ruwheid (AM-ruis): de basis van grom en jank."""
+    n = int(duur * SR)
+    f = np.broadcast_to(np.asarray(f, dtype=np.float64), (n,))
+    f = f * (1.0 + ruw * band(rng.standard_normal(n), 20, 90))
+    fase = 2 * np.pi * np.cumsum(f) / SR
+    return sum(np.sin(k * fase) / k for k in range(1, 18))
+
+
+def wolf():
+    for i in range(2):                          # grom: laag, ruw, aanzwellend
+        d = rng.uniform(0.9, 1.3)
+        n = int(d * SR)
+        t = np.arange(n) / SR
+        f = rng.uniform(85, 110) * (1.0 + 0.08 * np.sin(np.pi * t / d))
+        x = band(zaagtand(f, d, 0.35), 120, 1400) * np.sin(np.pi * t / d) ** 0.7
+        x *= 0.6 + 0.4 * (0.5 + 0.5 * np.sin(2 * np.pi * rng.uniform(16, 24) * t))   # ratel
+        schrijf("wolf_grom_%d" % i, x, 0.75)
+    for i in range(2):                          # hap: tanden die dichtklappen plus een korte grom
+        x = np.zeros(int(0.5 * SR))
+        L = int(0.03 * SR)
+        legg(x, band(rng.standard_normal(L), 1500, 7000) * omhul(L, 0.0005, 0.005), int(0.02 * SR), circulair=False)
+        legg(x, 0.7 * klap(1.0)[: int(0.12 * SR)], int(0.02 * SR), circulair=False)
+        g = band(zaagtand(rng.uniform(120, 150), 0.32, 0.4), 150, 1600)
+        legg(x, 0.6 * g * np.sin(np.pi * np.arange(len(g)) / len(g)), int(0.1 * SR), circulair=False)
+        schrijf("wolf_hap_%d" % i, x, 0.8)
+    d = 0.55                                    # jank: hoog, dalend (geraakt; lager afgespeeld = dood)
+    n = int(d * SR)
+    t = np.arange(n) / SR
+    f = 950 * np.exp(-1.3 * t / d) + 380
+    x = band(zaagtand(f, d, 0.08), 400, 4000) * omhul(n, 0.01, d * 0.5) * np.minimum(1.0, (d - t) / 0.05)
+    schrijf("wolf_jank", galm(x, 0.5, 0.2), 0.7)
+
+
+def zoef(duur, lo, hi):
+    """Door de lucht: banddoorlaatruis die aanzwelt en wegsterft."""
+    n = int(duur * SR)
+    t = np.arange(n) / SR
+    return band(rng.standard_normal(n), lo, hi, 2) * np.sin(np.pi * t / duur) ** 2
+
+
+def gevecht():
+    for i in range(2):
+        schrijf("worp_%d" % i, zoef(rng.uniform(0.22, 0.3), 500, 2500), 0.5)
+    for i in range(3):                          # steen op vacht of grond: dof plus een tik
+        L = int(0.22 * SR)
+        t = np.arange(L) / SR
+        x = np.sin(2 * np.pi * rng.uniform(150, 220) * t) * omhul(L, 0.001, 0.035)
+        x += 0.8 * band(rng.standard_normal(L), 800, 5000) * omhul(L, 0.0003, 0.008)
+        schrijf("steen_%d" % i, x, 0.7)
+    for i in range(2):                          # zwaard: zoef en een metalen klank (onharmonische partialen)
+        x = np.zeros(int(0.9 * SR))
+        legg(x, 0.6 * zoef(0.18, 1200, 6000), 0, circulair=False)
+        f = rng.uniform(1300, 1700)
+        legg(x, toon(f, 0.7, ((1, 1.0), (2.76, 0.5), (5.4, 0.25), (8.9, 0.1)), verval=0.12, aanzet=0.001),
+             int(0.14 * SR), circulair=False)
+        legg(x, 0.5 * band(rng.standard_normal(int(0.02 * SR)), 2000, 8000), int(0.14 * SR), circulair=False)
+        schrijf("zwaard_%d" % i, x, 0.7)
+    for i in range(2):                          # dorpeling geraakt: een doffe klap
+        schrijf("raak_%d" % i, klap(1.0) * omhul(int(0.2 * SR), 0.001, 0.06), 0.7)
+    n = int(2.2 * SR)                           # ontploffing (mijn): laag gerommel
+    t = np.arange(n) / SR
+    x = band(kleur_ruis(n, 1.0), 30, 900) * omhul(n, 0.004, 0.45)
+    x += 0.6 * band(rng.standard_normal(n), 500, 5000) * omhul(n, 0.001, 0.05)
+    schrijf("boem", x, 0.85)
+
+
+def leven():
+    x = np.zeros(int(3.5 * SR))                 # dood: een lage klok, twee slagen
+    for s in (0.0, 1.4):
+        legg(x, toon(196.0, 2.0, ((1, 1.0), (2.0, 0.4), (2.4, 0.3), (3.0, 0.2), (4.2, 0.1)), verval=0.7, aanzet=0.003),
+             int(s * SR), circulair=False)
+    schrijf("dood", galm(x, 1.0, 0.3), 0.6)
+    L = int(0.18 * SR)                          # geboorte: plop
+    t = np.arange(L) / SR
+    f = 260 + 900 * t / 0.18
+    x = np.sin(2 * np.pi * np.cumsum(f) / SR) * omhul(L, 0.002, 0.04)
+    schrijf("plop", x, 0.7)
+    for i in range(2):                          # water drinken: belletjes (stijgende sinusjes)
+        x = np.zeros(int(0.8 * SR))
+        for _ in range(9):
+            d = rng.uniform(0.03, 0.07)
+            n = int(d * SR)
+            tt = np.arange(n) / SR
+            f = rng.uniform(350, 700) * (1.0 + 1.2 * tt / d)
+            k = np.sin(2 * np.pi * np.cumsum(f) / SR) * omhul(n, 0.002, d * 0.4)
+            legg(x, k, int(rng.uniform(0.0, 0.7) * SR), circulair=False)
+        x += 0.15 * band(rng.standard_normal(len(x)), 300, 3000) * np.sin(np.pi * np.arange(len(x)) / len(x))
+        schrijf("water_%d" % i, x, 0.6)
+
+
 if __name__ == "__main__":
     os.makedirs(UIT, exist_ok=True)
     for f in (wind, golven, vuur, regen, krekels, vogels, uil, kip, zaag, houweel, sikkel,
-              klik, plaats, klaar, poort, fanfare, verloren):
+              klik, plaats, klaar, poort, fanfare, verloren, wolf, gevecht, leven):
         f()
     namen = sorted(os.listdir(UIT))
     print(len(namen), "bestanden in", UIT, ":", sum(os.path.getsize(os.path.join(UIT, n)) for n in namen) // 1024, "KB")

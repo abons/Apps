@@ -21,6 +21,7 @@ const GOLF_SPELERS := 5         ## golflussen, steeds verplaatst naar de dichtst
 const VOGELS_PER_SEIZOEN := [1.0, 0.8, 0.35, 0.0]
 const KREKELS_PER_SEIZOEN := [0.35, 1.0, 0.6, 0.0]
 const ZAAG_SOORTEN := [&"hut", &"gereedschapsloods", &"kippenhok", &"molen", &"melkerij", &"hek", &"poort"]
+const RAAK_GAT := 0.6          ## s: hoogstens een klap per dorpeling zo vaak
 const GEEN_KLAAR := [&"hek", &"weg"]   ## geen klokje bij elk afgebouwd hek of stuk weg
 
 var w: Wereld
@@ -48,6 +49,8 @@ var _bezig_vorig := {}      # dorpeling-id -> bezig > 0 in de vorige frame
 var _draagt_vorig := {}
 var _koe_t := {}            # koe-id -> s tot ze weer loeit
 var _kip_t := {}
+var _wolf_t := {}           # wolf-id -> s tot hij weer gromt
+var _raak_t := {}           # dorpeling-id -> tijd van de vorige klap (vuur raakt elke tik)
 var _vogel_t := 3.0
 var _uil_t := 20.0
 var _klaar_t := -10.0
@@ -72,7 +75,10 @@ static func catalogus() -> Dictionary:
 	c["eieren"] = [BEASTS + "voice_eggs_0.wav"]
 	for n in LUSSEN + ["klik", "plaats", "klaar", "poort_open", "poort_dicht", "missie_geslaagd", "missie_verloren"]:
 		c[n] = [EIGEN + n + ".wav"]
-	for g in [["vogel", 6], ["uil", 2], ["tok", 4], ["zaag", 2], ["houweel", 3], ["sikkel", 3]]:
+	for n in ["wolf_jank", "dood", "plop", "boem"]:
+		c[n] = [EIGEN + n + ".wav"]
+	for g in [["vogel", 6], ["uil", 2], ["tok", 4], ["zaag", 2], ["houweel", 3], ["sikkel", 3],
+			["wolf_grom", 2], ["wolf_hap", 2], ["worp", 2], ["steen", 3], ["zwaard", 2], ["raak", 2], ["water", 2]]:
 		c[g[0]] = _reeks(EIGEN + g[0] + "_%d.wav", g[1])
 	return c
 
@@ -186,8 +192,9 @@ func bouw(wereld: Wereld, v: WereldView, camera: Camera3D, b: Bestuur) -> void:
 	w.geleverd.connect(func(m: Plan, _brengt: String) -> void: speel3d("plaats", _deur(m), -12.0, 4.0, 30.0))
 	w.voorwerp_opgeraapt.connect(func(ob: Dictionary, _d: Dorpeling) -> void: speel3d("plaats", _tegel3d(ob), -8.0, 4.0, 30.0))
 	w.voorwerp_afgeleverd.connect(func(ob: Dictionary, _d: Dorpeling, _k: int) -> void:
-		for i in 3:          # beker aan de vlag: een handvol munten
-			speel3d("munt", _tegel3d(ob), -1.0, 6.0, 60.0, 0.06))
+		munten(_tegel3d(ob), 5))     # beker aan de vlag: munten die je hoort tellen
+	w.kas_beloning.connect(func(_id: String, _kas: int) -> void: munten(Vector3.INF, 4))
+	_koppel_strijd()
 	get_tree().node_added.connect(_bij_node)
 	_zoek_knoppen(get_tree().root)
 	_klaar_t = 1.0            # wat plaats_voorgebouwd bij de start zet, klinkt niet
@@ -428,12 +435,20 @@ func _werk_dorpelingen() -> void:
 ## Zagen (de zaagclip van de bouwer, impact = einde van de duwslag) geeft altijd de zaag, de houweelclip (punt in de
 ## steenhoop) altijd de houweel.
 func _bij_impact(welke: StringName, id: int) -> void:
-	if (welke != &"bouwen" and welke != &"zagen" and welke != &"houweel") or w.gepauzeerd:
+	if w.gepauzeerd:
 		return
 	var d := w.dorpeling(id)
 	if d == null or not view.units.has(id):
 		return
 	var pos := view.unit_pos(id) + Vector3(0, 0.8, 0)
+	if welke == &"aanval_zwaard":            # voetsoldaat: de klap van het zwaard op impact_s
+		speel3d("zwaard", pos, -3.0, 5.0, 40.0, 0.06)
+		return
+	if welke == &"steen":                    # inslag: bij de dichtste wolf (de steen vloog daarheen)
+		speel3d("steen", _dichtste_wolf(pos), -3.0, 5.0, 40.0, 0.1)
+		return
+	if welke != &"bouwen" and welke != &"zagen" and welke != &"houweel":
+		return
 	var soort: StringName = d.werk_plan.soort if d.werk_plan != null else &""
 	if welke == &"zagen":
 		speel3d("zaag", pos, -4.0, 5.0, 35.0, 0.05)
@@ -470,6 +485,89 @@ func _werk_dieren(dt: float) -> void:
 				else:
 					speel3d("tok", p, -6.0, 3.0, 25.0, 0.12)
 		_kip_t[k.id] = t
+	for wf in w.wolven:                       # een wolf gromt af en toe (missie 2 en 3)
+		var t: float = _wolf_t.get(wf.id, _rng.randf_range(3.0, 12.0)) - stap
+		if t <= 0.0:
+			t = _rng.randf_range(9.0, 22.0)
+			speel3d("wolf_grom", _wolf3d(wf), -6.0, 6.0, 45.0, 0.08)
+		_wolf_t[wf.id] = t
+
+
+# ---------------------------------------------------------------- wolven, gevecht, leven (missie 2 en 3)
+
+## Alleen sim-signalen; posities uit de view (wolven_view), anders uit de sim.
+func _koppel_strijd() -> void:
+	w.wolf_erbij.connect(func(wf: Wolf) -> void: speel3d("wolf_grom", _wolf3d(wf), -4.0, 6.0, 45.0, 0.06))
+	w.steen_gegooid.connect(func(d: Dorpeling, _wf: Wolf) -> void: speel3d("worp", _dorp3d(d), -6.0, 4.0, 35.0, 0.1))
+	w.zwaard_slag.connect(func(d: Dorpeling, _wf: Wolf) -> void: speel3d("worp", _dorp3d(d), -10.0, 4.0, 35.0, 0.15))
+	w.wolf_geraakt.connect(func(wf: Wolf) -> void: speel3d("wolf_jank", _wolf3d(wf), -8.0, 6.0, 45.0, 0.05, "Effecten", 1.2))
+	w.wolf_dood.connect(func(wf: Wolf) -> void: speel3d("wolf_jank", _wolf3d(wf), -2.0, 6.0, 50.0, 0.03, "Effecten", 0.85))
+	w.koe_weg.connect(_bij_koe_weg)
+	w.dorpeling_geraakt.connect(_bij_geraakt)
+	w.dorpeling_dood.connect(func(d: Dorpeling, _o: String) -> void: speel3d("dood", _dorp3d(d), -4.0, 10.0, 90.0, 0.0))
+	w.dorpeling_erbij.connect(func(d: Dorpeling) -> void: speel3d("plop", _dorp3d(d), -4.0, 5.0, 40.0, 0.05))
+	w.gedronken.connect(func(d: Dorpeling, _p: Plan) -> void: speel3d("water", _dorp3d(d), -6.0, 4.0, 30.0, 0.08))
+	if w.has_signal("ontploffing"):           # missie 4 (sim/regels.gd): een mijn gaat af
+		w.connect("ontploffing", func(t: Vector2i) -> void:
+			speel3d("boem", view.terrein.tegel_midden(t) + Vector3(0, 0.5, 0), 4.0, 10.0, 90.0, 0.05))
+
+
+## De wolf heeft een koe: hap en een angstige (hogere) loei.
+func _bij_koe_weg(k: Vee) -> void:
+	var p := Vector3(k.pos.x * w.tegel_m, 0.0, k.pos.y * w.tegel_m)
+	p.y = view.terrein.hoogte_op(p.x, p.z) + 1.0
+	speel3d("wolf_hap", p, -2.0, 6.0, 45.0, 0.05)
+	speel3d("loei", p, -4.0, 6.0, 45.0, 0.0, "Effecten", 1.25)
+
+
+## Geraakt: een klap, bij een wolf ook de hap. Vuur raakt elke tik: per dorpeling hoogstens een keer per RAAK_GAT s.
+func _bij_geraakt(d: Dorpeling, oorzaak: String) -> void:
+	if _tijd - float(_raak_t.get(d.id, -10.0)) < RAAK_GAT:
+		return
+	_raak_t[d.id] = _tijd
+	var p := _dorp3d(d)
+	speel3d("raak", p, -4.0, 5.0, 40.0, 0.1)
+	if oorzaak == Leven.OORZAAK_WOLF:
+		speel3d("wolf_hap", p, -3.0, 6.0, 45.0, 0.06)
+
+
+## `n` munten na elkaar (0,09 s uit elkaar): de kas die je hoort tellen. `pos` INF = 2D.
+func munten(pos: Vector3, n: int) -> void:
+	for i in n:
+		get_tree().create_timer(0.09 * i).timeout.connect(func() -> void:
+			if pos == Vector3.INF:
+				speel2d("munt", -4.0, 0.06)
+			else:
+				speel3d("munt", pos, -1.0, 6.0, 60.0, 0.06))
+
+
+func _wolf3d(wf: Wolf) -> Vector3:
+	var p: Vector3 = view.wolven.wolf_pos(wf.id) if view.wolven != null else Vector3.INF
+	if p == Vector3.INF:                      # al weg uit de view (dood, weg): de sim weet nog waar
+		p = Vector3(wf.pos.x * w.tegel_m, 0.0, wf.pos.y * w.tegel_m)
+		p.y = view.terrein.hoogte_op(p.x, p.z)
+	return p + Vector3(0, 0.5, 0)
+
+
+func _dorp3d(d: Dorpeling) -> Vector3:
+	if view.units.has(d.id):
+		return view.unit_pos(d.id) + Vector3(0, 0.9, 0)
+	var p := Vector3(d.pos.x * w.tegel_m, 0.0, d.pos.y * w.tegel_m)
+	p.y = view.terrein.hoogte_op(p.x, p.z) + 0.9
+	return p
+
+
+## De dichtste wolf binnen 20 m van `pos` (de inslag van een steen), anders `pos` zelf.
+func _dichtste_wolf(pos: Vector3) -> Vector3:
+	var beste := pos
+	var bd := 400.0
+	for wf in w.wolven:
+		var p := _wolf3d(wf)
+		var af := p.distance_squared_to(pos)
+		if af < bd:
+			bd = af
+			beste = p
+	return beste
 
 
 # ---------------------------------------------------------------- omgeving

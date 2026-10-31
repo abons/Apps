@@ -20,7 +20,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/sim_test.gd    # simtest (zonder GPU)
 "$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2 (ook missie3_test, missie4_test)
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
-"$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
+"$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken, muziekspeler
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
 "$G" --headless --path . --script res://test/menu_test.gd        # startmenu, pauzemenu, opnieuw, andere/volgende missie
@@ -52,9 +52,18 @@ Andere missie, verloren = Opnieuw / Andere missie / Bekijken. Elke keuze laadt `
 leider; man/vrouw/jongen/meisje, ouderen pitch 0,9), hamer/zaag/houweel op `Bumpkin.impact`, sikkel en oogst, melken,
 eieren, munt bij `verkocht`, klokje bij `plan_klaar`, poort, missie-stinger, UI-klik op elke knop; 3D: kampvuur, golven langs
 de kust (5 lussen naar de dichtste kustpunten), koeien loeien, kippen tokken; 2D-lagen: wind (seizoen, regen, zoom), regen,
-krekels 's nachts, vogels overdag, uil. Bussen Master/Effecten/Stemmen/Omgeving, volumes in `Geluid.BUSSEN`. Pauze zet
+krekels 's nachts, vogels overdag, uil; missie 2 en 3: wolf gromt/hapt/jankt, steen (worp en inslag), zwaard, klap bij
+geraakt, klok bij een dode, plop bij een geboorte, water bij de put, munten die tellen (beker, kasbeloning). Bussen
+Master/Effecten/Stemmen/Omgeving, volumes in `Geluid.BUSSEN`. Pauze zet
 werkgeluid stil; met `--write-movie` is alles stil. Bronnen: `audio/eigen/` (eigen synthese, `py -3.10 audio/maak_geluid.py`,
 in git) en `assets/audio/beasts/` (beasts-src, via `audio/haal_beasts.ps1` uit sync.ps1, niet in git). Details: `../audio.md` sectie 6.
+
+**Muziek** (`view/muziek.gd`, onder de root zodat hij het herladen van de scène overleeft): zoals het origineel cd-track 2
+in het startmenu, track 3 zolang de briefing open is, in de missie en bij het einde stil; lussen en 1,5 s overvloeien.
+Dempen met **Shift+M** (gewone M in het startmenu; in een missie is M de molen) of de noot-knop rechtsboven in het
+pauzemenu, volumeschuif in het pauzemenu (pc); bewaard in `user://muziek.cfg`. De tracks zijn je eigen cd-rip:
+`audio/haal_muziek.ps1` (uit sync.ps1) zet `lokaal/muziek/Track02..08` om naar `assets/audio/muziek/trackNN.ogg`, niet in
+git. Zonder die bestanden blijft het stil. Details: `../audio.md` sectie 7.
 
 `data/origineel/map1.json` en `map2.json` komen uit de gedecodeerde originele spelbestanden (auteursrecht): staan in `.gitignore`, net als `assets/`.
 
@@ -75,7 +84,7 @@ tegels en gooit elke 1,8 s een steen (2 schade, hp 8; munitie oneindig, clip `aa
 een jagende wolf binnen 6 tegels. Hp 0: valt om, ligt 30 s. View: `view/wolf_model.gd` (placeholder uit meshes in de kleuren van
 `lokaal/concept/img/wolf.jpg`, poten, kop, hp-balkje als hij geraakt is) en `view/wolven_view.gd`. Test `test/wolf_test.gd`; scenario
 `wolf` (wolf bijt een koe, een man gooit), frame `screenshots/missie2_wolf_steen.jpg`.
-Nog niet: wolf-glb, kinderen/baby's pakken, vluchten, wolfgeluid; goud (161) en drankjes (160) zijn placeholders, niet
+Nog niet: wolf-glb, kinderen/baby's pakken, vluchten; goud (161) en drankjes (160) zijn placeholders, niet
 op te rapen; klasse 226 (betekenis onbekend) is `geen`; prijzen/geluk, pensioen en de hints van missie 2 ontbreken; het leeg buiten de
 kaart (zwart in het origineel) wordt water, zodat het meer in het NW in de zee overloopt. `ontbreekt` in objecten.json geeft per klasse
 een waarschuwing in de log.
