@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3|4 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|bouwploeg|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
+## Opties na `--`:  --missie=1|2|3|4 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|bouwploeg|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|paddenstoelen|mist_start|mist_verkend|mist_rand|minikaart|prijzen
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -325,7 +325,33 @@ func _start_scenario() -> void:
 					d.bevel = {}
 					d.anker = d.tegel()
 					break
-			cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0.8, 0.5, 0), 0.5, deg_to_rad(30), 7.0)
+			if _stap_arg == 1:     # de gewone startcamera (hoek 40, afstand 26)
+				cam.zet_direct(view.terrein.tegel_midden(pt), 0.6, deg_to_rad(40), 26.0)
+			else:
+				cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0.8, 0.5, 0), 0.5, deg_to_rad(30), 7.0)
+		"paddenstoelen":
+			# de vier soorten (rood, blauw, bruin, wit; kaart-state 0, 1, 2, 6) op een rij naast een man, alleen in beeld
+			# (niet in de sim); --stap=1 met de gewone startcamera
+			var pt := w.dichtstbij_loopbaar(Vector2i(98, 61))
+			for d in w.dorpelingen:
+				if d.volwassen() and d.geslacht == "man":
+					d.zet_tegel(pt)
+					d.route.clear()
+					d.bevel = {}
+					d.anker = d.tegel()
+					break
+			var def: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["objecten"]["83"]
+			for i in 4:
+				var t := pt + Vector2i(1 + i, 0)
+				var n := Props.maak({"cls": 83, "model": def["model"], "state": [0, 1, 2, 6][i], "x": t.x, "y": t.y})
+				if n != null:
+					n.position = view.terrein.tegel_midden(t)
+					view.terrein.add_child(n)
+			var midden := view.terrein.tegel_midden(pt + Vector2i(2, 0))
+			if _stap_arg == 1:
+				cam.zet_direct(midden, 0.6, deg_to_rad(40), 26.0)
+			else:
+				cam.zet_direct(midden + Vector3(0, 0.4, 0), 0.0, deg_to_rad(26), 7.5)
 		"gezin":
 			# vier hutten staan al (8 bedden voor 6 mensen): het eerste stel gaat naar binnen, de baby komt eruit, 4x
 			var eerste: Plan = null

@@ -57,10 +57,11 @@ static func maak(ob: Dictionary) -> Node3D:
 	var model: String = ob["model"]
 	if model.begins_with("natuur:"):
 		var glb := model.substr(7)
+		var def: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["objecten"][str(ob["cls"])]
+		glb = str(def.get("soort_model", {}).get(str(int(ob.get("state", 0))), glb))   # paddenstoel: kleur per kaart-state
 		var n := Natuur.instantie(glb)
 		if n == null:
-			return _placeholder(glb, ob)
-		var def: Dictionary = Gegevens.lees(Gegevens.OBJECTEN)["objecten"][str(ob["cls"])]
+			return _placeholder(model.substr(7), ob)
 		n.scale = Vector3.ONE * float(def.get("schaal", 1.0))
 		if glb == "kampvuur":
 			_kampvuur_effecten(n)
@@ -222,8 +223,9 @@ static func _deeltjes(naam: String, tex: Texture2D, aantal: int, leven: float, g
 
 
 static func _paddenstoel(n: Node3D, soort: int) -> void:
-	var kappen := [Color(0.80, 0.15, 0.12), Color(0.55, 0.36, 0.20), Color(0.92, 0.90, 0.80), Color(0.55, 0.30, 0.60),
-		Color(0.85, 0.60, 0.15), Color(0.70, 0.35, 0.15), Color(0.80, 0.15, 0.12)]
+	# kaart-state = frame van poison.mfb: rood, blauw, bruin, donkerbruin, bruin, grijsgroen, wit (data/objecten.json 83)
+	var kappen := [Color(0.80, 0.15, 0.12), Color(0.20, 0.28, 0.75), Color(0.55, 0.36, 0.20), Color(0.38, 0.22, 0.12),
+		Color(0.55, 0.36, 0.20), Color(0.58, 0.60, 0.50), Color(0.92, 0.90, 0.88)]
 	var stam := MeshInstance3D.new()
 	stam.mesh = _cyl(0.07, 0.09, 0.3)
 	stam.material_override = _mat(Color(0.88, 0.85, 0.75))

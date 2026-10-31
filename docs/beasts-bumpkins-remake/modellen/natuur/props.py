@@ -23,7 +23,7 @@ from mathutils import Matrix, Vector, noise
 import natuur_lib as L
 from atlas import CEL
 
-ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "zaagbok", "bron", "bronplas", "hek_segment", "hek_poort",
+ALLE = ["paddenstoel", "paddenstoel_rood", "paddenstoel_blauw", "paddenstoel_wit", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "zaagbok", "bron", "bronplas", "hek_segment", "hek_poort",
         "hek_paal", "poort", "akker_kaal", "akker_rijp", "tinnen_beker", "magische_sleutel", "magische_poort"]
 ALLEEN = [n for n in L.OPTS.get("alleen", ",".join(ALLE)).split(",") if n]
 
@@ -206,37 +206,72 @@ def m(naam):
 
 
 # --- Paddenstoel -----------------------------------------------------------------------------
+# Vier soorten, naar poison.mfb (8 frames: 7 kaart-`state`s + een afgegeten stompje): 0 rood met witte stippen,
+# 1 blauw met stippen, 2-4 bruin, 5 grijsgroen, 6 wit. Welke glb bij welke state hoort: data/objecten.json klasse 83.
+PADDENSTOELEN = {
+    #            vorm    hoed (donker, licht)                     stippen               voet (donker, licht)                    plaat
+    "bruin": ("bol",  (0.12, 0.045, 0.016), (0.23, 0.095, 0.034), None,                 (0.48, 0.14, 0.035), (0.66, 0.27, 0.08), (0.42, 0.26, 0.12)),
+    "rood":  ("bol",  (0.42, 0.018, 0.010), (0.62, 0.035, 0.018), (0.86, 0.84, 0.78),   (0.70, 0.64, 0.52), (0.84, 0.79, 0.66), (0.80, 0.76, 0.66)),
+    "blauw": ("bol",  (0.020, 0.035, 0.26), (0.045, 0.085, 0.46), (0.72, 0.78, 0.92),   (0.70, 0.64, 0.52), (0.84, 0.79, 0.66), (0.70, 0.72, 0.78)),
+    "wit":   ("hoog", (0.66, 0.64, 0.66),   (0.88, 0.87, 0.86),   None,                 (0.74, 0.72, 0.68), (0.88, 0.86, 0.82), (0.55, 0.52, 0.52)),
+}
+
+
 def paddenstoel():
-    """Eekhoorntjesbrood-achtig: bruine hoed met putjes, oranje voet; 0,49 m hoog (kaartpickup, in het spel x2,3)."""
-    rnd = random.Random(3)
-    putjes = [Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(0.15, 1))).normalized() for _ in range(55)]
-    putr = [rnd.uniform(0.016, 0.034) for _ in putjes]
+    """Bruin, eekhoorntjesbrood-achtig: bruine hoed met putjes, oranje voet; 0,49 m hoog (voeding, state 2-5)."""
+    return _paddenstoel("paddenstoel", "bruin")
+
+
+def paddenstoel_rood():
+    """Vliegenzwam: rode hoed met witte stippen, crème voet (state 0, geneest)."""
+    return _paddenstoel("paddenstoel_rood", "rood")
+
+
+def paddenstoel_blauw():
+    """Blauwe hoed met lichte stippen (state 1, mana voor de tovenaar)."""
+    return _paddenstoel("paddenstoel_blauw", "blauw")
+
+
+def paddenstoel_wit():
+    """Witte, hoge klokhoed (geschubde inktzwam-vorm uit de sprite; state 6, dodelijk)."""
+    return _paddenstoel("paddenstoel_wit", "wit")
+
+
+def _paddenstoel(naam, soort):
+    vorm, h0, h1, stip, v0, v1, pl = PADDENSTOELEN[soort]
+    hoog_vorm = vorm == "hoog"
 
     def hoed_prof(n):
         out = []
         for i in range(n + 1):
             t = i / n                          # 0 = top, 1 = rand
             a = t * math.pi * 0.56
-            out.append((0.24 * math.sin(a) * 1.05, 0.29 + 0.20 * math.cos(a)))   # bolle hoed zoals concept/origineel
-        out.append((0.235, 0.275))             # omkrulde rand
-        out.append((0.2, 0.27))
+            if hoog_vorm:                      # smalle klok, zoals frame 4-6 van poison.mfb
+                out.append((0.155 * math.sin(a) * 1.05, 0.22 + 0.30 * math.cos(a)))
+            else:
+                out.append((0.24 * math.sin(a) * 1.05, 0.29 + 0.20 * math.cos(a)))   # bolle hoed zoals concept/origineel
+        if hoog_vorm:
+            out.append((0.15, 0.205))
+            out.append((0.125, 0.20))
+        else:
+            out.append((0.235, 0.275))         # omkrulde rand
+            out.append((0.2, 0.27))
         return out
 
     def hoed_punt(a, r, z):
         p = Vector((r * math.cos(a), r * math.sin(a), z))
         q = (p - Vector((0, 0, 0.26))).normalized()
-        d = 0.0
-        for pv, pr in zip(putjes, putr):
-            ang = q.angle(pv)
-            d += 0.0 * math.exp(-(ang * 0.25 / pr) ** 2)          # putjes zitten in het materiaal
-        d += 0.004 * noise.noise(p * 40)
-        return tuple(p - q * d)
+        return tuple(p - q * 0.004 * noise.noise(p * 40))
 
     def voet_punt(a, r, z):
         k = 1 + 0.04 * noise.noise(Vector((math.cos(a) * 3, math.sin(a) * 3, z * 20)))
         return (r * k * math.cos(a), r * k * math.sin(a), z)
-    voet = [(0.0, 0.0), (0.065, 0.0), (0.09, 0.02), (0.095, 0.07), (0.087, 0.14), (0.075, 0.21), (0.066, 0.28)]
-    plaat = [(0.2, 0.27), (0.14, 0.265), (0.07, 0.275)]
+    if hoog_vorm:
+        voet = [(0.0, 0.0), (0.055, 0.0), (0.075, 0.02), (0.075, 0.07), (0.066, 0.13), (0.056, 0.19), (0.05, 0.24)]
+        plaat = [(0.125, 0.20), (0.09, 0.205), (0.05, 0.22)]
+    else:
+        voet = [(0.0, 0.0), (0.065, 0.0), (0.09, 0.02), (0.095, 0.07), (0.087, 0.14), (0.075, 0.21), (0.066, 0.28)]
+        plaat = [(0.2, 0.27), (0.14, 0.265), (0.07, 0.275)]
 
     def bouw_deel(fijn):
         b = L.Bouwer()
@@ -247,16 +282,20 @@ def paddenstoel():
         draai(b, plaat[::-1], 24 * s, uvr=(0.6, 0, 1, 0.5), mat=2)
         return b
     # hoog: procedurele materialen
-    hm = L.smat("hoed_h", lambda nt: _putjes(nt, _ruiskleur(nt, (0.12, 0.045, 0.016), (0.23, 0.095, 0.034), 18)), ruw=0.55,
-                normaal=lambda nt: _putjes_bump(nt))
-    vm = L.smat("voet_h", lambda nt: _ruiskleur(nt, (0.48, 0.14, 0.035), (0.66, 0.27, 0.08), 60, streep=True), ruw=0.7,
-                normaal=lambda nt: _bump(nt, 120, 0.4))
-    pm = L.smat("plaat_h", (0.42, 0.26, 0.12), ruw=0.8, normaal=lambda nt: _bump(nt, 300, 0.6))
+    if stip is not None:          # rood/blauw: grote lichte stippen, iets opgezet
+        hm = L.smat("hoed_h", lambda nt: _putjes(nt, _ruiskleur(nt, h0, h1, 18), stip, schaal=15.0, kans=0.5), ruw=0.45,
+                    normaal=lambda nt: _putjes_bump(nt, schaal=15.0, kans=0.5, op=True))
+    elif hoog_vorm:               # wit: vezelig in de lengte
+        hm = L.smat("hoed_h", lambda nt: _ruiskleur(nt, h0, h1, 40, streep=True), ruw=0.6, normaal=lambda nt: _bump(nt, 160, 0.5))
+    else:
+        hm = L.smat("hoed_h", lambda nt: _putjes(nt, _ruiskleur(nt, h0, h1, 18)), ruw=0.55, normaal=lambda nt: _putjes_bump(nt))
+    vm = L.smat("voet_h", lambda nt: _ruiskleur(nt, v0, v1, 60, streep=True), ruw=0.7, normaal=lambda nt: _bump(nt, 120, 0.4))
+    pm = L.smat("plaat_h", pl, ruw=0.8, normaal=lambda nt: _bump(nt, 300, 0.6))
     for mm in (hm, vm, pm):
         STUDIO_LIT(mm)
     hoog = L.obj("_hoog", bouw_deel(True).mesh("_hoog", [hm, vm, pm]))
-    laag = L.obj("paddenstoel", bouw_deel(False).mesh("paddenstoel"))
-    mat = L.bak_set("paddenstoel", laag, [hoog], res=512, ext=0.01, ray=0.03, ao_min=0.35)
+    laag = L.obj(naam, bouw_deel(False).mesh(naam))
+    mat = L.bak_set(naam, laag, [hoog], res=512, ext=0.01, ray=0.03, ao_min=0.35)
     laag.data.materials.append(mat)
     bpy.data.objects.remove(hoog)
     return [laag]
@@ -301,10 +340,10 @@ def _ruiskleur(nt, a, b, schaal, streep=False):
     return mm.outputs[2]
 
 
-def _putjes_voronoi(nt):
+def _putjes_voronoi(nt, schaal=34.0, kans=0.55):
     tc = nt.nodes.new("ShaderNodeTexCoord")
     vo = nt.nodes.new("ShaderNodeTexVoronoi")
-    vo.inputs["Scale"].default_value = 34.0
+    vo.inputs["Scale"].default_value = schaal
     vo.inputs["Randomness"].default_value = 1.0
     nt.links.new(tc.outputs["Object"], vo.inputs["Vector"])
     # gat waar F1 klein is; cel-kleur bepaalt of de cel een putje heeft (ca. 40 %)
@@ -317,7 +356,7 @@ def _putjes_voronoi(nt):
     gt = nt.nodes.new("ShaderNodeMath")
     gt.operation = "GREATER_THAN"
     nt.links.new(sep.outputs["Red"], gt.inputs[0])
-    gt.inputs[1].default_value = 0.45
+    gt.inputs[1].default_value = 1.0 - kans
     inv = nt.nodes.new("ShaderNodeMath")
     inv.operation = "SUBTRACT"
     inv.inputs[0].default_value = 1.0
@@ -329,22 +368,22 @@ def _putjes_voronoi(nt):
     return mul.outputs[0]          # 1 = in een putje
 
 
-def _putjes(nt, kleur):
-    p = _putjes_voronoi(nt)
+def _putjes(nt, kleur, gat=(0.05, 0.018, 0.006), schaal=34.0, kans=0.55):
+    p = _putjes_voronoi(nt, schaal, kans)
     mx = nt.nodes.new("ShaderNodeMix")
     mx.data_type = "RGBA"
     nt.links.new(p, mx.inputs["Factor"])
     nt.links.new(kleur, mx.inputs[6])
-    mx.inputs[7].default_value = (0.05, 0.018, 0.006, 1)
+    mx.inputs[7].default_value = (*gat, 1)
     return mx.outputs[2]
 
 
-def _putjes_bump(nt):
-    p = _putjes_voronoi(nt)
+def _putjes_bump(nt, schaal=34.0, kans=0.55, op=False):
+    p = _putjes_voronoi(nt, schaal, kans)
     bp = nt.nodes.new("ShaderNodeBump")
     bp.inputs["Strength"].default_value = 0.9
     bp.inputs["Distance"].default_value = 0.01
-    bp.invert = True
+    bp.invert = not op
     nt.links.new(p, bp.inputs["Height"])
     return bp.outputs["Normal"]
 

@@ -40,6 +40,7 @@ signal gedronken(d: Dorpeling, put: Plan)      ## water gehaald bij de put (miss
 signal voorwerp_opgeraapt(ob: Dictionary, d: Dorpeling)   ## sim/voorwerpen.gd: beker of kelk aangeraakt
 signal voorwerp_afgeleverd(ob: Dictionary, d: Dorpeling, kas: int)   ## bij het doel (vlag): kas erbij, object weg
 signal voorwerp_gevallen(ob: Dictionary)   ## drager weg: ligt weer op de grond
+signal paddenstoel_gegeten(ob: Dictionary, d: Dorpeling, effect: String)   ## sim/paddenstoelen.gd: opgegeten, object weg
 ## Leven (sim/leven.gd): schade, dood (oorzaak "wolf", "ouderdom", ...; al uit `dorpelingen`), met pensioen (oud).
 signal dorpeling_geraakt(d: Dorpeling, oorzaak: String)
 signal dorpeling_dood(d: Dorpeling, oorzaak: String)
@@ -386,6 +387,7 @@ func tik(dt: float) -> void:
 	Leven.tik_alle(self, dt)
 	Beloningen.tik(self)
 	Voorwerpen.tik_alle(self, dt)
+	Paddenstoelen.tik_alle(self, dt)
 	Regels.tik(self, dt)
 	mist.tik(self)
 	_werk_generator(dt)

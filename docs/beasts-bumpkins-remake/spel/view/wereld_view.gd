@@ -59,6 +59,10 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	w.volwassen_geworden.connect(_wissel_model)    # jongen/meisje-glb wordt man/vrouw
 	w.met_pensioen.connect(_wissel_model)          # man/vrouw wordt oudere man/vrouw (sim/leven.gd)
 	w.dorpeling_dood.connect(_lijk)
+	w.paddenstoel_gegeten.connect(func(ob: Dictionary, _d: Dorpeling, _e: String) -> void:    # sim/paddenstoelen.gd
+		var n := terrein.get_node_or_null("paddenstoel_%d_%d" % [ob["x"], ob["y"]])
+		if n != null:
+			n.queue_free())
 
 	_pad = MeshInstance3D.new()
 	_pad.name = "Looppad"
