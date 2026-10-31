@@ -46,10 +46,15 @@ static func zet_venster(root: Window) -> void:
 
 ## `--opname=pad.png` (na `--`, met `--opname_frame=N`, standaard 40): na N frames het beeld van de viewport op zijn
 ## eigen maat opslaan en stoppen. Voor frames op `--venster`-maat: --write-movie neemt het venster op, niet de viewport.
+static var _opname_gezet := false     ## een keer per proces (startmenu en hud vragen het allebei, ook na een herlaad)
+
+
 static func zet_opname(n: Node) -> void:
 	var pad := optie("opname")
-	if pad == "":
+	if pad == "" or _opname_gezet:
 		return
+	_opname_gezet = true
+	n = n.get_tree().root          # de wortel blijft bestaan als de hoofdscène opnieuw laadt
 	var na := int(optie("opname_frame")) if optie("opname_frame") != "" else 40
 	var tree := n.get_tree()
 	var teller := [0]

@@ -24,6 +24,8 @@ var _wachtrij: Array = []        ## brieven die nog open moeten: {kop, tekst, gr
 var _pauzeerde := false          ## de briefing zette de sim op pauze
 var prijzen: Prijzenscherm       ## view/prijzen.gd: open met het goudstukken-icoon (munt_knop) of O
 var munt_knop: Button
+var menu_knop: Button            ## naast het munt-icoon: pauzemenu (view/pauzemenu.gd, main.gd); touch >= 48 dp
+signal menu_gevraagd
 var kas_toon := -1               ## getoonde kas: loopt in stappen naar w.kas (kas_stap, spel.json kas_teller)
 var _kas_t := 0.0
 var stand: PanelContainer        ## de tekstregels (pc)
@@ -87,7 +89,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop\nTab / I = details   F1 = deze uitleg"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nTab / I = details   F1 = deze uitleg"
 	pc2.add_child(hulp)
 	add_child(pc2)
 	knop_hulp = Button.new()
@@ -148,6 +150,15 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	add_child(prijzen)
 	prijzen.bouw(w)
 	munt_knop.pressed.connect(prijzen.wissel)
+	# menuknop (2026-10-31): pauzemenu met opnieuw / andere missie; op touch een volle knophoogte (>= 48 dp)
+	menu_knop = MenuKnop.new()
+	var mk := Bouwmenu.touch_knop_h() if Bouwmenu.touch else 52.0
+	menu_knop.custom_minimum_size = Vector2(mk, mk)
+	menu_knop.size = menu_knop.custom_minimum_size
+	menu_knop.position = Vector2(munt_knop.position.x + munt_knop.size.x * schaal + 10, minikaart.position.y)
+	menu_knop.tooltip_text = "menu (Esc)"
+	menu_knop.pressed.connect(func() -> void: menu_gevraagd.emit())
+	add_child(menu_knop)
 	if is_inside_tree():
 		get_viewport().size_changed.connect(_indeling)
 	if Scherm.optie("proef") == "prijzen":     # alleen voor frames (view/scherm.gd)
@@ -417,6 +428,29 @@ class MuntKnop extends Button:
 			draw_circle(m + Vector2(0, 1.5), 7.0, Color8(150, 105, 25))
 			draw_circle(m, 7.0, Color8(236, 190, 60))
 			draw_circle(m, 3.2, Color8(250, 222, 120))
+
+
+## Menuknop: dezelfde steenknop als het munt-icoon, met drie perkamentkleurige strepen.
+class MenuKnop extends Button:
+	func _init() -> void:
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var k := size.y / 52.0
+		draw_rect(r, Color8(74, 80, 101))
+		draw_rect(Rect2(0, 0, r.size.x, 3 * k), Color8(128, 136, 160))
+		draw_rect(Rect2(0, 0, 3 * k, r.size.y), Color8(128, 136, 160))
+		draw_rect(Rect2(0, r.size.y - 3 * k, r.size.x, 3 * k), Color8(36, 39, 52))
+		draw_rect(Rect2(r.size.x - 3 * k, 0, 3 * k, r.size.y), Color8(36, 39, 52))
+		if is_hovered():
+			draw_rect(r.grow(-3 * k), Color(1, 1, 1, 0.08))
+		for i in 3:
+			var y := (16.0 + i * 10.0) * k
+			draw_rect(Rect2(Vector2(13 * k, y + 1.5 * k), Vector2(26, 5) * k), Color(0, 0, 0, 0.5))
+			draw_rect(Rect2(Vector2(13 * k, y), Vector2(26, 5) * k), Brief.INKT)
 
 
 ## Rolletje: opgerolde brief met rode zegel (naar MAIL uit het origineel), knippert zachtjes tot je erop klikt.

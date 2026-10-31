@@ -23,13 +23,28 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
+"$G" --headless --path . --script res://test/menu_test.gd        # startmenu, pauzemenu, opnieuw, andere/volgende missie
 "$G" --headless --path . --script res://test/ghost_test.gd       # bouw-ghost: gebouw-glb, groen/rood, deurpijl, = gebouwd
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 
-Opties na `--`: `--missie=1|2` (standaard 1), `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, `--regen`, `--fps` (frametijden loggen),
+Opties na `--`: `--missie=1|2|3` (zonder: startmenu), `--seizoen=lente|zomer|herfst|winter`, `--uur=12`, `--tempo=2`, `--regen`, `--fps` (frametijden loggen),
 `--gang=0|1|2` (loopanimatie, zie onder), `--scenario=overzicht|kaart|dorp|selectie|pad|loop` (gescripte camera/invoer voor frames),
 `--geluid-log` (elke klank die start in de uitvoer), `--wolf_model=tripo|trellis|procedureel`, `--koe_model=tripo|procedureel` (spel.json `koe_model`, view/koe.gd), `--camwolf=4.5` (camera volgt de eerste wolf, met `--missie=2 --scenario=wolf`).
+
+## Startmenu en pauzemenu
+
+Zonder `--missie`/`--scenario` (telefoon, `speel.ps1` zonder `-Missie`) begint het spel met het **startmenu**
+(`view/startmenu.gd`): perkament met alle 30 missies (`data/campagne.json`: ons label, dorp van de eigen vlag; een speelbare
+missie toont de briefingtitel en het doel). Speelbaar = in `spel.json` `missies` en de kaart is er (nu 1-3); de rest staat vaal
+onder "Nog niet gebouwd". **Doorgaan** = laatst gestarte missie; gewonnen missies krijgen "gewonnen" (`user://voortgang.cfg`,
+scenario's en tests schrijven niet). In het spel: **menuknop** naast het munt-icoon (touch >= 48 dp) of **Esc** (in de bouwmodus
+eerst bouwmodus uit) = pauzemenu (`view/pauzemenu.gd`): Hervatten, Missie opnieuw, Andere missie, Afsluiten (pc); sim, camera
+en bouwmodus staan stil zolang het open is. Na de missie (2 s na de uitslag): gewonnen = Volgende missie / Verder spelen /
+Andere missie, verloren = Opnieuw / Andere missie / Bekijken. Elke keuze laadt `main.tscn` opnieuw met `Startmenu.volgende`
+(niets blijft over; de briefing is het laadscherm). Origineel: lineaire campagne zonder vrije keuze (alleen de dev-opdracht
+`loadmission`), menu's pauzeerden; vrije keuze tussen de speelbare missies is eigen keuze. Test `test/menu_test.gd`
+(`-- --frames` met venster: frames in `out/menu/`).
 
 ## Geluid
 
@@ -116,6 +131,7 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | WASD/pijlen, schermrand | pannen (begrensd tot het eiland) |
 | wiel | zoomen (2 m tot eilandoverzicht) |
 | Spatie, 1 / 2 / 4 | pauze, tempo 1x/2x/4x |
+| Esc, of de menuknop naast het munt-icoon | pauzemenu (opnieuw, andere missie, afsluiten) |
 | knop rechtsboven (of B / L / H / M / J / G / T / F / P) | bouwmodus: hut / loods / kippenhok / molen / melkerij / akker / weg / hek / poort. Het menu groeit: eerst hut, kippenhok, loods, weg; na een loods molen en akker; na een molen melkerij, hek en poort |
 | in de bouwmodus: links indrukken, slepen, loslaten | indrukken toont de ghost onder de wijzer, slepen schuift hem, loslaten plaatst (groen = kan, rood = kan niet of te duur). De ghost is het gebouw zelf (af-glb, doorzichtig getint, zelfde transform als na het bouwen; de kist alleen zolang de glb laadt) met een pijl op de deurtegel naar de deur, ook op touch; test `test/ghost_test.gd`. Weg en hek: slepen legt een rij met een ghost per tegel (grijs = is er al). De modus **blijft aan** na het plaatsen |
 | in de bouwmodus: knop Draai, wiel, R | een kwartslag draaien (wiel: omlaag verder, omhoog terug; het wiel zoomt dan niet). Weg en hek draaien niet, daar blijft het wiel zoomen |

@@ -117,8 +117,12 @@ func _unhandled_key_input(e: InputEvent) -> void:
 
 ## Gerafelde rand: punten rondom met een vaste ruis (geen rng-toestand, zelfde brief = zelfde rand).
 func _maak_rand() -> void:
-	_rand = PackedVector2Array()
-	var s := size
+	_rand = rand_punten(size)
+
+
+## De punten van de gerafelde rand rond een rechthoek van maat `s` (ook voor view/perkament.gd).
+static func rand_punten(s: Vector2) -> PackedVector2Array:
+	var uit := PackedVector2Array()
 	var stap := 18.0
 	var n := 0
 	var zij := [[Vector2(0, 0), Vector2(s.x, 0), Vector2(0, -1)], [Vector2(s.x, 0), Vector2(s.x, s.y), Vector2(1, 0)],
@@ -132,29 +136,38 @@ func _maak_rand() -> void:
 			var f := float(i) / stappen
 			var ruis := sin(n * 12.9898) * 43758.5453
 			ruis = (ruis - floorf(ruis)) * 7.0
-			_rand.append(a.lerp(e, f) - (z[2] as Vector2) * ruis)
+			uit.append(a.lerp(e, f) - (z[2] as Vector2) * ruis)
+	return uit
 
 
 func _draw() -> void:
-	if _rand.size() < 3:
+	teken_perkament(self, _rand, true)
+
+
+## Perkament met schaduw, rand, vlekken en (met `zegel`) de lakzegel rechtsonder, op `ci` (ook view/perkament.gd).
+static func teken_perkament(ci: Control, rand: PackedVector2Array, zegel: bool) -> void:
+	if rand.size() < 3:
 		return
+	var size := ci.size
 	var schaduw := PackedVector2Array()
-	for p in _rand:
+	for p in rand:
 		schaduw.append(p + Vector2(6, 8))
-	draw_colored_polygon(schaduw, Color(0, 0, 0, 0.45))
-	draw_colored_polygon(_rand, PERKAMENT)
-	var lus := _rand.duplicate()
-	lus.append(_rand[0])
-	draw_polyline(lus, RAND, 3.0, true)
+	ci.draw_colored_polygon(schaduw, Color(0, 0, 0, 0.45))
+	ci.draw_colored_polygon(rand, PERKAMENT)
+	var lus := rand.duplicate()
+	lus.append(rand[0])
+	ci.draw_polyline(lus, RAND, 3.0, true)
 	# vlekken in het perkament
 	for i in 9:
 		var h := Vector2(fposmod(sin(i * 3.7) * 977.0, 1.0), fposmod(sin(i * 5.3) * 613.0, 1.0))
-		draw_circle(Vector2(30, 30) + h * (size - Vector2(60, 60)), 18.0 + i * 3.0, Color(0, 0, 0, 0.05))
+		ci.draw_circle(Vector2(30, 30) + h * (size - Vector2(60, 60)), 18.0 + i * 3.0, Color(0, 0, 0, 0.05))
+	if not zegel:
+		return
 	# lakzegel met lint rechtsonder
 	var c := Vector2(size.x - 52, size.y - 34)
-	draw_colored_polygon(PackedVector2Array([c + Vector2(-12, 8), c + Vector2(-2, 8), c + Vector2(-10, 36), c + Vector2(-20, 30)]), ZEGEL_DONKER)
-	draw_colored_polygon(PackedVector2Array([c + Vector2(2, 8), c + Vector2(12, 8), c + Vector2(20, 30), c + Vector2(10, 36)]), ZEGEL_DONKER)
-	draw_circle(c, 24.0, ZEGEL_DONKER)
-	draw_circle(c, 20.0, ZEGEL)
-	draw_arc(c, 12.0, 0.0, TAU, 24, ZEGEL_DONKER, 2.5, true)
-	draw_string(get_theme_default_font(), c + Vector2(-6, 7), "M", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ZEGEL_DONKER)
+	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-12, 8), c + Vector2(-2, 8), c + Vector2(-10, 36), c + Vector2(-20, 30)]), ZEGEL_DONKER)
+	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(2, 8), c + Vector2(12, 8), c + Vector2(20, 30), c + Vector2(10, 36)]), ZEGEL_DONKER)
+	ci.draw_circle(c, 24.0, ZEGEL_DONKER)
+	ci.draw_circle(c, 20.0, ZEGEL)
+	ci.draw_arc(c, 12.0, 0.0, TAU, 24, ZEGEL_DONKER, 2.5, true)
+	ci.draw_string(ci.get_theme_default_font(), c + Vector2(-6, 7), "M", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ZEGEL_DONKER)

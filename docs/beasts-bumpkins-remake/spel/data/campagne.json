@@ -1,0 +1,155 @@
+{
+ "_uitleg": "Campagne voor het startmenu (view/startmenu.gd): alle 30 missies van het origineel op volgorde. titel = ons korte label uit ../missies.md (het origineel heeft geen missienamen; een speelbare missie toont de briefingtitel uit hints.json), dorp = naam op de eigen vlag (eigenaar 0) in M<n>.MIS, leeg = geen eigen dorp (M24, M25, M28, M30). Speelbaar = staat in spel.json missies.",
+ "missies": [
+  {
+   "nr": 1,
+   "titel": "Aorta (verbannen)",
+   "dorp": "Moonton"
+  },
+  {
+   "nr": 2,
+   "titel": "Terug op het vasteland",
+   "dorp": "Goatton"
+  },
+  {
+   "nr": 3,
+   "titel": "Gouden kelk van Barathkar",
+   "dorp": "Moonton"
+  },
+  {
+   "nr": 4,
+   "titel": "Beker van Vervulling",
+   "dorp": "Parpton"
+  },
+  {
+   "nr": 5,
+   "titel": "Zombiedorp en heilig zwaard",
+   "dorp": "Sykeston"
+  },
+  {
+   "nr": 6,
+   "titel": "Parpton",
+   "dorp": "Biggunton"
+  },
+  {
+   "nr": 7,
+   "titel": "Oorlogskas",
+   "dorp": "Pantston"
+  },
+  {
+   "nr": 8,
+   "titel": "Wormton en kas",
+   "dorp": "Gruffton"
+  },
+  {
+   "nr": 9,
+   "titel": "Tovenaarsleerling",
+   "dorp": "Biggunton"
+  },
+  {
+   "nr": 10,
+   "titel": "Toren der Kennis",
+   "dorp": "Cheekston"
+  },
+  {
+   "nr": 11,
+   "titel": "Vijandelijke enclave",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 12,
+   "titel": "Grens: BomberMan",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 13,
+   "titel": "Ringworm en de pest",
+   "dorp": "Cheekston"
+  },
+  {
+   "nr": 14,
+   "titel": "Vloek van de zombies",
+   "dorp": "Moonton"
+  },
+  {
+   "nr": 15,
+   "titel": "Blagton en de toverrollen",
+   "dorp": "Biggunton"
+  },
+  {
+   "nr": 16,
+   "titel": "Big Pockets Barry",
+   "dorp": "Biggunton"
+  },
+  {
+   "nr": 17,
+   "titel": "Schatkaart",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 18,
+   "titel": "Koe naar de heler",
+   "dorp": "Wormton"
+  },
+  {
+   "nr": 19,
+   "titel": "Biggunton en Sykeston",
+   "dorp": "Moonton"
+  },
+  {
+   "nr": 20,
+   "titel": "Fast Fingers Freddy",
+   "dorp": "Gruffton"
+  },
+  {
+   "nr": 21,
+   "titel": "Goluckyton",
+   "dorp": "Gruffton"
+  },
+  {
+   "nr": 22,
+   "titel": "Graaf Drapoga",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 23,
+   "titel": "Goud en vee",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 24,
+   "titel": "Bruiloft van Lurkio",
+   "dorp": ""
+  },
+  {
+   "nr": 25,
+   "titel": "Drie gebouwen",
+   "dorp": ""
+  },
+  {
+   "nr": 26,
+   "titel": "Reus Deavo",
+   "dorp": "Moonton"
+  },
+  {
+   "nr": 27,
+   "titel": "Lord Randybar",
+   "dorp": "Pantston"
+  },
+  {
+   "nr": 28,
+   "titel": "Verdediging tegen de Dark Lord",
+   "dorp": ""
+  },
+  {
+   "nr": 29,
+   "titel": "Heilige Kelk en Fontein",
+   "dorp": "Blagton"
+  },
+  {
+   "nr": 30,
+   "titel": "Slotgevecht",
+   "dorp": ""
+  }
+ ]
+}

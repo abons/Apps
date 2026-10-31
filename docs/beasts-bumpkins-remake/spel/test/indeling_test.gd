@@ -6,7 +6,8 @@ extends SceneTree
 ## hint, touchbalk) overlappen elkaar niet; ook met de bouwmodus aan en (staand) de lade open. Brief en prijzenscherm
 ## passen in beeld. Touch: de tellers zijn >= 16 dp (Scherm.dp), de stand-tekstregels zijn weg.
 ## Pc (2026-10-31): ook op 1600x900; standaard alleen de tellerrij en de knop "? Toetsen", en met de details (Tab) en de
-## sneltoetsuitleg (F1) uitgeklapt, apart en samen, weer niets buiten beeld of over elkaar.
+## sneltoetsuitleg (F1) uitgeklapt, apart en samen, weer niets buiten beeld of over elkaar. De menuknop (2026-10-31) telt
+## mee als vast deel. Start- en pauzemenu: test/menu_test.gd.
 
 var fouten := 0
 var cam: Camera3D
@@ -181,7 +182,7 @@ func _indeling(hud: Hud, bm: Bouwmenu, wat: String) -> void:
 			if not vp.encloses(_rect(c)):
 				buiten.append("%s %s" % [c.get_class() if c.name.begins_with("@") else String(c.name), _rect(c)])
 	_check(buiten.is_empty(), "%s: alles in beeld %s" % [wat, buiten])
-	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "stand": hud.kop if hud.kop != null else hud.tellers,
+	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "menu": hud.menu_knop, "stand": hud.kop if hud.kop != null else hud.tellers,
 		"details": hud.stand, "toetsen-knop": hud.knop_hulp, "hulpregels": hud.hulp.get_parent(),
 		"lade-knop": bm.knop_lade, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
 	var namen := delen.keys().filter(func(k: String) -> bool:

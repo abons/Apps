@@ -4,6 +4,8 @@ extends Node3D
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
+## Zonder --missie en --scenario begint het spel met het startmenu (view/startmenu.gd); een keuze daar, of in het
+## pauzemenu (view/pauzemenu.gd, menuknop of Esc), laadt deze scène opnieuw met `Startmenu.volgende`.
 
 var w: Wereld
 var licht: Licht
@@ -18,20 +20,35 @@ var hints: Hints                  # sim/hints.gd, alleen in gewoon spel en --sce
 var szt := 0.0
 const RAND_M := 12.0              ## m marge buiten het 192x192-raster voor de camera (alleen met mist)
 var _stap := 0
+var startmenu: Startmenu           # alleen als er (nog) geen missie gekozen is
+var pauzemenu: Pauzemenu          # view/pauzemenu.gd: menuknop of Esc, en na de missie
 
 
 func _ready() -> void:
 	Prestatie.merk("main _ready")
 	var opt := _opties()
+	var uit_menu := Startmenu.volgende > 0
+	if Startmenu.naar_menu or (not uit_menu and not opt.has("missie") and not opt.has("scenario")):
+		Startmenu.naar_menu = false
+		set_process(false)
+		startmenu = Startmenu.new()
+		startmenu.name = "Startmenu"
+		add_child(startmenu)
+		return
+	var nr := int(opt.get("missie", "1"))
+	if uit_menu:                       # gekozen in het start- of pauzemenu: geen scenario, de opdrachtregel-missie telt niet
+		nr = Startmenu.volgende
+		Startmenu.volgende = 0
+		opt.erase("scenario")
 	w = Wereld.new()
-	if not w.laad("", int(opt.get("missie", "1"))):
+	if not w.laad("", nr):
 		push_error("main: wereld laden mislukt (draai sync.ps1 en --import)")
 		get_tree().quit(1)
 		return
 	Prestatie.merk("wereld geladen (sim)")
 	Voorladen.start(w.missie_nr)       # alleen mobiel: glb's parallel lezen (view/voorladen.gd)
 	var laadscherm: CanvasLayer = null
-	if Voorladen.aan:                  # alleen mobiel: briefing als laadscherm, eerst een frame tekenen, dan opbouwen
+	if Voorladen.aan or uit_menu:      # mobiel, of na een keuze in het menu: briefing als laadscherm, eerst een frame tekenen, dan opbouwen
 		set_process(false)
 		laadscherm = Voorladen.scherm(self, w)
 		await get_tree().process_frame
@@ -126,6 +143,14 @@ func _ready() -> void:
 	Prestatie.merk("geluid")
 	w.plaats_voorgebouwd()          # na view en bouwmenu: die tekenen het via plan_gezet/plan_klaar
 	Prestatie.merk("voorgebouwd")
+	pauzemenu = Pauzemenu.new()
+	pauzemenu.name = "Pauzemenu"
+	add_child(pauzemenu)
+	pauzemenu.bouw(w, cam, bouwmenu)
+	hud.menu_gevraagd.connect(pauzemenu.wissel)
+	if scenario == "":
+		Startmenu.bewaar_laatste(w.missie_nr)
+		w.missie_einde.connect(_missie_einde)
 	if scenario != "":
 		cam.invoer_aan = false
 		_start_scenario()
@@ -139,6 +164,18 @@ func _ready() -> void:
 		laadscherm.queue_free()
 		set_process(true)
 	print("[spel] missie ", w.missie_nr, " (", w.missie.get("naam", "?"), ") eiland ", w.eiland, " dorpelingen ", w.dorpelingen.size(), " objecten ", w.objecten.size(), " seizoen ", w.seizoen_naam())
+
+
+## Na de missie: gewonnen onthouden; na 2 s (de uitslag staat dan even in beeld) het einde-menu.
+func _missie_einde(u: String) -> void:
+	if u == "gewonnen":
+		Startmenu.bewaar_gewonnen(w.missie_nr)
+	get_tree().create_timer(2.0).timeout.connect(_open_einde.bind(u))
+
+
+func _open_einde(u: String) -> void:
+	if is_instance_valid(pauzemenu):
+		pauzemenu.open_einde(u)
 
 
 func _opties() -> Dictionary:
@@ -188,6 +225,8 @@ func _process(dt: float) -> void:
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	if w == null:
+		return
 	if e is InputEventKey and e.pressed and not e.echo:
 		match e.keycode:
 			KEY_SPACE: w.gepauzeerd = not w.gepauzeerd
@@ -196,7 +235,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_4: w.tempo = 4.0
 			KEY_K: w.regen_handmatig = {-1: 1, 1: 0, 0: -1}[w.regen_handmatig]
 			KEY_N: w.tijd_s = (w.dag_nr() + 1) * w.seizoen_duur() + 60.0
-			KEY_ESCAPE: get_tree().quit()
+			KEY_ESCAPE: pauzemenu.open()      # bouwmodus vangt Esc eerst af (Bouwmenu), het open menu ook (Pauzemenu)
 
 
 # ---------------------------------------------------------------- scenario's (frames voor verificatie)

@@ -26,8 +26,14 @@ func bouw(wereld: Wereld) -> Hints:
 		briefing = m.get("briefing", {})
 		hints = m.get("hints", [])
 		_tik_s = float(w.spel["seizoen_s"]) / float(d.get("seizoen_tikken", 2880))
-	w.voorwerp_opgeraapt.connect(func(ob: Dictionary, _d: Dorpeling) -> void: _opgeraapt[int(ob["cls"])] = true)
+	# een methode, geen lambda: een lambda houdt deze Hints vast en Hints de Wereld, zodat de Wereld na het herladen van
+	# de scène (startmenu, pauzemenu) nooit vrijkwam
+	w.voorwerp_opgeraapt.connect(_bij_opgeraapt)
 	return self
+
+
+func _bij_opgeraapt(ob: Dictionary, _d: Dorpeling) -> void:
+	_opgeraapt[int(ob["cls"])] = true
 
 
 ## Vuurt elke hint waarvan de trigger nu waar is (en waarvan de `na`-hint al getoond is). Geeft de gevuurde ids.
