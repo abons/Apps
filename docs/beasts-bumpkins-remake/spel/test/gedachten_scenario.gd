@@ -2,7 +2,8 @@ extends Node
 ## Scenario `gedachten` (main.gd --scenario=gedachten), frames voor de gedachtewolkjes en het portret (sim/gedachten.gd,
 ## view/gedachten_view.gd, view/portret.gd): zes dorpelingen rond het kampvuur, elk met een andere behoefte (wil melk,
 ## honger, dorst, wil een ei, boos, tevreden), sim op pauze; de eerste (wil melk) is gekozen. --stap=verliefd kiest de
-## vrouw die een gezin sticht.
+## vrouw die een gezin sticht. --stap=man|vrouw|bouwer|voetsoldaat kiest zo een (bouwer en voetsoldaat: een volwassen man
+## krijgt die rol), voor de frames van het portret (test/portret_frames.sh).
 
 var m: Node            ## main.gd
 var w: Wereld
@@ -38,6 +39,15 @@ func start(main: Node) -> Node:
 				_rollen[0][1] = "melk" if _rollen[0][0] != eerste else "verliefd"
 				break
 		_zet()
+	if stap in ["man", "vrouw", "bouwer", "voetsoldaat"]:
+		for r in _rollen:
+			var d: Dorpeling = r[0]
+			if d.volwassen() and d.leeftijd == "volwassen" and d.geslacht == ("vrouw" if stap == "vrouw" else "man"):
+				eerste = d
+				if stap in ["bouwer", "voetsoldaat"]:
+					d.rol = stap
+					w.rol_veranderd.emit(d)
+				break
 	m.bestuur.gekozen.clear()
 	m.bestuur.gekozen.append(eerste.id)
 	m.view.gekozen = m.bestuur.gekozen

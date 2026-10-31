@@ -90,6 +90,32 @@ func _ronde(touch: bool) -> void:
 		await _frames(1)
 		_check(not hud.tellers.tempo_ik.visible and hud.tellers.tempo.visible and hud.tellers.tempo.text == "4x", "%s: 4x bij tempo 4" % naam)
 		w.tempo = 1.0
+	# bouwplaats kiezen zonder selectie: Annuleren midden boven met wat er terugkomt; Delete (pc) of de knop annuleert
+	var plan: Plan = null
+	for r in range(3, 12):
+		plan = w.maak_plan(&"hut", w.kampvuur + Vector2i(r, -r), 0)
+		if plan != null and w.plan_zet(plan):
+			break
+		plan = null
+	_check(plan != null, "%s: een hutplan gezet" % naam)
+	if plan != null:
+		var kas_voor := w.kas + w.annuleer_opbrengst(plan)
+		var bewaar := b.gekozen.duplicate()
+		b.gekozen.clear()
+		b.gekozen_plan = plan
+		await _frames(2)
+		_check(hud.annuleer_knop.visible and hud.annuleer_knop.text == "Annuleer hut (+%d)" % w.annuleer_opbrengst(plan), "%s: knop '%s'" % [naam, hud.annuleer_knop.text])
+		_binnen(hud.annuleer_knop, "%s annuleerknop" % naam)
+		var ak := _rect(hud.annuleer_knop)
+		_check(absf(ak.get_center().x - root.get_visible_rect().size.x * 0.5) < 2.0 and not ak.intersects(_rect(hud.stil_knop)) 				and not ak.intersects(_rect(hud.menu_knop)), "%s: annuleerknop midden boven, los van de knoppenrij" % naam)
+		_check(not touch or hud.annuleer_knop.size.y >= Bouwmenu.touch_knop_h() - 0.5, "%s: annuleerknop >= 48 dp" % naam)
+		if touch:
+			hud.annuleer_knop.pressed.emit()
+		else:
+			_toets(hud, KEY_DELETE)
+		await _frames(1)
+		_check(not plan in w.plannen and w.kas == kas_voor and not hud.annuleer_knop.visible, "%s: geannuleerd, kas terug (%d)" % [naam, w.kas])
+		b.gekozen = bewaar
 	var maten := [Vector2i(2400, 1080), Vector2i(1080, 2400), Vector2i(2400, 1080), Vector2i(1080, 2400)]
 	if not touch:
 		maten = [Vector2i(1600, 900)] + maten

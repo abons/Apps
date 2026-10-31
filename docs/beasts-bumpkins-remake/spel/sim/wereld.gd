@@ -13,6 +13,7 @@ const REGENKANS := [0.35, 0.10, 0.40, 0.0]
 signal bevel_gegeven(ids: Array, soort: String, doel: Vector2i)
 signal plan_gezet(plan: Plan)
 signal plan_klaar(plan: Plan)
+signal plan_weg(plan: Plan)       ## geannuleerd voor het af was (annuleer_plan): view haalt bouwplaats en stapels weg
 signal koe_erbij(koe: Vee)
 signal koe_geclaimd(koe: Vee)
 signal missie_einde(uitslag: String)      ## "gewonnen" of "verloren", een keer
@@ -1712,8 +1713,9 @@ func plan_zet(p: Plan) -> bool:
 			return false
 	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(p.soort), p.bouwtijd_s))
 	kas -= prijs(p.soort)
+	p.betaald = prijs(p.soort)
 	plannen.append(p)
-	_leg_route(route)                 # voor de stapels: die mijden het pad
+	_leg_route(route, p)              # voor de stapels: die mijden het pad
 	p.stapels = stapel_plekken(p)     # zaagbok en steenhoop: de view zet ze neer, de werkplekken volgen eruit
 	plan_gezet.emit(p)
 	return true
@@ -1799,22 +1801,109 @@ func kan_betalen_plan(p: Plan) -> bool:
 
 ## Leg de deurweg van `van` (weg_route) en betaal elke nieuwe padtegel. Geeft het aantal nieuwe padtegels.
 func leg_weg(van: Vector2i, p: Plan = null) -> int:
-	return _leg_route(weg_route(van, p))
+	return _leg_route(weg_route(van, p), p)
 
 
-func _leg_route(route: Array[Vector2i]) -> int:
+## Legt `route` als pad en betaalt de nieuwe tegels. Met `p`: de route komt in p.deurweg (gedeeld gebruik, zie
+## annuleer_plan) en wat nieuw is met zijn oude soort in p.pad_oud.
+func _leg_route(route: Array[Vector2i], p: Plan = null) -> int:
 	var pad := raster.namen.find("pad")
 	if route.is_empty() or pad < 0:
 		return 0
 	var nieuw := 0
 	for t in route:
 		var ix := raster.idx(t.x, t.y)
+		if p != null and not t in p.deurweg:
+			p.deurweg.append(t)
 		if raster.soort[ix] != pad:
+			if p != null:
+				p.pad_oud[t] = raster.soort[ix]
 			raster.soort[ix] = pad
 			nieuw += 1
+	if p != null:      # wat er al aan pad naast lag: geen aansluiting van een ander (annuleer_weg)
+		for t in route:
+			if not p.pad_oud.has(t):
+				continue
+			for d in 8:
+				var n := t + Vector2i(Raster.DC[d], Raster.DR[d])
+				if raster.in_kaart(n.x, n.y) and raster.soort[raster.idx(n.x, n.y)] == pad and not n in route:
+					p.pad_buren[n] = true
 	kas = maxi(0, kas - nieuw * int(spel.get("weg_per_tegel", 0)))
 	wegen_veranderd.emit()      # ook zonder nieuwe tegels: de stoep naar de deur (view/wegen.gd)
 	return nieuw
+
+
+## Annuleren van een plan dat nog niet af is (besluit gebruiker 2026-10-31): alles terug. De prijs van het gebouw
+## alleen zolang er nog niet aan gebouwd is (voortgang 0; eigen keuze: er was geen regel, een begonnen bouwplaats
+## heeft materiaal gekost), de deurweg altijd: de tegels die dit plan nieuw legde gaan weer terug naar hun oude
+## grond en hun weg_per_tegel komt terug. Behalve wat inmiddels een ander gebruikt (annuleer_weg). Geeft wat
+## terugkomt, -1 als het niet kan (af, of niet door de speler gezet).
+func annuleer_plan(p: Plan) -> int:
+	if p == null or p.klaar or p.betaald < 0 or not p in plannen:
+		return -1
+	var terug := annuleer_opbrengst(p)
+	var weg := annuleer_weg(p)
+	for t in weg:
+		raster.soort[raster.idx(t.x, t.y)] = int(p.pad_oud[t])
+	plannen.erase(p)
+	for d in dorpelingen:
+		if d.werk_plan == p:
+			d.werk_plan = null
+			d.bouwt = false
+			d.route.clear()
+			d.bevel = {}
+	kas += terug
+	plan_weg.emit(p)
+	if not weg.is_empty():
+		wegen_veranderd.emit()
+	return terug
+
+
+## Wat annuleer_plan teruggeeft (verandert niets): prijs als er nog niet gebouwd is, plus de deurwegtegels die weggaan.
+func annuleer_opbrengst(p: Plan) -> int:
+	if p == null or p.klaar or p.betaald < 0:
+		return -1
+	var g := p.betaald if p.voortgang <= 0.0 else 0
+	return g + annuleer_weg(p).size() * int(spel.get("weg_per_tegel", 0))
+
+
+## De deurwegtegels die bij annuleren weggaan: vanaf de deur, alleen wat dit plan nieuw legde, en tot de eerste tegel
+## die een ander gebruikt: in de deurweg van een ander plan of gebouw, een weg-plan erop, of een padtegel of weg-plan
+## ernaast die niet op deze route ligt en er bij het leggen nog niet lag (Plan.pad_buren: een zelf gelegde weg of een
+## ander pad sluit daar aan; de deurweg van een ander plan ernaast telt niet, die sluit aan waar hij eindigt). Die tegel en alles
+## erachter (naar het dorp toe) blijft liggen en wordt niet terugbetaald.
+func annuleer_weg(p: Plan) -> Array[Vector2i]:
+	var weg: Array[Vector2i] = []
+	var pad := raster.namen.find("pad")
+	if pad < 0:
+		return weg
+	var anders := {}
+	var weg_plan := {}
+	for q in plannen:
+		if q == p:
+			continue
+		for t in q.deurweg:
+			anders[t] = true
+		if q.soort == &"weg" and not q.klaar:
+			weg_plan[q.tegel] = true
+	var op_route := {}
+	for t in p.deurweg:
+		op_route[t] = true
+	for t in p.deurweg:
+		if not p.pad_oud.has(t) or anders.has(t) or weg_plan.has(t) or raster.soort[raster.idx(t.x, t.y)] != pad:
+			break
+		var vast := false
+		for d in 8:
+			var n := t + Vector2i(Raster.DC[d], Raster.DR[d])
+			if op_route.has(n) or p.pad_buren.has(n) or anders.has(n) or not raster.in_kaart(n.x, n.y):
+				continue
+			if raster.soort[raster.idx(n.x, n.y)] == pad or weg_plan.has(n):
+				vast = true
+				break
+		if vast:
+			break
+		weg.append(t)
+	return weg
 
 
 ## Afgebouwd gebouw waarvan de voetafdruk `t` bevat, of null.

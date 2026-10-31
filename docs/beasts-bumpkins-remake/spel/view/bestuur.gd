@@ -11,6 +11,8 @@ extends Node
 ## besluit gebruiker 2026-10-31). Stilstaan: de hand-knop of X in de HUD (Hud.stilstaan).
 ## Klik op een voorwerp op de grond (beker, kelk) met een selectie: de dichtste loopt erheen en raapt het op
 ## (sim/voorwerpen.gd); naar de vlag brengen is daarna een gewoon loopbevel.
+## Klik op een bouwplaats (plan dat nog niet af is) zonder selectie: die bouwplaats kiezen (`gekozen_plan`); de HUD
+## toont dan Annuleren met wat er terugkomt (Wereld.annuleer_plan, besluit gebruiker 2026-10-31), ook Delete.
 
 const KLIK_DREMPEL := 6.0       # px: minder slepen telt als klik
 const PICK_PX := 30.0           # px rond een unit waarbinnen een klik hem kiest
@@ -22,6 +24,7 @@ var cam: Camera3D
 var voorwerpen: Node3D          # view/voorwerpen_view.gd (grond_pos)
 var kader: Control
 var gekozen: Array = []
+var gekozen_plan: Plan = null   ## bouwplaats gekozen met een klik zonder selectie (Hud: Annuleren)
 var _links := false
 var _start := Vector2.ZERO
 var _sleept := false
@@ -74,6 +77,7 @@ func _unhandled_input(e: InputEvent) -> void:
 
 func wis_selectie() -> void:
 	gekozen.clear()
+	gekozen_plan = null
 	if view != null:
 		view.gekozen = gekozen
 
@@ -86,7 +90,15 @@ func _voor_camera(id: int) -> bool:
 	return not cam.is_position_behind(view.unit_pos(id))
 
 
+## Annuleer de gekozen bouwplaats (Hud-knop of Delete). Geeft wat terugkwam, -1 als het niet kon.
+func annuleer_gekozen_plan() -> int:
+	var terug := w.annuleer_plan(gekozen_plan)
+	gekozen_plan = null
+	return terug
+
+
 func kies_in_rechthoek(r: Rect2, toevoegen := false) -> void:
+	gekozen_plan = null
 	if not toevoegen:
 		gekozen.clear()
 	for d in w.dorpelingen:
@@ -106,6 +118,7 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 		if af < bd:
 			bd = af
 			beste = d.id
+	gekozen_plan = null
 	if beste >= 0:
 		if not toevoegen:
 			gekozen.clear()
@@ -120,6 +133,10 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 			w.wissel_poort(poort)
 			return
 	if gekozen.is_empty():
+		if tp.x >= 0:
+			gekozen_plan = w.plan_op(tp)       # bouwplaats kiezen: de HUD biedt Annuleren aan
+			if gekozen_plan != null:
+				view.markeer(gekozen_plan.tegel)
 		return
 	var wid := _wolf_onder(pos)          # vechtbevel: de volwassenen (niet de bouwer) gooien stenen
 	if wid >= 0 and w.geef_vechtbevel(gekozen, wid) > 0:

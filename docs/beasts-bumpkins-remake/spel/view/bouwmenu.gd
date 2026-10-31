@@ -174,6 +174,8 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	w.plan_klaar.connect(nieuw_pad)
 	w.plan_gezet.connect(_toon_plan)
 	w.plan_klaar.connect(_plan_klaar)
+	w.plan_weg.connect(nieuw_pad)
+	w.plan_weg.connect(_plan_weg)
 	_hekken = Node3D.new()
 	_hekken.name = "Hekken"
 	parent3d.add_child(_hekken)
@@ -1006,6 +1008,18 @@ func _grond(t: Vector2i) -> Vector3:
 	if terrein != null:
 		v.y = terrein.hoogte_op(v.x, v.z)
 	return v
+
+
+## Plan geannuleerd (Wereld.annuleer_plan): bouwplaats en stapels weg.
+func _plan_weg(p: Plan) -> void:
+	for s: Node3D in _stapels.get(p, []):
+		s.queue_free()
+	_stapels.erase(p)
+	var k: Node3D = _kisten.get(p)
+	if k != null:
+		k.queue_free()
+	_kisten.erase(p)
+	_getoond.erase(p)
 
 
 ## Plan af: stapels weg, de kist wordt het gebouw (glb op ware grootte, of op de mensendeur geschaald).

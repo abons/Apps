@@ -70,6 +70,16 @@ foreach ($b in @('..\modellen\dieren\koe.glb', '..\modellen\dieren\koe_anim.json
     if (Test-Path $src) { Copy-Item $src (Join-Path $assets (Split-Path $src -Leaf)) -Force; Write-Host "gekopieerd: assets/$(Split-Path $src -Leaf)" }
     else { Write-Host "ontbreekt (overgeslagen): $b" }
 }
+# portretten (view/portret.gd, spel.json portret): Gemini-versies van het originele statbust, prive, niet in git;
+# alleen bustNN.png (niet de _v1/_groot-proeven). Zonder bron rendert het portret de kop uit het model.
+$pbron = Join-Path $PSScriptRoot '..\lokaal\concept\img\portret'
+$pdoel = Join-Path $assets 'portret'
+if (Test-Path $pbron) {
+    New-Item -ItemType Directory -Force $pdoel | Out-Null
+    $n = 0
+    foreach ($p in Get-ChildItem (Join-Path $pbron 'bust??.png')) { Copy-Item $p.FullName (Join-Path $pdoel $p.Name) -Force; $n++ }
+    Write-Host "gekopieerd: assets/portret/ ($n portretten)"
+} else { Write-Host "ontbreekt (overgeslagen): ..\lokaal\concept\img\portret" }
 # stemmen en klanken uit beasts-src naar assets/audio/beasts/ (prive, niet in git; audio.md sectie 6)
 & (Join-Path $PSScriptRoot 'audio\haal_beasts.ps1')
 # muziek: eigen cd-rip naar assets/audio/muziek/ (prive, niet in git; audio.md sectie 7); zonder bron overgeslagen

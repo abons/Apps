@@ -23,6 +23,8 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/paddenstoel_test.gd  # paddenstoelen eten: rood heelt, bruin voedt, wit doodt, blauw mana
 "$G" --headless --path . --script res://test/besluiten_test.gd   # besluiten 2026-10-31: wie bouwt, bouwafstand, bron, honger, stilstaan, M1 met 2 bouwers
 "$G" --headless --path . --script res://test/gedachten_test.gd   # gedachtewolkjes: elke behoefte de goede gedachte, volgorde, ikonen
+"$G" --headless --path . --script res://test/portret_test.gd     # portret: png per soort/rol (spel.json portret), ronde hoeken, 3D-terugval
+"$G" --headless --path . --script res://test/deurweg_test.gd     # deurweg bij het plaatsen + annuleren (alles terug, gedeelde tegels blijven)
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken, muziekspeler
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
@@ -127,8 +129,12 @@ Besluiten gebruiker 2026-10-31 (`spel.json` `_wie_bouwt`, `_bouw_afstand`, `leve
   somber > verliefd > blij. Wens en dorst pas als ze onvervuld blijven (60 s trek, 1,5 x `dorst_s`) en er iets aan te doen
   is (winkel staat of is bouwbaar; bron of put). Drempels in `Gedachten.STANDAARD`, te overschrijven met `spel.json`
   `gedachten`. `view/gedachten_view.gd`: wolkje (Sprite3D, vaste schermgrootte, rode rand = dringend) alleen bij een
-  behoefte of op de gekozen, pc met korte tekst erboven. `view/portret.gd`: rechtsonder kop (eigen render van zijn model in
-  een SubViewport, 6 frames na een wissel), naam, hp-balk, gedachte met uitleg (pc; inklapbaar, `hud.cfg` `portret_in`);
+  behoefte of op de gekozen, pc met korte tekst erboven. `view/portret.gd`: rechtsonder kop = Gemini-portret van zijn soort
+  of rol (besluit gebruiker 2026-10-31; `spel.json` `portret`: soort man/vrouw/jongen/meisje/oude_man/oude_vrouw = bust
+  12/13/02/07/00/17, rol bouwer 03, voetsoldaat 04 en de twaalf rollen die nog komen; `uitsnede` 6 %, ronde hoeken, rand).
+  De png's (afgeleid van statbust, **niet in git**) kopieert `sync.ps1` uit `lokaal/concept/img/portret/bustNN.png` naar
+  `assets/portret/`; ontbreekt er een, dan de oude kop (eigen render van zijn model in een SubViewport, 6 frames na een
+  wissel). Test `test/portret_test.gd`, frames `bash test/portret_frames.sh` (`--scenario=gedachten --stap=man|vrouw|bouwer|voetsoldaat`). Naam, hp-balk, gedachte met uitleg (pc; inklapbaar, `hud.cfg` `portret_in`);
   touch compact zonder tekst, staand weg zolang het bouwmenu onderin bezig is. Ikonen: `view/gedachte_ikonen.gd` (eigen SVG).
   Frames: scenario `gedachten` (`--stap=verliefd`).
 
@@ -153,7 +159,13 @@ route of prijs + pad te duur = niet gezet. De ghost toont precies die route als 
 `shaders/weg_ghost.gdshader` doorzichtig en getint als de gebouw-ghost, stencil tegen dubbele dekking; groen, rood bij te
 ver of te duur), alleen opnieuw gerekend als tegel, draai, wegen, plannen of kas veranderen; de hint zegt "Hut 300 + pad
 6 x 20 = 420"; geen route = rood "Geen pad naar je dorp" zonder weg. Bij
-afbouwen legt `leg_weg` hem nog eens (gratis; voorgebouwd en een doorgesneden weg). Test `test/deurweg_test.gd`, frames
+afbouwen legt `leg_weg` hem nog eens (gratis; voorgebouwd en een doorgesneden weg). Meteen bij het plaatsen = besluit
+gebruiker 2026-10-31 (`spel.json` `_deurweg`). **Annuleren** (besluit gebruiker 2026-10-31): klik zonder selectie op een
+bouwplaats (`Bestuur.gekozen_plan`), dan midden boven "Annuleer hut (+420)" of Delete; `Wereld.annuleer_plan`: alles terug
+en de nieuwe padtegels worden weer hun oude grond (`Plan.pad_oud`), vanaf de deur tot de eerste tegel die een ander
+gebruikt (in de `Plan.deurweg` van een ander plan of gebouw, een weg-plan, of een pad ernaast dat er bij het leggen nog
+niet lag, `Plan.pad_buren`); die en de rest naar het dorp blijven, zonder geld terug. Er was geen annuleerregel; eigen
+keuze: de prijs van het gebouw alleen zolang de voortgang 0 is, de deurweg altijd. Test `test/deurweg_test.gd`, frames
 `test/deurweg_frames.sh` (`--proef=bouw --proef_pad`, rood met `--proef_duur`). De laatste meters, van de
 deurtegel tot de echte deur binnen de voetafdruk, tekent `Wegen` als stoep naar `Plan.deur_punt`.
 Zelf wegen leggen (2026-10-30): bouwsoort **weg** (vanaf de start, `prijzen.weg` 2 kas en `bouwtijd_s.weg` 3 s per tegel,

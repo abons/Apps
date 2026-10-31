@@ -11,6 +11,8 @@ extends CanvasLayer
 ## bewaard in user://hud.cfg.
 ## Stilstaan (besluit gebruiker 2026-10-31, "alleen stilstaan knop", origineel de hand): naast de menuknop een hand-knop,
 ## alleen zichtbaar met een selectie, of X: de gekozen dorpelingen blijven staan zonder eigen klussen (Wereld.geef_stilstaan).
+## Bouwplaats annuleren (besluit gebruiker 2026-10-31): klik zonder selectie op een plan dat niet af is (Bestuur.gekozen_plan),
+## dan midden boven "Annuleer hut (+420)" (Wereld.annuleer_opbrengst) of Delete.
 ## Melding (midden boven, 2,5 s): een geweigerd bevel (Wereld.bevel_geweigerd, bv. een vrouw laten bouwen).
 ## Portret (besluit gebruiker 2026-10-31, view/portret.gd): rechtsonder de (eerste) gekozen dorpeling met zijn gedachte;
 ## op de pc inklapbaar (bewaard in hud.cfg), weg zolang het bouwpaneel open is of de bouwmodus de onderkant gebruikt
@@ -34,6 +36,7 @@ var menu_knop: Button            ## naast het munt-icoon: pauzemenu (view/pauzem
 signal menu_gevraagd
 var stil_knop: Button            ## hand: stilstaan voor de selectie (X); touch >= 48 dp, alleen met een selectie
 var melding: Label               ## geweigerd bevel, verdwijnt na MELDING_S
+var annuleer_knop: Button        ## gekozen bouwplaats (Bestuur.gekozen_plan): "Annuleer hut (+420)"; ook Delete
 var _melding_t := 0.0
 const MELDING_S := 2.5
 var kas_toon := -1               ## getoonde kas: loopt in stappen naar w.kas (kas_stap, spel.json kas_teller)
@@ -101,7 +104,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: rij onderin of lettertoets, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nX / hand = stilstaan (selectie)   M = muziek aan/uit   Tab / I = details   F1 = deze uitleg"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: rij onderin of lettertoets, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nX / hand = stilstaan (selectie)   klik bouwplaats + Delete = annuleren   M = muziek aan/uit   Tab / I = details   F1 = deze uitleg"
 	pc2.add_child(hulp)
 	add_child(pc2)
 	knop_hulp = Button.new()
@@ -179,6 +182,15 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	stil_knop.visible = false
 	stil_knop.pressed.connect(stilstaan)
 	add_child(stil_knop)
+	# bouwplaats annuleren (besluit gebruiker 2026-10-31): alles terug, zie Wereld.annuleer_plan
+	annuleer_knop = Button.new()
+	annuleer_knop.name = "AnnuleerPlan"
+	annuleer_knop.custom_minimum_size = Vector2(0, mk)
+	annuleer_knop.add_theme_font_size_override("font_size", int(18 * maxf(1.0, Scherm.dp() * 0.6)))
+	annuleer_knop.tooltip_text = "bouwplaats annuleren (Delete)"
+	annuleer_knop.visible = false
+	annuleer_knop.pressed.connect(annuleer_plan)
+	add_child(annuleer_knop)
 	melding = Label.new()
 	melding.add_theme_font_size_override("font_size", int(22 * maxf(1.0, Scherm.dp() * 0.6)))
 	melding.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -249,6 +261,8 @@ func _process(dt: float) -> void:
 	_kas_teller(dt)
 	if stil_knop != null and bestuur != null:
 		stil_knop.visible = not bestuur.gekozen.is_empty()
+	if annuleer_knop != null and bestuur != null:
+		_werk_annuleer_knop()
 	if _melding_t > 0.0:
 		_melding_t -= dt
 		if _melding_t <= 0.0:
@@ -459,6 +473,35 @@ func _volgende_brief() -> void:
 	brief.toon(b["kop"], b["tekst"], b["groot"])
 
 
+## De knop bij een gekozen bouwplaats: weg als het plan af of weg is, anders met wat er terugkomt.
+func _werk_annuleer_knop() -> void:
+	var p := bestuur.gekozen_plan
+	if p != null and (p.klaar or not p in w.plannen):
+		bestuur.gekozen_plan = null
+		p = null
+	var terug := w.annuleer_opbrengst(p) if p != null else -1
+	annuleer_knop.visible = terug >= 0
+	if terug >= 0:
+		var naam: String = Bouwmenu.GEBOUWEN.get(p.soort, {}).get("tekst", String(p.soort))
+		var tekst := "Annuleer %s (+%d)" % [naam.to_lower(), terug]
+		if annuleer_knop.text != tekst:
+			annuleer_knop.text = tekst
+			annuleer_knop.reset_size()
+		# midden boven, onder de rij munt/menu/hand (die staat op touch staand tot ver naar rechts)
+		var vp := get_viewport().get_visible_rect().size
+		annuleer_knop.position = Vector2(roundf((vp.x - annuleer_knop.size.x) * 0.5),
+				maxf(96.0, stil_knop.position.y + stil_knop.size.y + 16.0))
+
+
+## Annuleer de gekozen bouwplaats (knop of Delete): melding met wat er terugkwam.
+func annuleer_plan() -> int:
+	var terug := bestuur.annuleer_gekozen_plan() if bestuur != null else -1
+	if terug >= 0:
+		toon_melding("Geannuleerd: +%d terug" % terug)
+		annuleer_knop.visible = false
+	return terug
+
+
 ## Stilstaan voor de selectie (hand-knop of X).
 func stilstaan() -> int:
 	if bestuur == null or bestuur.gekozen.is_empty():
@@ -495,6 +538,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif k == KEY_X and bestuur != null and not bestuur.gekozen.is_empty():
 		stilstaan()
+		get_viewport().set_input_as_handled()
+	elif (k == KEY_DELETE or k == KEY_BACKSPACE) and bestuur != null and bestuur.gekozen_plan != null:
+		annuleer_plan()
 		get_viewport().set_input_as_handled()
 	elif k == KEY_F1 and kop != null:
 		wissel_hulp()

@@ -1,8 +1,11 @@
 class_name Portret
 extends PanelContainer
 ## Portret van de gekozen dorpeling rechtsonder (besluit gebruiker 2026-10-31; origineel: statbust rechtsonder met zijn
-## gedachtewolkje). Geen originele sprite: het borstbeeld wordt gerenderd uit het eigen bumpkin-model van zijn soort
-## (Bumpkin.glb_voor) in een eigen SubViewport, een paar frames na elke wissel en daarna niet meer (goedkoop op mobiel).
+## gedachtewolkje). Kop = het Gemini-portret van zijn soort of rol (spel.json `portret`, bestand_voor; besluit gebruiker
+## 2026-10-31), bijgesneden (`uitsnede`) en op maat geschaald met ronde hoeken in een rand. Die png's zijn afgeleid van
+## het originele statbust en staan niet in git (sync.ps1 kopieert ze naar assets/portret/). Ontbreekt de png: terugval
+## op een render uit het eigen bumpkin-model (Bumpkin.glb_voor) in een eigen SubViewport, een paar frames na elke wissel
+## en daarna niet meer (goedkoop op mobiel).
 ## Pc: kop, naam, gezondheidsbalk en de gedachte met zijn betekenis en wat je eraan doet (sim/gedachten.gd uitleg);
 ## inklapbaar met het streepje (alleen nog naam, balk en ikoon), bewaard in user://hud.cfg (view/hud.gd).
 ## Touch: compact, kop + balk + ikoon, geen tekst (gebruiker: geen kleine teksten op de telefoon).
@@ -10,6 +13,9 @@ extends PanelContainer
 signal ingeklapt_gewisseld
 
 const RENDER_FRAMES := 6          ## zoveel frames rendert de SubViewport na een wissel (animatieboom staat dan stil)
+const KOP_PC := 110.0             ## px: kop op de pc
+const KOP_TOUCH := 80.0           ## dp: kop op touch (compact)
+const HOEK := 10.0                ## hoekstraal van kop en rand (x k)
 
 var w: Wereld
 var touch := false
@@ -21,6 +27,8 @@ var _sv: SubViewport
 var _cam: Camera3D
 var _model: Bumpkin
 var _model_glb := "?"
+var png := ""                     ## het getoonde portretbestand; "" = de 3D-terugval
+static var _png_cache := {}       ## "pad|px" -> ImageTexture (bijgesneden, geschaald, ronde hoeken)
 var _render_n := 0
 var _kop: TextureRect
 var _naam: Label
@@ -74,12 +82,17 @@ func bouw(wereld: Wereld, is_touch: bool, schaal: float) -> void:
 	rij.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(rij)
 	_kop = TextureRect.new()
+	_kop.name = "Kop"
 	_kop.texture = _sv.get_texture()
-	_kop.custom_minimum_size = Vector2(110, 110) * k if not touch else Vector2(80, 80) * k
+	_kop.custom_minimum_size = Vector2(KOP_PC, KOP_PC) * k if not touch else Vector2(KOP_TOUCH, KOP_TOUCH) * k
 	_kop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_kop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_kop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rij.add_child(_kop)
+	var rand := Rand.new()
+	rand.straal = int(HOEK * k)
+	rand.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_kop.add_child(rand)
 	_info = VBoxContainer.new()
 	_info.add_theme_constant_override("separation", int(4 * k))
 	_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -159,12 +172,18 @@ func zet(d: Dorpeling) -> void:
 		return
 	var nieuw := d != dorpeling
 	dorpeling = d
-	var glb := Bumpkin.glb_voor(d.geslacht, d.leeftijd, d.rol)
-	if glb != _model_glb:
-		_wissel_model(glb, d.leeftijd == "kind")
+	var p := bestand_voor(w.spel, d.geslacht, d.leeftijd, d.rol)
+	if p != png:
+		png = p
+		_kop.texture = png_textuur(png, roundi(_kop.custom_minimum_size.x), float(w.spel.get("portret", {}).get("uitsnede", 0.0)), HOEK * k) 				if png != "" else _sv.get_texture()
+		_render_n = RENDER_FRAMES if png == "" else 0
+	if png == "":
+		var glb := Bumpkin.glb_voor(d.geslacht, d.leeftijd, d.rol)
+		if glb != _model_glb:
+			_wissel_model(glb, d.leeftijd == "kind")
 	if nieuw:
 		_naam.text = d.naam if d.naam != "" else "dorpeling %d" % d.id
-		_render_n = RENDER_FRAMES
+		_render_n = RENDER_FRAMES if png == "" else 0
 	_balk.deel = d.gezondheid / maxf(1.0, d.gezondheid_max)
 	_balk.queue_redraw()
 	var g := Gedachten.van(w, d)
@@ -182,6 +201,67 @@ func zet(d: Dorpeling) -> void:
 		_richt()
 	else:
 		_sv.render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+
+## Sleutel in spel.json `portret.soort`, zoals Bumpkin.glb_voor: kind = jongen/meisje, oud = oude_man/oude_vrouw.
+static func soort_sleutel(geslacht: String, leeftijd: String) -> String:
+	var v := geslacht == "vrouw"
+	if leeftijd == "kind":
+		return "meisje" if v else "jongen"
+	if leeftijd == "oud":
+		return "oude_vrouw" if v else "oude_man"
+	return "vrouw" if v else "man"
+
+
+## Het portretbestand voor deze dorpeling (rol gaat voor soort), "" als het niet in de data staat of ontbreekt (dan
+## de 3D-terugval). Een rol met een eigen bestand dat ontbreekt valt ook terug op 3D (het rolmodel), niet op de soort.
+static func bestand_voor(spel: Dictionary, geslacht: String, leeftijd: String, rol := "") -> String:
+	var c: Dictionary = spel.get("portret", {})
+	var b := ""
+	if rol != "" and (c.get("rol", {}) as Dictionary).has(rol):
+		b = c["rol"][rol]
+	else:
+		b = (c.get("soort", {}) as Dictionary).get(soort_sleutel(geslacht, leeftijd), "")
+	if b == "":
+		return ""
+	var p := String(c.get("map", "res://assets/portret/")) + b
+	return p if ResourceLoader.exists(p) else ""
+
+
+## Het portret als vierkante textuur van `px`: `uitsnede` van elke kant eraf (de grijze rand), Lanczos naar px
+## (scherp zonder mipmaps, ook als de bron op Android VRAM-gecomprimeerd is) en ronde hoeken met straal `hoek`.
+static func png_textuur(pad: String, px: int, uitsnede: float, hoek: float) -> Texture2D:
+	var sl := "%s|%d|%.3f|%d" % [pad, px, uitsnede, roundi(hoek)]
+	if _png_cache.has(sl):
+		return _png_cache[sl]
+	var tex := load(pad) as Texture2D
+	if tex == null:
+		return null
+	var img := tex.get_image()
+	if img == null:
+		return tex
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var z := mini(img.get_width(), img.get_height())
+	var rand := roundi(z * clampf(uitsnede, 0.0, 0.4))
+	var maat := z - 2 * rand
+	img = img.get_region(Rect2i((img.get_width() - z) / 2 + rand, (img.get_height() - z) / 2 + rand, maat, maat))
+	img.resize(px, px, Image.INTERPOLATE_LANCZOS)
+	var r := maxf(hoek, 0.0)
+	if r > 0.5:
+		for y in px:
+			for x in px:
+				var cx := clampf(x + 0.5, r, px - r)
+				var cy := clampf(y + 0.5, r, px - r)
+				var af := Vector2(x + 0.5 - cx, y + 0.5 - cy).length()
+				if af > r - 1.0:
+					var c := img.get_pixel(x, y)
+					c.a *= clampf(r - af, 0.0, 1.0)
+					img.set_pixel(x, y, c)
+	var uit := ImageTexture.create_from_image(img)
+	_png_cache[sl] = uit
+	return uit
 
 
 func _wissel_model(glb: String, kind: bool) -> void:
@@ -212,6 +292,23 @@ func _richt() -> void:
 	var doel := hoofd + Vector3(0, 0.1, 0) * schaal      # het bot zit onder in het hoofd; midden = kin tot kruin
 	_cam.position = doel + Vector3(0, 0.06, 1.45) * schaal
 	_cam.look_at(doel)
+
+
+## Rand om de kop: ronde hoeken in de kleur van het paneel (de png heeft dezelfde hoeken).
+class Rand extends Control:
+	var straal := 10
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var sb := StyleBoxFlat.new()
+		sb.draw_center = false
+		sb.border_color = Color(0.72, 0.58, 0.36, 0.95)
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(straal)
+		sb.anti_aliasing = true
+		draw_style_box(sb, Rect2(Vector2.ZERO, size))
 
 
 ## Gezondheidsbalk: groen > geel > rood.

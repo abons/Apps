@@ -17,6 +17,13 @@ var open := false          ## poort: open = loopbaar
 ## Bouwplaats (origineel woodpile/rockpile, klasse 115/114): tegel van de zaagbok [0] en de steenhoop [1], door
 ## Wereld.plan_zet gezet (Wereld.stapel_plekken); leeg voor akker, hek, poort en weg. De view zet ze daar neer.
 var stapels: Array[Vector2i] = []
+## Deurweg (Wereld.plan_zet, _rond_af): alle tegels van de gelegde route (deurtegel eerst), ook die al pad waren; een
+## ander plan dat erover loopt houdt die tegels bij annuleren (Wereld.annuleer_plan). `pad_oud`: alleen de tegels die
+## dit plan nieuw legde -> hun soort ervoor. `betaald`: de prijs die plan_zet afhaalde (-1 = niet door de speler gezet).
+var deurweg: Array[Vector2i] = []
+var pad_oud := {}
+var pad_buren := {}     ## padtegels die bij het leggen al naast de nieuwe tegels lagen (geen aansluiting van een ander)
+var betaald := -1
 const STAPELS: Array[StringName] = [&"zaagbok", &"steenhoop"]
 const STAPEL_HOEK_STAP := 0.7    ## rad: de steenhoop staat iets anders gedraaid dan de zaagbok
 
