@@ -23,6 +23,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
+"$G" --headless --path . --script res://test/ghost_test.gd       # bouw-ghost: gebouw-glb, groen/rood, deurpijl, = gebouwd
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 
@@ -116,7 +117,7 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | wiel | zoomen (2 m tot eilandoverzicht) |
 | Spatie, 1 / 2 / 4 | pauze, tempo 1x/2x/4x |
 | knop rechtsboven (of B / L / H / M / J / G / T / F / P) | bouwmodus: hut / loods / kippenhok / molen / melkerij / akker / weg / hek / poort. Het menu groeit: eerst hut, kippenhok, loods, weg; na een loods molen en akker; na een molen melkerij, hek en poort |
-| in de bouwmodus: links indrukken, slepen, loslaten | indrukken toont de ghost onder de wijzer, slepen schuift hem, loslaten plaatst (groen = kan, rood = kan niet of te duur). Weg en hek: slepen legt een rij met een ghost per tegel (grijs = is er al). De modus **blijft aan** na het plaatsen |
+| in de bouwmodus: links indrukken, slepen, loslaten | indrukken toont de ghost onder de wijzer, slepen schuift hem, loslaten plaatst (groen = kan, rood = kan niet of te duur). De ghost is het gebouw zelf (af-glb, doorzichtig getint, zelfde transform als na het bouwen; de kist alleen zolang de glb laadt) met een pijl op de deurtegel naar de deur, ook op touch; test `test/ghost_test.gd`. Weg en hek: slepen legt een rij met een ghost per tegel (grijs = is er al). De modus **blijft aan** na het plaatsen |
 | in de bouwmodus: knop Draai, wiel, R | een kwartslag draaien (wiel: omlaag verder, omhoog terug; het wiel zoomt dan niet). Weg en hek draaien niet, daar blijft het wiel zoomen |
 | in de bouwmodus: knop Stop, nog eens op de bouwknop, rechts klikken, Esc | bouwmodus uit (rechts slepen draait gewoon de camera) |
 | links klikken op een poort | open of dicht: dicht houdt koeien tegen, dorpelingen lopen er altijd door |
@@ -148,7 +149,7 @@ rechtsboven, een keuze sluit hem), hint en Draai/Bouwen/Annuleer onderin op sche
 (38 graden horizontaal) en staat 1,3x verder en 12 graden steiler. Liggend (en de pc op 1600x900) zoals het was.
 Op de pc proberen: `-- --venster=1080x2400` (viewport op die maat, venster geschaald); frames op die maat:
 `-- --venster=1080x2400 --opname=out/x.png --opname_frame=30` (`--write-movie` neemt het venster op, niet de viewport),
-met `--proef=bouw|lade|prijzen` voor de bouwmodus, de open lade of de prijzen. `bash test/portret_frames.sh` maakt de set in `out/portret/`.
+met `--proef=bouw|lade|prijzen` voor de bouwmodus, de open lade of de prijzen (bouw: `--proef_soort=molen`, `--proef_draai=0..3`, `--proef_rood` = op het kampvuur; frames in `out/ghost/`). `bash test/portret_frames.sh` maakt de set in `out/portret/`.
 
 Lopen kan iedereen; vechten en werken alleen volwassenen (`Wereld.geef_bevel`; vechten = stenen gooien naar een wolf, werken heeft nog geen eigen invoer).
 

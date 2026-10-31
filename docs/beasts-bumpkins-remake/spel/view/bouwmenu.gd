@@ -63,7 +63,15 @@ var actief := false
 var soort: StringName = &"hut"
 var draai := 0
 var knoppen := {}          ## soort -> Button
-var ghost: MeshInstance3D
+var ghost: MeshInstance3D  ## de kist: terugval zolang de glb laadt, en voor akker, weg, hek, poort
+var _gmodel: Node3D         ## ghost van het gebouw zelf: een instantie van de af-glb (null = nog de kist)
+var _gmodel_soort: StringName = &""
+var _gmodel_sleutel := []   ## [tegel, draai] waarop _gmodel nu staat
+var _gsurf: Array = []      ## [MeshInstance3D, surface, mat_kan, mat_niet] per oppervlak van _gmodel
+var _gkan := -1             ## kleur van _gmodel nu: 1 kan, 0 niet, -1 nog niet gezet
+var _pijl: MeshInstance3D   ## deurpijl op de grond: op de deurtegel (Plan.deur_tegel), wijst naar de deur
+static var _gmat := {}      ## bronmateriaal -> [kan, niet]: doorzichtige getinte kopieen (texturen gedeeld)
+var _proef_tegel := Vector2i(-1, -1)   ## alleen --proef=bouw op de pc: de ghost staat hier in plaats van onder de wijzer
 var _rechts_start := Vector2.ZERO
 var _rechts := false
 var _kisten := {}          ## Plan -> wat er op de bouwplaats staat: de kist of een stand-instantie
@@ -118,6 +126,9 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	ghost = _kist(soort, Color(0.3, 1.0, 0.3, 0.45))
 	ghost.visible = false
 	parent3d.add_child(ghost)
+	_pijl = _maak_pijl()
+	_pijl.visible = false
+	parent3d.add_child(_pijl)
 	w.plan_gezet.connect(_toon_plan)
 	w.plan_klaar.connect(_plan_klaar)
 	_hekken = Node3D.new()
@@ -190,7 +201,7 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	get_viewport().size_changed.connect(_indeling)
 	_indeling()
 	match Scherm.optie("proef"):     # alleen voor frames (view/scherm.gd)
-		"bouw": kies.call_deferred(&"hut")
+		"bouw": _proef_bouw.call_deferred()
 		"lade": zet_lade.call_deferred(true)
 
 
@@ -333,6 +344,9 @@ func kies(s: StringName, aan := true) -> void:
 		ghost = _kist(soort, Color(0.3, 1.0, 0.3, 0.45))
 		oud.get_parent().add_child(ghost)
 		oud.queue_free()
+		_wis_gmodel()
+	if aan and not soort in RIJ_SOORTEN:
+		_scene(GEBOUWEN[soort]["glb"])     # de glb alvast in de achtergrond; tot hij er is de kist
 	zet_actief(aan)
 	if aan and _staand and lade_open:
 		zet_lade(false)
@@ -343,6 +357,10 @@ func kies(s: StringName, aan := true) -> void:
 func zet_actief(aan: bool) -> void:
 	actief = aan
 	ghost.visible = aan
+	if _gmodel != null:
+		_gmodel.visible = false
+	if _pijl != null:
+		_pijl.visible = false
 	_drukt = false
 	_sleep_start = Vector2i(-1, -1)
 	_t_vinger = -1
@@ -446,6 +464,7 @@ func _process(_dt: float) -> void:
 		return
 	if soort in RIJ_SOORTEN and _drukt and _sleep_start.x >= 0:
 		ghost.visible = false
+		_pijl.visible = false
 		var eind := bestuur.tegel_onder(_wijzer)
 		if eind.x < 0:
 			return
@@ -455,12 +474,18 @@ func _process(_dt: float) -> void:
 			_rij = BouwRij.route(w, soort, _sleep_start, eind)
 			_toon_rij(_rij, BouwRij.statussen(w, soort, _rij))
 		return
-	_toon_ghost(_plan_onder(_wijzer))
+	_toon_ghost(_plan_op(_proef_tegel) if _proef_tegel.x >= 0 else _plan_onder(_wijzer))
 
 
 ## De ghost op plan `p` (groen = kan, rood = kan niet); geeft of het kan. Null = geen ghost.
+## Gebouwen met een glb tonen het gebouw zelf, doorzichtig en groen of rood getint, precies zoals _plan_klaar het
+## neerzet (_zet_op_plek, zelfde draai), plus een pijl op de deurtegel; zolang de glb laadt de kist.
 func _toon_ghost(p: Plan) -> bool:
-	ghost.visible = p != null
+	var gm := _ghost_model()
+	ghost.visible = p != null and gm == null
+	if gm != null:
+		gm.visible = p != null
+	_pijl.visible = p != null and Plan.DEUREN.has(soort)
 	if p == null:
 		return false
 	ghost.position = _midden(p)
@@ -471,7 +496,124 @@ func _toon_ghost(p: Plan) -> bool:
 	if soort in RIJ_SOORTEN:
 		kan = BouwRij.statussen(w, soort, [p.tegel])[0] == BouwRij.KAN
 	(ghost.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if kan else KLEUR_NIET
+	if gm != null:
+		var sl := [p.tegel, p.draai]
+		if sl != _gmodel_sleutel:
+			_gmodel_sleutel = sl
+			_zet_op_plek(gm, p)
+		if _gkan != int(kan):
+			_gkan = int(kan)
+			for e: Array in _gsurf:
+				(e[0] as MeshInstance3D).set_surface_override_material(e[1], e[2] if kan else e[3])
+	if _pijl.visible:
+		var dt := p.deur_tegel()
+		var dr := -p.deur_richting()        # van de deurtegel naar de deur: hier gaan ze naar binnen
+		_pijl.position = _grond(dt) + Vector3(0, 0.06, 0)
+		_pijl.rotation.y = atan2(-float(dr.y), float(dr.x))
+		(_pijl.material_override as StandardMaterial3D).albedo_color = PIJL_KAN if kan else PIJL_NIET
 	return kan
+
+
+## De model-ghost van de huidige soort: een instantie van de af-glb met doorzichtige getinte materialen, zonder
+## schaduw en zonder botsing. Een instantie tegelijk, opnieuw bij een andere soort; de PackedScene en de materialen
+## komen uit de caches (_scenes, _gmat). Null zolang de glb nog laadt, of als de soort er geen heeft.
+func _ghost_model() -> Node3D:
+	if _gmodel != null and _gmodel_soort == soort:
+		return _gmodel
+	if soort in RIJ_SOORTEN:
+		return null
+	var ps := _scene(GEBOUWEN[soort]["glb"])
+	if ps == null:
+		return null
+	_wis_gmodel()
+	_info(soort, ps)
+	var n: Node3D = ps.instantiate()
+	_gmodel_soort = soort
+	_gmodel = n
+	_gkan = -1
+	_gmodel_sleutel = []
+	_ontbots(n)
+	var lijst: Array = []
+	Natuur._meshes(n, lijst)
+	for mi: MeshInstance3D in lijst:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var bron := mi.get_active_material(s)
+			if not _gmat.has(bron):
+				_gmat[bron] = [_ghost_mat(bron, true), _ghost_mat(bron, false)]
+			_gsurf.append([mi, s, _gmat[bron][0], _gmat[bron][1]])
+	n.visible = false
+	ghost.get_parent().add_child(n)
+	return n
+
+
+func _wis_gmodel() -> void:
+	if _gmodel != null:
+		_gmodel.queue_free()
+	_gmodel = null
+	_gmodel_soort = &""
+	_gsurf.clear()
+
+
+## Botsvormen en physics uit een ghost: hij mag niets tegenhouden en geen klik vangen.
+static func _ontbots(n: Node) -> void:
+	for c in n.get_children():
+		if c is CollisionObject3D or c is CollisionShape3D:
+			c.queue_free()
+		else:
+			_ontbots(c)
+
+
+const GHOST_ALFA := 0.6
+const PIJL_KAN := Color(0.45, 1.0, 0.4, 0.9)
+const PIJL_NIET := Color(1.0, 0.3, 0.25, 0.9)
+
+## Doorzichtige, getinte kopie van een gebouwmateriaal: de textuur blijft (zo blijft de deur te zien) en wordt met de
+## tint vermenigvuldigd, plus wat eigen licht in de tint zodat hij ook 's nachts en in de schaduw opvalt. Depth
+## prepass: alleen de voorste laag, geen rommel van achterwanden door de voorgevel heen.
+static func _ghost_mat(bron: Material, kan: bool) -> Material:
+	var m: BaseMaterial3D
+	if bron is BaseMaterial3D:
+		m = (bron as BaseMaterial3D).duplicate() as BaseMaterial3D
+	else:
+		m = StandardMaterial3D.new()
+	var tint := Color(0.55, 1.0, 0.5) if kan else Color(1.0, 0.45, 0.4)
+	var a := m.albedo_color
+	m.albedo_color = Color(a.r * tint.r, a.g * tint.g, a.b * tint.b, GHOST_ALFA)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+	m.cull_mode = BaseMaterial3D.CULL_BACK
+	m.emission_enabled = true
+	m.emission = Color(0.1, 0.45, 0.1) if kan else Color(0.5, 0.08, 0.06)
+	m.emission_energy_multiplier = 1.0
+	m.emission_texture = null
+	m.disable_receive_shadows = true
+	return m
+
+
+## Platte pijl (langs +x, 1,5 m lang) die op de grond ligt en altijd boven het terrein tekent.
+func _maak_pijl() -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	var punten := [Vector2(-0.75, -0.18), Vector2(0.1, -0.18), Vector2(0.1, 0.18), Vector2(-0.75, 0.18),   # steel
+		Vector2(0.1, -0.55), Vector2(0.75, 0.0), Vector2(0.1, 0.55)]                                        # punt
+	for i in [0, 2, 1, 0, 3, 2, 4, 6, 5]:
+		var v: Vector2 = punten[i]
+		st.add_vertex(Vector3(v.x, 0.0, v.y))
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = true
+	mat.render_priority = 1
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = PIJL_KAN
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
 
 
 ## Een ghost-tegel per tegel van de rij, gekleurd naar BouwRij-status (groen kan, rood kan niet of te duur, grijs al
@@ -1110,6 +1252,7 @@ func bevestig() -> void:
 func _toon_touch() -> void:
 	if soort in RIJ_SOORTEN:
 		ghost.visible = false
+		_pijl.visible = false
 		_touch_rij()
 		if _t_sleutel != _t_getoond:
 			_t_getoond = _t_sleutel
@@ -1117,3 +1260,40 @@ func _toon_touch() -> void:
 		knop_bouw.disabled = not BouwRij.KAN in _t_st
 		return
 	knop_bouw.disabled = not _toon_ghost(_plan_op(_t_tegel))
+
+
+## `--proef=bouw` (alleen frames, view/scherm.gd): bouwmodus voor `--proef_soort=` (standaard hut), `--proef_draai=0..3`;
+## de ghost groen op de vrije plek die het dichtst bij het midden van het beeld ligt, of met `--proef_rood` op het
+## kampvuur (kan niet). De camera springt erheen; kas en menu staan open, zodat alleen de plek de kleur bepaalt.
+func _proef_bouw() -> void:
+	w.alles_open = true
+	w.kas = maxi(w.kas, 100000)
+	var s := StringName(Scherm.optie("proef_soort"))
+	if not GEBOUWEN.has(s):
+		s = &"hut"
+	kies(s)
+	_scene(GEBOUWEN[s]["glb"], true)     # frames: wachten op de glb, anders hangt het van de laadtijd af of het de kist is
+	draai = posmod(int(Scherm.optie("proef_draai")), 4)
+	var t := w.kampvuur
+	if not "--proef_rood" in OS.get_cmdline_user_args():
+		var mid := bestuur.tegel_onder(get_viewport().get_visible_rect().size * 0.5)
+		if mid.x < 0:
+			mid = w.kampvuur
+		var best := Vector2i(-1, -1)
+		for r in range(0, 14):
+			for dx in range(-r, r + 1):
+				for dz in range(-r, r + 1):
+					if best.x >= 0 or maxi(absi(dx), absi(dz)) != r:
+						continue
+					var p := _plan_op(mid + Vector2i(dx, dz))
+					if p != null and w.kan_bouwen(p):
+						best = mid + Vector2i(dx, dz)
+		if best.x >= 0:
+			t = best
+	if touch:
+		_t_tegel = t
+		_t_eind = t
+	else:
+		_proef_tegel = t
+	if bestuur.cam != null and bestuur.cam.has_method("spring_naar"):
+		bestuur.cam.spring_naar(_grond(t))
