@@ -22,6 +22,15 @@ uniform float normaal_sterkte = 0.8;
 uniform vec3 gras_kleur : source_color = vec3(0.075, 0.25, 0.035);
 uniform vec3 gras_licht : source_color = vec3(0.115, 0.34, 0.05);
 uniform float stip_kans = 0.04;
+// Grasvarianten (2026-10-31, view/gras_varianten.gd, -- --gras=naam): standaardwaarden = het beeld van 144ea40.
+uniform float gras_herkleur = 1.0;       // 0 = oude textuurkleur (voor 144ea40), 1 = herkleurd naar gras_kleur
+uniform float gras_licht_sterkte = 1.0;  // vermenigvuldiger op de lichte vlekken uit de kaart (UV2.x)
+uniform float gras_verzadiging = 1.0;    // 1 = ongewijzigd, < 1 grijzer
+uniform float gras_helderheid = 1.0;
+uniform float gras_macro = 0.0;          // grote vlekken (ruis) naar gras_macro_kleur; 0 = uit, kost dan niets
+uniform vec3 gras_macro_kleur : source_color = vec3(0.16, 0.20, 0.04);
+uniform float gras_macro_schaal = 0.1;   // ruisfrequentie per meter (0,1 = vlekken van ~10 m)
+uniform float stip_sterkte = 1.0;
 
 varying vec3 wp;
 varying vec4 vc;
@@ -110,7 +119,13 @@ void fragment() {
 			vec3 a2 = textureGrad(kleur_tex, vec3(uv * 0.29 + vec2(0.37, 0.61), float(i)), dx * 0.29, dy * 0.29).rgb;
 			vec3 a = mix(a1, a2, 0.38);
 			if (i == 0) {
-				a = mix(gras_kleur, gras_licht, lv) * clamp(dot(a, vec3(0.3, 0.59, 0.11)) / 0.105, 0.6, 1.3);
+				vec3 gb = mix(gras_kleur, gras_licht, clamp(lv * gras_licht_sterkte, 0.0, 1.0));
+				if (gras_macro > 0.0) {
+					gb = mix(gb, gras_macro_kleur, gras_macro * smoothstep(0.32, 0.68, ruis(wp.xz * gras_macro_schaal) * 0.65 + ruis(wp.xz * gras_macro_schaal * 2.7 + 5.3) * 0.35));
+				}
+				vec3 gh = gb * clamp(dot(a, vec3(0.3, 0.59, 0.11)) / 0.105, 0.6, 1.3);
+				a = mix(a, gh, gras_herkleur);
+				a = mix(vec3(dot(a, vec3(0.2126, 0.7152, 0.0722))), a, gras_verzadiging) * gras_helderheid;
 			}
 			alb += a * wi;
 			nrm += (textureGrad(normaal_tex, vec3(uv, float(i)), dx, dy).rgb * 2.0 - 1.0) * wi * (i == 2 ? 1.0 - steil : 1.0);
@@ -122,7 +137,7 @@ void fragment() {
 	float fijn = ruis(wp.xz * 9.0);
 	alb *= (0.78 + 0.5 * n) * (0.94 + 0.12 * fijn);
 	vec3 sk;
-	float st = stipjes(wp.xz, sk) * smoothstep(0.5, 0.8, b[0] / tot);
+	float st = stipjes(wp.xz, sk) * smoothstep(0.5, 0.8, b[0] / tot) * stip_sterkte;
 	alb = mix(alb, sk, st);
 	alb = mix(alb, alb * gras_droog, clamp(droog * droogw * (0.75 + 0.5 * n), 0.0, 1.0));
 	alb = mix(alb, alb * pad_kleur, clamp(pa.x, 0.0, 1.0));

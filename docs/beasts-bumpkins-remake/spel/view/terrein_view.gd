@@ -276,6 +276,7 @@ func _bouw_terrein() -> void:
 		terrein_mat.shader = load("res://shaders/terrein.gdshader")
 		for soort in ["kleur", "normaal", "ruw"]:
 			terrein_mat.set_shader_parameter(soort + "_tex", _texturenset(soort))
+	GrasVarianten.pas_toe(terrein_mat)   # -- --gras=naam: alleen voor vergelijkingsbeelden, zonder optie geen effect
 	m.surface_set_material(0, terrein_mat)
 	var mi := MeshInstance3D.new()
 	mi.name = "Terrein"
