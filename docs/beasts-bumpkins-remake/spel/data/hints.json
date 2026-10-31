@@ -23,7 +23,7 @@
           "tekst": "Elke lente krijgen de koeien kalfjes. Houd ze bij elkaar, het liefst in een omheinde wei."},
         {"id": "1-10", "bron": "MIS1-10.TXT", "open": false, "trigger": {"type": "timer", "tikken": 360},
           "tekst": "Met het goudstukken-icoon bovenaan stel je de prijzen in."},
-        {"id": "1-9", "bron": "MIS1-9.TXT", "open": false, "trigger": {"type": "aantal", "wat": "kippen", "meer_dan": 1}, "wacht_op": "ouderdom",
+        {"id": "1-9", "bron": "MIS1-9.TXT", "open": false, "trigger": {"type": "aantal", "wat": "kippenhok", "meer_dan": 1}, "_trigger": "M1.MIS: aantal klasse 111 (kip, 200 per stuk) > 1; het origineel koopt een kip waar de remake een hok met 3 kippen zet, dus 2 kippenhokken (zoals 1-12). Was wacht_op ouderdom: sim/leven.gd heeft die nu (2026-10-31)",
           "tekst": "Bouw je hutten niet allemaal tegelijk, dan worden ook niet alle bewoners tegelijk oud."},
         {"id": "1-8", "bron": "MIS1-8.TXT", "open": true, "trigger": {"type": "voorwerp", "klasse": 159},
           "tekst": "Hm, dat ziet er kostbaar uit. Breng het eens naar je vlag."}

@@ -120,7 +120,7 @@ Conditie-record (gevonden met regex `type 0xCD a b c id 0xCD 01 00 00 00`, `type
 | 1-7 | aantal poort (169) > 0 | ja | na 1-6 | wilde koeien claimen, paarse halsband |
 | 1-11 | timer 360 | nee | timer | koeien kalven in de lente, houd ze bij elkaar |
 | 1-10 | timer 360 | nee | timer (view/prijzen.gd) | prijzen via het goudicoon |
-| 1-9 | aantal kip (111) > 1 | nee | `wacht_op` ouderdom | hutten gespreid bouwen voor de levensduur |
+| 1-9 | aantal kip (111) > 1 | nee | `kippenhok` > 1 (een hok = de kip van het origineel; was `wacht_op` ouderdom tot 2026-10-31) | hutten gespreid bouwen voor de levensduur |
 | 1-8 | type 12: dorpeling raakt beker (object 6) | ja | `voorwerp` 159 | dat lijkt kostbaar, naar de vlag |
 | M2 briefing | start | | brief, pauze | terug op het vasteland; kas boven 10.000; gevaarlijke beesten |
 | 2-1 | geen conditie (start) | nee | start | wolven jagen op kinderen en koeien |

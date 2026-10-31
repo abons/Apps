@@ -1,8 +1,8 @@
 extends SceneTree
 ## Headless test hints (sim/hints.gd, data/hints.json): godot --headless --path . --script res://test/hint_test.gd
 ## Missie 1: keten 1-12 (start) -> 1-2 (timer 108 tikken) -> 1-3 (hut af) -> 1-4 (loods af) -> 1-5 (molen af) ->
-## 1-6 (timer 288, na 1-5) -> 1-7 (poort af), 1-11 en 1-10 op 360 tikken, 1-8 bij het oprapen van de beker; hints met
-## wacht_op vuren niet. Missie 2 en 3: briefing en de hints die de remake kan tonen.
+## 1-6 (timer 288, na 1-5) -> 1-7 (poort af), 1-11 en 1-10 op 360 tikken, 1-9 bij het tweede kippenhok, 1-8 bij het oprapen
+## van de beker; hints met wacht_op vuren niet. Missie 2 en 3: briefing en de hints die de remake kan tonen.
 
 var fouten := 0
 
@@ -43,7 +43,13 @@ func _initialize() -> void:
 	_loop(w, h, 80 * tik_s)
 	_check("1-11" in gevuurd, "1-11 op 360 tikken")
 	_check("1-10" in gevuurd, "1-10 (prijzen) op 360 tikken")
-	_check(not "1-9" in gevuurd, "1-9 (wacht_op) vuurt niet")
+	_check(not "1-9" in gevuurd, "1-9 nog niet zonder kippenhokken")
+	_bouw(w, &"kippenhok")
+	h.controleer()
+	_check(not "1-9" in gevuurd, "1-9 nog niet na een kippenhok")
+	_bouw(w, &"kippenhok")
+	h.controleer()
+	_check(gevuurd.back() == "1-9", "tweede kippenhok af -> 1-9 (%s)" % [gevuurd])
 	_check(not "1-8" in gevuurd, "1-8 nog niet")
 	var b: Dictionary = Voorwerpen.alle(w)[0]
 	var man: Dorpeling = null
@@ -61,7 +67,7 @@ func _initialize() -> void:
 	var dubbel := gevuurd.duplicate()
 	_loop(w, h, 30.0)
 	_check(gevuurd == dubbel, "geen hint twee keer")
-	_check(gevuurd == ["1-12", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-11", "1-10", "1-8"], "volgorde %s" % [gevuurd])
+	_check(gevuurd == ["1-12", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-11", "1-10", "1-9", "1-8"], "volgorde %s" % [gevuurd])
 
 	for nr in [2, 3]:
 		var w2 := Wereld.new()
