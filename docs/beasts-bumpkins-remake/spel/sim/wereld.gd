@@ -50,6 +50,7 @@ signal object_erbij(ob: Dictionary)          ## sim/regels.gd: een regel maakt e
 signal object_weg(ob: Dictionary)            ## sim/regels.gd: object van de kaart (0x17, of een mijn die afging)
 signal object_veranderd(ob: Dictionary)      ## sim/regels.gd: bv. de magische poort gaat open (0x13)
 signal ontploffing(t: Vector2i)              ## sim/regels.gd: een mijn gaat af op tegel t
+signal bevel_geweigerd(ids: Array, reden: String)   ## speler gaf een bevel dat niemand uit de selectie mag (view: melding)
 signal regel_gevuurd(id: String)             ## sim/regels.gd: missieregel uit spel.json missies.<nr>.regels
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
@@ -74,6 +75,7 @@ const GILDEN := {&"gereedschapsloods": "bouwer", &"voetvolkgilde": "voetsoldaat"
 ## de start (2026-10-30); af wordt de tegel pad en verdwijnt het plan (_weg_af).
 const START_SOORTEN := [&"hut", &"kippenhok", &"gereedschapsloods", &"weg"]
 var alles_open := false                  ## tests en scenario's: het hele bouwmenu meteen
+var overal_bouwen := false               ## tests en scenario's: geen maximale bouwafstand (bouw_afstand)
 const ONTGRENDEL := {&"molen": &"gereedschapsloods", &"akker": &"gereedschapsloods", &"melkerij": &"molen",
 	&"hek": &"molen", &"poort": &"molen"}
 const NIET_BLOKKEREND := [&"akker"]       ## loopbaar na de bouw (beasts-src Ground.FIELD is begaanbaar)
@@ -194,6 +196,8 @@ func _vul_raster(kaart: Dictionary, tegels: Dictionary) -> void:
 				naam = map_tex.get(str(int(rij_tex[x])), naam)
 			var i := raster.idx(x, y)
 			raster.soort[i] = _soort_index(naam)
+			if x < rij_tex.size():
+				raster.tex[i] = clampi(int(rij_tex[x]), 0, 255)
 			var weg := str(int(rij_weg[x]))
 			if wegen.has(weg) and naam != "water" and naam != "leeg":
 				raster.soort[i] = _soort_index(wegen[weg])
@@ -562,7 +566,7 @@ func _kies_klus(d: Dorpeling) -> void:
 			return
 	if not d.volwassen() or d.rol == "voetsoldaat":    # soldaten boeren niet (origineel)
 		return
-	var plan := _open_plan(d)
+	var plan := _open_plan(d) if d.kan_bouwen() else null    # alleen mannen en bouwers (besluit gebruiker 2026-10-31)
 	if plan != null and geef_bouwbevel([d.id], plan) > 0:
 		return
 	if not molens().is_empty():
@@ -1614,7 +1618,7 @@ func maak_plan(soort: StringName, tegel: Vector2i, draai: int) -> Plan:
 	var m: Vector2i = BOUWSOORTEN[soort]
 	var p := Plan.new(soort, tegel, posmod(draai, 4), m.x, m.y)
 	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(soort), 60.0))
-	return p if kan_bouwen(p) else null
+	return p if kan_bouwen(p) and binnen_bouwafstand(p) else null
 
 
 ## Alle tegels van de voetafdruk loopbaar (objecten staan al in het raster), geen pad, vrij van andere plannen en hun
@@ -1642,9 +1646,58 @@ func kan_bouwen(p: Plan) -> bool:
 	return true
 
 
+## Waarom `p` hier niet kan, voor de ghost: "" = kan (alleen plaats, niet de prijs), REDEN_TE_VER, REDEN_GEEN_PAD of
+## "Hier kan het niet".
+func bouw_reden(p: Plan) -> String:
+	if Plan.DEUREN.has(p.soort):
+		var dt := p.deur_tegel()
+		if raster.in_kaart(dt.x, dt.y) and raster.loopbaar_v(dt) and bereik[raster.idx(dt.x, dt.y)] == 0:
+			return REDEN_GEEN_PAD        # origineel "Cannot link path to your village"
+	if not kan_bouwen(p):
+		return "Hier kan het niet"
+	if not binnen_bouwafstand(p):
+		return REDEN_TE_VER              # origineel "Too far from your existing buildings"
+	return ""
+
+
+## Afstand in tegels (Chebyshev, rand tot rand; 0 = raakt) van de voetafdruk van `p` tot het dichtste dorpsanker:
+## afgebouwd eigen gebouw, kampvuur of de eigen vlag (de vlag het dichtst bij het kampvuur). Plannen in aanbouw tellen niet.
+func afstand_tot_dorp(p: Plan) -> int:
+	var r := p.afdruk()
+	var ankers: Array[Rect2i] = [Rect2i(kampvuur, Vector2i.ONE)]
+	var vlag := Vector2i(-1, -1)
+	var vd := INF
+	for ob in objecten:
+		if ob["naam"] == "vlag":
+			var t := Vector2i(ob["x"], ob["y"])
+			var af := Vector2(t).distance_squared_to(Vector2(kampvuur))
+			if af < vd:
+				vd = af
+				vlag = t
+	if vlag.x >= 0:
+		ankers.append(Rect2i(vlag, Vector2i.ONE))
+	for q in plannen:
+		if q.klaar and q != p:
+			ankers.append(q.afdruk())
+	var beste := 1 << 30
+	for a in ankers:
+		var dx := maxi(0, maxi(a.position.x - r.end.x, r.position.x - a.end.x) + 1)
+		var dy := maxi(0, maxi(a.position.y - r.end.y, r.position.y - a.end.y) + 1)
+		beste = mini(beste, maxi(dx, dy))
+	return beste
+
+
+## Binnen spel.json `bouw_afstand.max_tegels` van het dorp (besluit gebruiker 2026-10-31), of een soort die overal mag.
+func binnen_bouwafstand(p: Plan) -> bool:
+	var c: Dictionary = spel.get("bouw_afstand", {})
+	if overal_bouwen or c.is_empty() or String(p.soort) in c.get("uitgezonderd", []):
+		return true
+	return afstand_tot_dorp(p) <= int(c.get("max_tegels", 12))
+
+
 ## Zet het plan neer en betaal de prijs uit de kas (origineel: bij het bestellen). False als het niet kan of te duur is.
 func plan_zet(p: Plan) -> bool:
-	if not ontgrendeld(p.soort) or not kan_bouwen(p) or not kan_betalen(p.soort):
+	if not ontgrendeld(p.soort) or not kan_bouwen(p) or not binnen_bouwafstand(p) or not kan_betalen(p.soort):
 		return false
 	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(p.soort), p.bouwtijd_s))
 	kas -= prijs(p.soort)
@@ -1781,10 +1834,35 @@ func plan_op(t: Vector2i) -> Plan:
 ## aan werkt houdt zijn plek, een nieuwe krijgt de eerste vrije. Geeft het aantal.
 func geef_bouwbevel(ids: Array, p: Plan) -> int:
 	var n := 0
+	var bouwers := 0
 	for id in ids:
 		var d := dorpeling(id)
-		if d != null and d.kan_bevel("werk") and _wijs_werkplek(d, p):
-			n += 1
+		if d != null and d.kan_bevel("werk"):
+			bouwers += 1
+			if _wijs_werkplek(d, p):
+				n += 1
+	if bouwers == 0 and not ids.is_empty():
+		bevel_geweigerd.emit(ids, REDEN_GEEN_BOUWER)
+	return n
+
+
+const REDEN_GEEN_BOUWER := "Alleen mannen en bouwers bouwen"
+const REDEN_TE_VER := "Te ver van je gebouwen"
+const REDEN_GEEN_PAD := "Geen pad naar je dorp"
+
+## Stilstaan (besluit gebruiker 2026-10-31, origineel de hand-knop): elke dorpeling uit `ids` stopt waar hij is en
+## blijft daar zonder zelfstandige klussen tot hij een ander bevel krijgt (Dorpeling.stil). Geeft het aantal.
+func geef_stilstaan(ids: Array) -> int:
+	var n := 0
+	for id in ids:
+		var d := dorpeling(id)
+		if d == null or not d.geef_bevel(self, "loop", d.tegel()):
+			continue
+		d.route.clear()
+		d.bevel = {}
+		d.anker = d.tegel()
+		d.stil = true
+		n += 1
 	return n
 
 

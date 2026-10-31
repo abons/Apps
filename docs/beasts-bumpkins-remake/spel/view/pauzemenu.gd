@@ -21,7 +21,7 @@ var titel: Label
 var sub: Label
 var knoppen := {}                  ## actie -> Button
 var muziek_rij: HBoxContainer      ## "Muziek" + volumeschuif (view/muziek.gd), alleen pc; niet in `knoppen`
-var muziek_knop: Button            ## noot-knop rechts in de kopregel: muziek aan/uit (ook Shift+M)
+var muziek_knop: Button            ## noot-knop rechts in de kopregel: muziek aan/uit (ook M)
 var _kop_links: Control
 var muziek_schuif: HSlider
 var _was_gepauzeerd := false
@@ -146,7 +146,7 @@ func _toon(kop: String, tekst: String, acties: Array, kleur: Color) -> void:
 	leg_neer()
 
 
-## Knoptekst en schuif volgen de muziekspeler (ook als Shift+M hem omzet terwijl het menu open is).
+## Knoptekst en schuif volgen de muziekspeler (ook als M hem omzet terwijl het menu open is).
 func werk_muziek_bij() -> void:
 	if not is_inside_tree():
 		return
@@ -154,7 +154,7 @@ func werk_muziek_bij() -> void:
 	if not m.gewijzigd.is_connected(werk_muziek_bij):
 		m.gewijzigd.connect(werk_muziek_bij)
 	muziek_knop.set("uit", m.stil)
-	muziek_knop.tooltip_text = "Muziek aan (Shift+M)" if m.stil else "Muziek uit (Shift+M)"
+	muziek_knop.tooltip_text = "Muziek aan (M)" if m.stil else "Muziek uit (M)"
 	muziek_knop.queue_redraw()
 	muziek_schuif.set_value_no_signal(m.volume)
 

@@ -54,6 +54,9 @@ var levensduur_s := 0.0       ## sterft van ouderdom als ouderdom_s dit haalt; o
 ## Geluk 0..1 (haak voor de economie/prijzen, niet hier ingevuld): 1 = tevreden. Lager laat ouderdom_s sneller lopen
 ## (origineel hint 2-3: "hoge prijzen maken ontevreden, en ontevreden mensen leven korter"), zie leven.ongeluk_versnelt.
 var geluk := 1.0
+## Stilstaan (besluit gebruiker 2026-10-31, origineel: de hand-knop): blijft staan waar hij is, geen zelfstandige klussen,
+## niet zwerven, niet slapen gaan, niet zelf vechten; alleen vluchten voor een wolf. Een nieuw bevel heft het op.
+var stil := false
 
 
 ## Schade (wolfbeet, later zwaard of pijl): gezondheid omlaag; bij 0 sterft hij (Leven.sterf: uit alle lijsten,
@@ -81,6 +84,8 @@ func volwassen() -> bool:
 
 ## Lopen, slapen en vluchten kan iedereen; vechten, werken, koeien claimen en een gezin stichten ("huis") alleen volwassenen.
 func kan_bevel(soort: String) -> bool:
+	if soort == "werk" and not kan_bouwen():
+		return false
 	if soort == "vecht" and rol == "bouwer":
 		return false
 	if rol == "voetsoldaat" and soort in ["werk", "claim", "huis", "oogst", "melk", "raap", "lever"]:
@@ -90,6 +95,12 @@ func kan_bevel(soort: String) -> bool:
 	return soort == "loop" or soort == "slaap" or soort == "vuur" or soort == "vlucht" or volwassen()
 
 
+## Bouwen: alleen volwassen mannen en bouwers (besluit gebruiker 2026-10-31, origineel hamerpunt 0x440b3c: man of
+## bouwer; de vrouw heeft geen hamerknop). Voetsoldaten bouwen niet.
+func kan_bouwen() -> bool:
+	return volwassen() and rol != "voetsoldaat" and (geslacht == "man" or rol == "bouwer")
+
+
 ## Vrij voor een gezin: volwassen, uitgerust, zonder bevel, bouwklus, koe of wieg, en geen baby op de arm.
 func vrij_voor_gezin() -> bool:
 	return volwassen() and rust <= 0.0 and ledig() and draagt == "" and rol != "voetsoldaat"
@@ -97,7 +108,7 @@ func vrij_voor_gezin() -> bool:
 
 ## Niets omhanden: geen bevel, route, bouwklus, koe, wieg, klus of baby en niet binnen.
 func ledig() -> bool:
-	return bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
+	return not stil and bevel.is_empty() and route.is_empty() and werk_plan == null and doel_koe == null and wieg.is_empty() \
 		and baby <= 0.0 and not binnen and bezig <= 0.0 and klus == null and klus_tegel.x < 0 and melk_koe == null and raap_kip == null and gilde == null and slaapplek == null and not slaapt and doel_wolf == null
 
 
@@ -113,6 +124,8 @@ func zet_tegel(t: Vector2i) -> void:
 func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 	if not kan_bevel(soort):
 		return false
+	if soort != "vlucht":             # vluchten houdt stilstaan aan, elk ander bevel heft het op
+		stil = false
 	if soort != "gilde":
 		gilde = null
 	if soort != "slaap" and soort != "vuur":          # een bevel van de speler wekt hem
@@ -196,7 +209,7 @@ func tick(w: Wereld, dt: float) -> void:
 			var f: float = float(w.spel["bouwer"]["tempo"]) if rol == "bouwer" else 1.0
 			werk_plan.voortgang = minf(1.0, werk_plan.voortgang + dt * f / werk_plan.bouwtijd_s)
 			return
-		if bevel.is_empty() and baby <= 0.0 and not slaapt:    # met de baby op de arm blijft ze staan; wie ligt, ligt
+		if bevel.is_empty() and baby <= 0.0 and not slaapt and not stil:    # met de baby op de arm blijft ze staan; wie ligt, ligt
 			_zwerf(w, dt)
 		return
 	var rest := dt

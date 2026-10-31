@@ -9,6 +9,9 @@ extends CanvasLayer
 ## Pc (2026-10-31, gebruiker: te veel tekst): dezelfde rij icoon + getal, met pauze-icoon / 2x / 4x erachter; de tekstregels
 ## klappen uit met het pijltje of Tab / I, de sneltoetsuitleg met "? Toetsen" of F1. Beide standaard dicht, per speler
 ## bewaard in user://hud.cfg.
+## Stilstaan (besluit gebruiker 2026-10-31, "alleen stilstaan knop", origineel de hand): naast de menuknop een hand-knop,
+## alleen zichtbaar met een selectie, of X: de gekozen dorpelingen blijven staan zonder eigen klussen (Wereld.geef_stilstaan).
+## Melding (midden boven, 2,5 s): een geweigerd bevel (Wereld.bevel_geweigerd, bv. een vrouw laten bouwen).
 
 var w: Wereld
 var bestuur: Bestuur
@@ -26,6 +29,10 @@ var prijzen: Prijzenscherm       ## view/prijzen.gd: open met het goudstukken-ic
 var munt_knop: Button
 var menu_knop: Button            ## naast het munt-icoon: pauzemenu (view/pauzemenu.gd, main.gd); touch >= 48 dp
 signal menu_gevraagd
+var stil_knop: Button            ## hand: stilstaan voor de selectie (X); touch >= 48 dp, alleen met een selectie
+var melding: Label               ## geweigerd bevel, verdwijnt na MELDING_S
+var _melding_t := 0.0
+const MELDING_S := 2.5
 var kas_toon := -1               ## getoonde kas: loopt in stappen naar w.kas (kas_stap, spel.json kas_teller)
 var _kas_t := 0.0
 var stand: PanelContainer        ## de tekstregels (pc)
@@ -89,7 +96,7 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nTab / I = details   F1 = deze uitleg"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc menu\nX / hand = stilstaan (selectie)   M = muziek aan/uit   Tab / I = details   F1 = deze uitleg"
 	pc2.add_child(hulp)
 	add_child(pc2)
 	knop_hulp = Button.new()
@@ -159,6 +166,26 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	menu_knop.tooltip_text = "menu (Esc)"
 	menu_knop.pressed.connect(func() -> void: menu_gevraagd.emit())
 	add_child(menu_knop)
+	stil_knop = StilKnop.new()
+	stil_knop.custom_minimum_size = Vector2(mk, mk)
+	stil_knop.size = stil_knop.custom_minimum_size
+	stil_knop.position = Vector2(menu_knop.position.x + mk + 10, minikaart.position.y)
+	stil_knop.tooltip_text = "stilstaan (X)"
+	stil_knop.visible = false
+	stil_knop.pressed.connect(stilstaan)
+	add_child(stil_knop)
+	melding = Label.new()
+	melding.add_theme_font_size_override("font_size", int(22 * maxf(1.0, Scherm.dp() * 0.6)))
+	melding.add_theme_color_override("font_outline_color", Color.BLACK)
+	melding.add_theme_constant_override("outline_size", 6)
+	melding.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	melding.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	melding.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	melding.position.y = 150
+	melding.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	melding.visible = false
+	add_child(melding)
+	w.bevel_geweigerd.connect(_geweigerd)
 	if is_inside_tree():
 		get_viewport().size_changed.connect(_indeling)
 	if Scherm.optie("proef") == "prijzen":     # alleen voor frames (view/scherm.gd)
@@ -210,6 +237,12 @@ func _kas_teller(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_kas_teller(dt)
+	if stil_knop != null and bestuur != null:
+		stil_knop.visible = not bestuur.gekozen.is_empty()
+	if _melding_t > 0.0:
+		_melding_t -= dt
+		if _melding_t <= 0.0:
+			melding.visible = false
 	var uur := w.uur()
 	var h := int(uur)
 	var m := int(fposmod(uur, 1.0) * 60.0)
@@ -359,6 +392,23 @@ func _volgende_brief() -> void:
 	brief.toon(b["kop"], b["tekst"], b["groot"])
 
 
+## Stilstaan voor de selectie (hand-knop of X).
+func stilstaan() -> int:
+	if bestuur == null or bestuur.gekozen.is_empty():
+		return 0
+	return w.geef_stilstaan(bestuur.gekozen)
+
+
+func _geweigerd(_ids: Array, reden: String) -> void:
+	toon_melding(reden)
+
+
+func toon_melding(tekst: String) -> void:
+	melding.text = tekst
+	melding.visible = true
+	_melding_t = MELDING_S
+
+
 func _brief_dicht() -> void:
 	if _pauzeerde:
 		w.gepauzeerd = false
@@ -375,6 +425,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif (k == KEY_TAB or k == KEY_I) and kop != null:
 		wissel_details()
+		get_viewport().set_input_as_handled()
+	elif k == KEY_X and bestuur != null and not bestuur.gekozen.is_empty():
+		stilstaan()
 		get_viewport().set_input_as_handled()
 	elif k == KEY_F1 and kop != null:
 		wissel_hulp()
@@ -451,6 +504,37 @@ class MenuKnop extends Button:
 			var y := (16.0 + i * 10.0) * k
 			draw_rect(Rect2(Vector2(13 * k, y + 1.5 * k), Vector2(26, 5) * k), Color(0, 0, 0, 0.5))
 			draw_rect(Rect2(Vector2(13 * k, y), Vector2(26, 5) * k), Brief.INKT)
+
+
+## Hand (stilstaan, naar de hand-knop van het origineel): steenknop met een open hand.
+class StilKnop extends Button:
+	func _init() -> void:
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var k := size.y / 52.0
+		draw_rect(r, Color8(74, 80, 101))
+		draw_rect(Rect2(0, 0, r.size.x, 3 * k), Color8(128, 136, 160))
+		draw_rect(Rect2(0, 0, 3 * k, r.size.y), Color8(128, 136, 160))
+		draw_rect(Rect2(0, r.size.y - 3 * k, r.size.x, 3 * k), Color8(36, 39, 52))
+		draw_rect(Rect2(r.size.x - 3 * k, 0, 3 * k, r.size.y), Color8(36, 39, 52))
+		if is_hovered():
+			draw_rect(r.grow(-3 * k), Color(1, 1, 1, 0.08))
+		var huid := Color8(236, 200, 160)
+		var rand := Color(0, 0, 0, 0.55)
+		var delen := [Rect2(17, 24, 19, 16), Rect2(17, 12, 4, 14), Rect2(22, 9, 4, 16), Rect2(27, 10, 4, 15),
+			Rect2(32, 13, 4, 13)]
+		var duim := PackedVector2Array([Vector2(36, 30) * k, Vector2(42, 22) * k, Vector2(44, 25) * k, Vector2(37, 37) * k])
+		for d: Rect2 in delen:
+			draw_rect(Rect2(d.position * k, d.size * k).grow(1.5 * k), rand)
+		draw_colored_polygon(duim, rand)
+		for d: Rect2 in delen:
+			draw_rect(Rect2(d.position * k, d.size * k), huid)
+		draw_colored_polygon(PackedVector2Array([Vector2(36, 31) * k, Vector2(42, 23.5) * k, Vector2(43, 25) * k,
+			Vector2(36.5, 35) * k]), huid)
 
 
 ## Rolletje: opgerolde brief met rode zegel (naar MAIL uit het origineel), knippert zachtjes tot je erop klikt.

@@ -18,6 +18,7 @@ extends RefCounted
 
 const OORZAAK_WOLF := "wolf"
 const OORZAAK_OUDERDOM := "ouderdom"
+const OORZAAK_HONGER := "honger"
 
 
 static func cfg(w: Wereld) -> Dictionary:
@@ -48,7 +49,13 @@ static func tik_alle(w: Wereld, dt: float) -> void:
 		if d.levensduur_s <= 0.0:
 			_begin(w, d)
 		d.geraakt_s += dt
-		if d.geraakt_s >= float(c["herstel_na_s"]) and d.gezondheid < d.gezondheid_max:
+		var honger := hongerig(w, d)
+		if honger and not d.slaapt:     # te lang geen eten: langzaam hp eraf (besluit gebruiker 2026-10-31)
+			d.gezondheid = maxf(0.0, d.gezondheid - float(c["honger"]["verlies_deel_per_s"]) * d.gezondheid_max * dt)
+			if d.gezondheid <= 0.0:
+				sterf(w, d, OORZAAK_HONGER)
+				continue
+		elif d.geraakt_s >= float(c["herstel_na_s"]) and d.gezondheid < d.gezondheid_max:
 			var f := float(c["herstel_slaap"]) if d.slaapt else 1.0
 			d.gezondheid = minf(d.gezondheid_max, d.gezondheid + float(c["herstel_per_s"]) * f * dt)
 		if d.leeftijd == "kind":
@@ -61,6 +68,18 @@ static func tik_alle(w: Wereld, dt: float) -> void:
 				and d.wieg.is_empty() and d.baby <= 0.0 and not d.binnen:
 			_met_pensioen(w, d)
 	_vlucht_t(w, dt)
+
+
+## Honger: langer dan leven.honger.na_s wakker zonder eten (laagste Dorpeling.trek over de waren; kopen of een bruine
+## paddenstoel zet die op 0). Zonder `honger` in de data nooit.
+static func hongerig(w: Wereld, d: Dorpeling) -> bool:
+	var h: Dictionary = cfg(w).get("honger", {})
+	if h.is_empty() or d.trek.is_empty():
+		return false
+	var minst := INF
+	for waar in Wereld.WAREN:
+		minst = minf(minst, float(d.trek.get(waar, 0.0)))
+	return minst >= float(h["na_s"])
 
 
 ## Eerste tik: gezondheid uit de data, levensduur per dorpeling (hash op id: zelfde spel, zelfde levens), en de

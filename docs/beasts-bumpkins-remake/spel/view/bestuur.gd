@@ -7,6 +7,8 @@ extends Node
 ## Klik op een koe met een selectie: de eerste volwassene loopt erheen en claimt haar (nog eens = loslaten).
 ## Klik op een levende wolf met een selectie: vechtbevel (Wereld.geef_vechtbevel; alleen volwassenen, niet de bouwer),
 ## ze lopen erheen en gooien stenen (sim/wolf.gd). Werkbevelen hebben nog geen eigen invoer.
+## Klik op een plan met alleen vrouwen of kinderen gekozen: geweigerd met een melding (alleen mannen en bouwers bouwen,
+## besluit gebruiker 2026-10-31). Stilstaan: de hand-knop of X in de HUD (Hud.stilstaan).
 ## Klik op een voorwerp op de grond (beker, kelk) met een selectie: de dichtste loopt erheen en raapt het op
 ## (sim/voorwerpen.gd); naar de vlag brengen is daarna een gewoon loopbevel.
 
@@ -136,9 +138,12 @@ func klik(pos: Vector2, toevoegen := false) -> void:
 	var t := tegel_onder(pos)
 	if t.x >= 0:
 		var p := w.plan_op(t)
-		if p != null and w.geef_bouwbevel(gekozen, p) > 0:
-			view.markeer(p.tegel)
-			return
+		if p != null:
+			if w.geef_bouwbevel(gekozen, p) > 0:
+				view.markeer(p.tegel)
+				return
+			if not gekozen.any(func(id: int) -> bool: return w.dorpeling(id) != null and w.dorpeling(id).kan_bouwen()):
+				return      # alleen vrouwen/kinderen gekozen: bouwbevel geweigerd (melding via Wereld.bevel_geweigerd), niet lopen
 		var g := w.gebouw_op(t)
 		if g != null and Wereld.GILDEN.has(g.soort) and w.geef_gildebevel(gekozen, g) > 0:
 			view.markeer(g.deur_tegel())

@@ -2,7 +2,7 @@ extends SceneTree
 ## Headless: laden alle verwachte klanken (view/geluid.gd catalogus) en staan de bussen?
 ## audio/eigen/ moet compleet zijn (in git). assets/audio/beasts/ (uit beasts-src, sync.ps1) alleen als de map er is.
 ## Daarna de muziekspeler (view/muziek.gd) met twee gemaakte stille tracks: context menu -> briefing (overvloeien, oude
-## stopt) -> missie (stil), zelfde context = doorspelen, einde, dempen (M/Shift+M), volume, bewaren en teruglezen.
+## stopt) -> missie (afspeellijst 4..8 met pauze, zachter), zelfde context = doorspelen, einde, dempen (M/Shift+M), volume, bewaren en teruglezen.
 ##   "$G" --headless --path . --script res://test/audio_test.gd
 
 const Geluid := preload("res://view/geluid.gd")
@@ -72,7 +72,10 @@ func _muziek() -> void:
 	_check(not m.stil and is_equal_approx(m.volume, Muziek.VOLUME_STANDAARD), "zonder cfg: standaard volume, niet gedempt")
 	var t2 := _stil(4.0)
 	var t3 := _stil(4.0)
-	m.streams = {2: t2, 3: t3}
+	var t4 := _stil(1.0)
+	var t5 := _stil(1.0)
+	m.streams = {2: t2, 3: t3, 4: t4, 5: t5}     # 6..8 ontbreken: de afspeellijst slaat ze over
+	m.lijst_pauze_s = 0.5
 
 	m.zet(&"menu")
 	var p1 := m.speler()
@@ -93,8 +96,23 @@ func _muziek() -> void:
 
 	m._bij_brief_dicht()
 	_check(m.context == &"missie", "briefing dicht: context missie")
-	await _wacht(Muziek.FADE + 0.3)
-	_check(not p1.playing and not p2.playing, "missie: stil (zoals het origineel)")
+	var p3 := m.speler()
+	_check(p3.playing and p3.stream == t4, "missie: afspeellijst begint met track 4 (besluit gebruiker 2026-10-31)")
+	_check(t4.loop_mode == AudioStreamWAV.LOOP_DISABLED, "missietrack lust niet")
+	await _wacht(0.9)
+	_check(p3.volume_db < linear_to_db(Muziek.MISSIE_GAIN) + 0.5 and p3.volume_db > -30.0,
+			"missiemuziek zachter dan het menu (%.1f dB)" % p3.volume_db)
+	var gezien := {}
+	for i in 60:
+		await _wacht(0.1)
+		var sp := m.speler()
+		if sp.playing:
+			gezien[sp.stream] = true
+		elif gezien.has(t4) and not sp.playing:
+			gezien["pauze"] = true
+		if gezien.has(t5):
+			break
+	_check(gezien.has("pauze") and gezien.has(t5), "na track 4 een pauze, dan track 5 (6..8 ontbreken: overgeslagen)")
 	m._bij_einde("verloren")
 	_check(m.context == &"verloren", "einde: context verloren")
 	m.zet(&"bestaat_niet")
@@ -107,14 +125,15 @@ func _muziek() -> void:
 	var k := InputEventKey.new()
 	k.keycode = KEY_M
 	k.pressed = true
+	m._input(k)
+	_check(m.stil and AudioServer.is_bus_mute(bus), "M: gedempt, bus Muziek stil (overal, ook in een missie)")
 	k.shift_pressed = true
 	m._input(k)
-	_check(m.stil and AudioServer.is_bus_mute(bus), "Shift+M: gedempt, bus Muziek stil")
-	m.wissel_stil()
-	_check(not m.stil and not AudioServer.is_bus_mute(bus), "nog eens: weer aan")
+	_check(not m.stil and not AudioServer.is_bus_mute(bus), "Shift+M: weer aan")
 	m.zet_volume(0.3)
 	_check(absf(AudioServer.get_bus_volume_db(bus) - linear_to_db(0.3)) < 0.01, "volume 0,3 op de bus")
 	m.zet_stil(true)
+	_check(Bouwmenu.GEBOUWEN[&"molen"]["toets"] != KEY_M, "de molen heeft M niet meer (muziek)")
 	_check(gemeld[0] == 4, "gewijzigd bij elke verandering (%d)" % gemeld[0])
 	var n := Muziek.new()          # teruglezen zoals bij een nieuwe start
 	_check(n.stil and is_equal_approx(n.volume, 0.3), "bewaard en teruggelezen: gedempt, volume 0,3")

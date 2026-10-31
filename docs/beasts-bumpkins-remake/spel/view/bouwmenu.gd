@@ -31,7 +31,7 @@ const GEBOUWEN := {
 	&"hut": {"tekst": "Hut", "toets": KEY_B, "glb": "res://assets/peasant_hut_rt.glb", "hoogte": 2.4},
 	&"gereedschapsloods": {"tekst": "Loods", "toets": KEY_L, "glb": "res://assets/gereedschapsloods_rt.glb", "hoogte": 2.4},
 	&"kippenhok": {"tekst": "Kippenhok", "toets": KEY_H, "glb": "res://assets/kippenhok_rt.glb", "hoogte": 1.2},
-	&"molen": {"tekst": "Molen", "toets": KEY_M, "glb": "res://assets/molen_rt.glb", "hoogte": 3.0},
+	&"molen": {"tekst": "Molen", "toets": KEY_Z, "glb": "res://assets/molen_rt.glb", "hoogte": 3.0},
 	&"melkerij": {"tekst": "Melkerij", "toets": KEY_J, "glb": "res://assets/melkerij_boerderij_rt.glb", "hoogte": 2.6},
 	&"akker": {"tekst": "Akker", "toets": KEY_G, "glb": "", "hoogte": 0.3},   # geen glb: per tegel akker_kaal + akker_rijp
 	&"weg": {"tekst": "Weg", "toets": KEY_T, "glb": "", "hoogte": 0.15},      # af = padtegel, view/wegen.gd (slepen = rij)
@@ -101,6 +101,7 @@ var knop_draai: Button
 var knop_stop: Button
 var knop_bouw: Button       ## alleen touch: Bouwen (bevestigen)
 var hint: Label
+var _hint_basis := ""        ## hinttekst van de modus; _toon_ghost zet er de reden achter als de ghost rood is
 static var touch := OS.has_feature("mobile") or "--touch" in OS.get_cmdline_user_args()   ## touch-bouwen (zie boven)
 var knop_h := KNOP_H        ## touch: >= 48 dp (bouw())
 var kolom: VBoxContainer   ## liggend rechtsboven (knoppen, hint, Draai, Stop); staand onderin (lade, hint, Draai, Stop)
@@ -389,6 +390,7 @@ func zet_actief(aan: bool) -> void:
 			hint.text = ("%s: slepen = rij, loslaten = plaatsen" % g) if soort in RIJ_SOORTEN \
 					else ("%s: loslaten = plaatsen" % g)
 			hint.text += "   rechts = stop"
+		_hint_basis = hint.text
 	if aan:
 		bestuur.wis_selectie()
 
@@ -494,9 +496,16 @@ func _toon_ghost(p: Plan) -> bool:
 	if soort == &"weg":
 		ghost.position.y = _grond(p.tegel).y + _hoogte(soort) * 0.5
 	ghost.rotation.y = draai * PI * 0.5
-	var kan := w.kan_bouwen(p) and w.kan_betalen(p.soort)
+	var reden := w.bouw_reden(p)     # te ver van het dorp, geen pad (besluit gebruiker 2026-10-31), of kan hier niet
+	if reden == "" and not w.kan_betalen(p.soort):
+		reden = "Te duur"
+	var kan := reden == ""
 	if soort in RIJ_SOORTEN:
 		kan = BouwRij.statussen(w, soort, [p.tegel])[0] == BouwRij.KAN
+		if kan:
+			reden = ""
+	if hint != null and _hint_basis != "":
+		hint.text = _hint_basis if kan or reden == "" else "%s   (%s)" % [_hint_basis, reden]
 	(ghost.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if kan else KLEUR_NIET
 	if gm != null:
 		var sl := [p.tegel, p.draai]
@@ -1196,7 +1205,7 @@ func kan_bevestigen() -> bool:
 		_touch_rij()
 		return BouwRij.KAN in _t_st
 	var p := _plan_op(_t_tegel)
-	return p != null and w.kan_bouwen(p) and w.kan_betalen(p.soort)
+	return p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p) and w.kan_betalen(p.soort)
 
 
 ## Bouwen (touch): het plan of de rij neerzetten. De modus blijft aan; bij een rij wordt het eind het nieuwe begin.
@@ -1248,7 +1257,7 @@ func _proef_bouw() -> void:
 					if best.x >= 0 or maxi(absi(dx), absi(dz)) != r:
 						continue
 					var p := _plan_op(mid + Vector2i(dx, dz))
-					if p != null and w.kan_bouwen(p):
+					if p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p):
 						best = mid + Vector2i(dx, dz)
 		if best.x >= 0:
 			t = best

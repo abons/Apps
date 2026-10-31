@@ -21,6 +21,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2 (ook missie3_test, missie4_test)
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/paddenstoel_test.gd  # paddenstoelen eten: rood heelt, bruin voedt, wit doodt, blauw mana
+"$G" --headless --path . --script res://test/besluiten_test.gd   # besluiten 2026-10-31: wie bouwt, bouwafstand, bron, honger, stilstaan, M1 met 2 bouwers
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken, muziekspeler
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
@@ -62,9 +63,10 @@ werkgeluid stil; met `--write-movie` is alles stil. Bronnen: `audio/eigen/` (eig
 in git) en `assets/audio/beasts/` (beasts-src, via `audio/haal_beasts.ps1` uit sync.ps1, niet in git). Details: `../audio.md` sectie 6.
 
 **Muziek** (`view/muziek.gd`, onder de root zodat hij het herladen van de scène overleeft): zoals het origineel cd-track 2
-in het startmenu, track 3 zolang de briefing open is, in de missie en bij het einde stil; lussen en 1,5 s overvloeien.
-Dempen met **Shift+M** (gewone M in het startmenu; in een missie is M de molen) of de noot-knop rechtsboven in het
-pauzemenu, volumeschuif in het pauzemenu (pc); bewaard in `user://muziek.cfg`. De tracks zijn je eigen cd-rip:
+in het startmenu, track 3 zolang de briefing open is (beide lussen), bij het einde stil; 1,5 s overvloeien. In de missie
+(besluit gebruiker 2026-10-31, afwijking van het origineel dat daar stil was) een zachte afspeellijst 4..8: elke track een
+keer, dan 30 s stilte, op 0,45 van het volume (`Muziek.LIJST_PAUZE_S`, `MISSIE_GAIN`). Dempen met **M** overal (de molen
+kreeg Z) of de noot-knop rechtsboven in het pauzemenu, volumeschuif in het pauzemenu (pc); bewaard in `user://muziek.cfg`. De tracks zijn je eigen cd-rip:
 `audio/haal_muziek.ps1` (uit sync.ps1) zet `lokaal/muziek/Track02..08` om naar `assets/audio/muziek/trackNN.ogg`, niet in
 git. Zonder die bestanden blijft het stil. Details: `../audio.md` sectie 7.
 
@@ -97,11 +99,25 @@ een waarschuwing in de log.
 ## Zelfstandig werk en de nacht
 
 Wie niets omhanden heeft kiest elke 0,5 s zelf (`Wereld._kies_klus`): wat hij draagt wegbrengen, kopen waar hij trek in
-heeft, en als volwassene bouwen aan een open plan (een bouwer altijd, anderen met hoogstens `zelf_bouwen_per_plan` (2)
-tegelijk; een plan hoeft dus niet meer aangeklikt te worden), oogsten, melken, eieren rapen. 's Nachts is er geen klus:
+heeft, water halen (bron of put, ook in missie 1), en als man bouwen aan een open plan (een bouwer altijd, andere mannen met
+hoogstens `zelf_bouwen_per_plan` (2) tegelijk; een plan hoeft dus niet meer aangeklikt te worden), oogsten, melken, eieren rapen. 's Nachts is er geen klus:
 wie een bed heeft (2 per hut) gaat de hut in, de rest gaat in een slaapzak (origineel `sleepers`) bij het kampvuur liggen;
 's ochtends staat iedereen op. Zonder opdracht zwerft iedereen rond het kampvuur (anker); alleen na een loop-, vecht-,
 claim- of gildebevel van de speler blijft hij in de buurt van waar hij stond. Een bevel van de speler gaat altijd voor.
+
+Besluiten gebruiker 2026-10-31 (`spel.json` `_wie_bouwt`, `_bouw_afstand`, `leven._honger`, `_vallen`; test `test/besluiten_test.gd`):
+- **Alleen mannen en bouwers bouwen** (origineel hamerpunt 0x440b3c; de vrouw heeft geen hamerknop): `Dorpeling.kan_bouwen`. Een
+  bouwbevel aan alleen vrouwen of kinderen wordt geweigerd met een melding midden boven (`Wereld.bevel_geweigerd`). M1 met 2 mannen
+  bouwt hut, kippenhok en loods zelf af en niemand verhongert in 20 min.
+- **Bouwafstand**: een plan binnen `bouw_afstand.max_tegels` (12, eigen keuze) van een afgebouwd gebouw, het kampvuur of de eigen
+  vlag; weg overal. Ghost rood met de reden in de hint ("Te ver van je gebouwen", "Geen pad naar je dorp" = deurtegel
+  niet bereikbaar). Plannen in aanbouw tellen niet mee.
+- **Honger**: langer dan `leven.honger.na_s` (360 s wakker) niets gegeten = 0,08 % van de max hp per s eraf, geen herstel,
+  geluk -0,25; een bruine paddenstoel heft het op. Dood door honger = oorzaak `honger`.
+- **Stilstaan** (origineel de hand): hand-knop naast de menuknop (alleen met een selectie, touch 48 dp) of **X**: blijft
+  staan, geen eigen klussen, niet zwerven, slapen of zelf vechten; vluchten wel. Elk nieuw bevel heft het op.
+- **Vallen** (M4): mijn meteen dodelijk voor iedereen binnen de straal, direct contact met het vuur (binnen `vuur.kern` 0,6)
+  ook, de rand doet schade per s; spies (klasse 36, vanaf M6) schade 40, overleefbaar.
 
 ## Weide
 
@@ -146,7 +162,9 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | wiel | zoomen (2 m tot eilandoverzicht) |
 | Spatie, 1 / 2 / 4 | pauze, tempo 1x/2x/4x |
 | Esc, of de menuknop naast het munt-icoon | pauzemenu (opnieuw, andere missie, afsluiten) |
-| knop rechtsboven (of B / L / H / M / J / G / T / F / P) | bouwmodus: hut / loods / kippenhok / molen / melkerij / akker / weg / hek / poort. Het menu groeit: eerst hut, kippenhok, loods, weg; na een loods molen en akker; na een molen melkerij, hek en poort |
+| X, of de hand naast de menuknop (met een selectie) | stilstaan: de gekozen dorpelingen blijven staan zonder eigen klussen, tot een nieuw bevel |
+| M | muziek aan/uit (overal) |
+| knop rechtsboven (of B / L / H / Z / J / G / T / F / P) | bouwmodus: hut / loods / kippenhok / molen / melkerij / akker / weg / hek / poort. Het menu groeit: eerst hut, kippenhok, loods, weg; na een loods molen en akker; na een molen melkerij, hek en poort |
 | in de bouwmodus: links indrukken, slepen, loslaten | indrukken toont de ghost onder de wijzer, slepen schuift hem, loslaten plaatst (groen = kan, rood = kan niet of te duur). De ghost is het gebouw zelf (af-glb, doorzichtig getint, zelfde transform als na het bouwen; de kist alleen zolang de glb laadt) met een pijl op de deurtegel naar de deur, ook op touch; test `test/ghost_test.gd`. Weg en hek: slepen legt een rij met een ghost per tegel (grijs = is er al). De modus **blijft aan** na het plaatsen |
 | in de bouwmodus: knop Draai, wiel, R | een kwartslag draaien (wiel: omlaag verder, omhoog terug; het wiel zoomt dan niet). Weg en hek draaien niet, daar blijft het wiel zoomen |
 | in de bouwmodus: knop Stop, nog eens op de bouwknop, rechts klikken, Esc | bouwmodus uit (rechts slepen draait gewoon de camera) |

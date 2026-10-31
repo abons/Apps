@@ -351,9 +351,10 @@ Bron: openbumpkins (decompilatie van `BEASTS.EXE`, GPLv3; `src/bridge/session_co
 | --- | --- | --- | --- |
 | menu | 2 | ja | 2, een keer (67 s) |
 | briefing | 3 | ja | 3, tot de briefing dicht is |
-| missie, gewonnen, verloren | stil | - | stil |
+| missie | afspeellijst 4..8, elk een keer, dan 30 s stilte, 0,45 x volume (besluit gebruiker 2026-10-31) | nee | stil |
+| gewonnen, verloren | stil | - | stil |
 
-Dempen: **Shift+M** altijd, gewone **M** alleen zonder bouwmenu (startmenu; in een missie is M de molen, `Bouwmenu.GEBOUWEN`), en een getekende noot-knop rechtsboven in het pauzemenu. Volumeschuif onderaan in het pauzemenu, **alleen pc** (op touch maakte de extra rij het paneel te hoog voor de 48 dp-knoppen op 1600x900; daar het toestelvolume). Volume en dempen in `user://muziek.cfg` (onleesbaar = standaard 0,7, niet gedempt).
+Dempen: **M** overal, met of zonder Shift (besluit gebruiker 2026-10-31; de molen kreeg **Z**), en een getekende noot-knop rechtsboven in het pauzemenu. Volumeschuif onderaan in het pauzemenu, **alleen pc** (op touch maakte de extra rij het paneel te hoog voor de 48 dp-knoppen op 1600x900; daar het toestelvolume). Volume en dempen in `user://muziek.cfg` (onleesbaar = standaard 0,7, niet gedempt).
 
 Bestanden: `spel/assets/audio/muziek/track02.ogg .. track08.ogg`, **niet in git** (`assets/` staat in `.gitignore`). `spel/audio/haal_muziek.ps1` (vanuit `sync.ps1`) zoekt de eigen cd-rip in `lokaal/muziek/` of op de laptop-share, als `TrackNN.*` (RaZLeN-naam) of `beastsNN.wav` (bchunk/openbumpkins), en maakt stereo 44,1 kHz Vorbis q5, loudnorm -18 LUFS, piek -1 dBTP. Ontbreekt een track, dan blijft die context stil met een melding. Test: `test/audio_test.gd` (stille testtracks: wissel, overvloeien, doorspelen, dempen, volume, bewaren).
 
@@ -362,7 +363,7 @@ Bestanden: `spel/assets/audio/muziek/track02.ogg .. track08.ogg`, **niet in git*
 | # | vraag |
 | --- | --- |
 | 1 | **De cd-tracks**: heb je een rip (of de cd)? Zet `Track02..Track08` in `lokaal/muziek/` en draai `sync.ps1`. Niet van internet gehaald |
-| 2 | Menu en briefing **lussen** bij ons; het origineel speelde ze een keer (menu na 67 s stil). Lus houden of trouw een keer? |
-| 3 | **Tracks 4 tot 8** speelt het origineel niet. Wil je ze ergens (bijv. zacht in de missie, of bij winst)? Dat wijkt af van het origineel |
-| 4 | **M** is in een missie de molen-bouwtoets. Muziek nu op Shift+M (gewone M alleen in het startmenu). Molen naar een andere toets en M voor muziek? |
+| 2 | ✅ 2026-10-31: menu en briefing blijven lussen |
+| 3 | ✅ 2026-10-31: tracks 4 tot 8 zacht in de missie (afspeellijst met pauzes), afwijking van het origineel |
+| 4 | ✅ 2026-10-31: M = muziek overal, molen op Z |
 | 5 | Voor publicatie mag het origineel er niet in: eigen of gegenereerde muziek (zie `onderzoek.md`: Stable Audio 3 lokaal of Eleven Music) |

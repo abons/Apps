@@ -49,6 +49,7 @@ func _start() -> void:
 	bm._toon_ghost(p)
 	if not Bouwmenu._scenes.has(Bouwmenu.GEBOUWEN[&"hut"]["glb"]):
 		_check(bm.ghost.visible and bm._gmodel == null, "kist zolang de glb laadt")
+	_test_te_ver()
 	process_frame.connect(_stap)
 
 
@@ -121,9 +122,25 @@ func _vrije_tegel() -> Vector2i:
 				if maxi(absi(dx), absi(dz)) != r:
 					continue
 				var p := bm._plan_op(mid + Vector2i(dx, dz))
-				if p != null and w.kan_bouwen(p):
+				if p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p):
 					return mid + Vector2i(dx, dz)
 	return w.kampvuur
+
+
+## Te ver van het dorp (bouw_afstand, besluit gebruiker 2026-10-31): ghost rood, de hint noemt de reden.
+func _test_te_ver() -> void:
+	var max_t := int(w.spel["bouw_afstand"]["max_tegels"])
+	for r in range(max_t + 6, 60, 2):
+		for dx in [-r, r]:
+			var p := bm._plan_op(w.kampvuur + Vector2i(dx, 0))
+			if p != null and w.kan_bouwen(p) and not w.binnen_bouwafstand(p):
+				_check(not bm._toon_ghost(p), "te ver van het dorp: ghost rood")
+				_check(Wereld.REDEN_TE_VER in bm.hint.text, "hint noemt de reden (%s)" % bm.hint.text)
+				var dichtbij := bm._plan_op(_vrije_tegel())
+				bm._toon_ghost(dichtbij)
+				_check(not Wereld.REDEN_TE_VER in bm.hint.text, "dichtbij: geen reden in de hint")
+				return
+	_check(false, "geen plek te ver van het dorp gevonden")
 
 
 func _check(ok: bool, wat: String) -> void:

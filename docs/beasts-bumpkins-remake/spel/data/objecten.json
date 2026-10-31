@@ -26,6 +26,7 @@
     "87":  {"naam": "triggerplek", "origineel": "None_87", "model": "geen", "voetafdruk": [1, 1], "blokkeert": false, "_uitleg": "onzichtbaar vlak waar een regel op let (M4: aanraken = gewonnen; M12 klasse 87 = trigger-vlakken)"},
     "29":  {"naam": "stenen_muur", "origineel": "stone wall", "model": "natuur:stenen_muur", "voetafdruk": [1, 1], "blokkeert": true, "dynamisch": true},
     "37":  {"naam": "mijn", "origineel": "mine", "model": "placeholder:mijn", "voetafdruk": [1, 1], "blokkeert": false, "dynamisch": true},
+    "36":  {"naam": "spies", "origineel": "spike trap", "model": "placeholder:mijn", "voetafdruk": [1, 1], "blokkeert": false, "dynamisch": true, "_uitleg": "vanaf M6 (m06.json 7x); schade overleefbaar, spel.json vallen.spies (besluit gebruiker 2026-10-31); eigen model ontbreekt nog: het mijnblokje"},
     "61":  {"naam": "olie", "origineel": "oil", "model": "placeholder:olie", "voetafdruk": [1, 1], "blokkeert": false, "dynamisch": true},
     "7":   {"naam": "vuur", "origineel": "fire", "model": "placeholder:vuur", "voetafdruk": [1, 1], "blokkeert": false, "dynamisch": true, "_uitleg": "ontstaat door een regel (M4 valbeker, actie 0x04); sim/regels.gd"},
     "110": {"naam": "koe",          "origineel": "cow",         "model": "koe", "vee": true, "voetafdruk": [1, 1], "blokkeert": false},

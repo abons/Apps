@@ -95,45 +95,74 @@ func _initialize() -> void:
 	_check(_obj(w, "gouden_kelk") == Vector2i(40, 10), "gouden kelk verschenen op (40,10) (%s)" % _obj(w, "gouden_kelk"))
 	_check(w.kas == 8000, "sleutel levert geen kas op")
 
-	# mijn: wie erop stapt krijgt schade
+	# mijn: wie erop stapt is meteen dood (besluit gebruiker 2026-10-31: "unit was gelijk dood")
 	var geraakt := []
 	w.dorpeling_geraakt.connect(func(d: Dorpeling, o: String) -> void: geraakt.append([d.id, o]))
+	var doden := []
+	w.dorpeling_dood.connect(func(d: Dorpeling, o: String) -> void: doden.append([d.id, o]))
 	var knal := []
 	w.ontploffing.connect(func(t: Vector2i) -> void: knal.append(t))
-	var hp0 := man2.gezondheid
 	_zet(man2, Vector2i(67, 82))
 	_tik(w, hints, 1)
 	_check(knal.has(Vector2i(67, 82)) and _tel(w, "mijn") == 10, "mijn op (67,82) gaat af onder de dorpeling")
-	_check(man2.gezondheid < hp0 and [man2.id, "mijn"] in geraakt, "schade door de mijn (%.0f -> %.0f)" % [hp0, man2.gezondheid])
-	_zet(man2, w.kampvuur + Vector2i(0, 2))
+	_check(not man2 in w.dorpelingen and [man2.id, "mijn"] in doden, "mijn: meteen dood (%s)" % [doden])
 
-	# valbeker: oprapen = 4-9 + vuur; met olie gaan de mijnen eromheen af
+	# valbeker: oprapen = 4-9 + vuur op de beker; direct contact met de vlam = dood; met olie gaan de mijnen eromheen af
 	_zet(man, beker)
 	_tik(w, hints, 1)
 	_check("4-9" in getoond and w.regels_af.has("valbeker"), "beker opgeraapt: hint 4-9, regel valbeker")
 	_check(_tel(w, "vuur") == 1 and _obj(w, "vuur") == beker, "vuur op de beker (68,85)")
-	var hpv := man.gezondheid
+	_tik(w, hints, 1)
+	_check(not man in w.dorpelingen and [man.id, "vuur"] in doden, "direct contact met het vuur: meteen dood (%s)" % [doden])
 	_tik(w, hints, int(2.5 / w.tik_dt))
-	_check(man.gezondheid < hpv or not man in w.dorpelingen, "vuur en mijnen doen schade aan de drager")
 	_check(_tel(w, "mijn") < 10, "olie onder het vuur: mijnen eromheen gingen af (nog %d)" % _tel(w, "mijn"))
-	# de tinnen beker is niets waard bij de vlag
-	if man in w.dorpelingen:
-		man.gezondheid = man.gezondheid_max
-		var kas_b := w.kas
-		_zet(man, _obj(w, "vlag") + Vector2i(1, 1))
-		_tik(w, hints, 2)
-		_check(Voorwerpen.van(w, man).is_empty() and w.kas == kas_b, "tinnen beker bij de vlag: weg, geen kas")
+	# de rand van het vuur (buiten de kern, binnen straal): schade per s, overleefbaar
+	var rand: Dorpeling = w.dorpelingen[0]
+	var vc: Dictionary = w.spel["vallen"]["vuur"]
+	var vt0 := _obj(w, "vuur")
+	rand.gezondheid = rand.gezondheid_max
+	rand.zet_tegel(vt0)
+	rand.pos = Vector2(vt0) + Vector2(0.5, 0.5) + Vector2((float(vc["kern"]) + float(vc["straal"])) * 0.5, 0.0)
+	rand.route.clear()
+	rand.bevel = {}
+	rand.stil = true
+	var hpr := rand.gezondheid
+	_tik(w, hints, int(1.5 / w.tik_dt))
+	_check(rand in w.dorpelingen and rand.gezondheid < hpr, "rand van het vuur: schade, niet dood (%.0f -> %.0f)" % [hpr, rand.gezondheid])
+	rand.stil = false
+	_zet(rand, w.kampvuur + Vector2i(0, 2))
 	_tik(w, hints, int(30.0 / w.tik_dt))
 	_check(_tel(w, "vuur") == 0, "vuur is uitgebrand")
-	# een bouwer dooft vuur
+	# de tinnen beker (gevallen bij de dode) is niets waard bij de vlag; geen nieuw vuur
+	var drager: Dorpeling = w.dorpelingen[1]
+	drager.gezondheid = drager.gezondheid_max
+	_zet(drager, _obj(w, "zilveren_beker"))
+	_tik(w, hints, 2)
+	_check(not Voorwerpen.van(w, drager).is_empty() and _tel(w, "vuur") == 0, "beker weer opgeraapt, geen tweede vuur")
+	var kas_b := w.kas
+	_zet(drager, _obj(w, "vlag") + Vector2i(1, 1))
+	_tik(w, hints, 2)
+	_check(Voorwerpen.van(w, drager).is_empty() and w.kas == kas_b, "tinnen beker bij de vlag: weg, geen kas")
+	# een bouwer dooft vuur (hij raakt het voor hij in de kern komt)
 	var vt := w.dichtstbij_loopbaar(Vector2i(110, 108))
 	var v2 := Regels.maak(w, 7, vt)
-	var b: Dorpeling = man2
+	var b: Dorpeling = w.dorpelingen[0]
 	b.rol = "bouwer"
 	_zet(b, vt + Vector2i(0, 1) if w.raster.loopbaar_v(vt + Vector2i(0, 1)) else vt)
 	_tik(w, hints, 1)
-	_check(not v2 in w.objecten, "een bouwer dooft het vuur (origineel 0x448f78)")
+	_check(not v2 in w.objecten and b in w.dorpelingen, "een bouwer dooft het vuur (origineel 0x448f78)")
 	b.rol = ""
+	# spies (klasse 36, vanaf M6): schade, overleefbaar
+	var st := w.dichtstbij_loopbaar(w.kampvuur + Vector2i(3, 3))
+	var sp := Regels.maak(w, 36, st)
+	_check(not sp.is_empty() and sp["naam"] == "spies", "spies te maken (klasse 36)")
+	b.gezondheid = b.gezondheid_max
+	var hps := b.gezondheid
+	_zet(b, st)
+	_tik(w, hints, 1)
+	_check(b in w.dorpelingen and b.gezondheid < hps and [b.id, "spies"] in geraakt, "spies: schade (%.0f -> %.0f), overleefd" % [hps, b.gezondheid])
+	_zet(b, w.kampvuur + Vector2i(0, 2))
+	_check(w.uitslag == "", "nog 2 dorpelingen: niet verloren (%d)" % w.dorpelingen.size())
 
 	# zombie (type 18): standaard actief (gebruiker: de zombie valt aan); passief = staat stil, kijkt, bijt niet
 	var z: Wolf = zombies[1] if zombies[0] == bewaker else zombies[0]

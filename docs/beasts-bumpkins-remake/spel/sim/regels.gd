@@ -11,6 +11,8 @@ extends RefCounted
 ##             weg {klasse, tegels}  objecten van die klasse op die tegels van de kaart (0x17)
 ## Vallen (spel.json `vallen`): een mijn (klasse 37) gaat af als een dorpeling erop stapt; vuur (klasse 7) brandt een
 ## tijd, doet schade in de buurt, een bouwer dooft het, en met olie (61) eronder zet het de mijnen eromheen af.
+## Besluit gebruiker 2026-10-31: een mijn is meteen dodelijk (vallen.mijn.dodelijk), direct contact met het vuur (binnen
+## vallen.vuur.kern) ook; de rand van het vuur doet schade per s; een spies (klasse 36, vanaf M6) doet schade, overleefbaar.
 ## Geen signalen naar de Wereld toe (die zouden de Wereld vasthouden): alles wordt per tik afgelezen.
 
 const RAAK := 0.75
@@ -28,6 +30,7 @@ static func tik(w: Wereld, dt: float) -> void:
 		w.regel_gevuurd.emit(id)
 	_mijnen(w)
 	_vuren(w, dt)
+	_spiezen(w, dt)
 
 
 static func _waar(w: Wereld, als: Dictionary) -> bool:
@@ -152,7 +155,7 @@ static func ontplof(w: Wereld, ob: Dictionary) -> void:
 	w.ontploffing.emit(t)
 	for d in w.dorpelingen.duplicate():
 		if not d.binnen and d.pos.distance_to(m) <= float(c.get("straal", 1.5)):
-			d.raak(w, float(c.get("schade", 60)), "mijn")
+			d.raak(w, d.gezondheid if bool(c.get("dodelijk", false)) else float(c.get("schade", 60)), "mijn")
 
 
 static func _vuren(w: Wereld, dt: float) -> void:
@@ -168,6 +171,10 @@ static func _vuren(w: Wereld, dt: float) -> void:
 		if float(ob["brand_s"]) <= 0.0:
 			verwijder(w, ob)
 			continue
+		var kern := float(c.get("kern", 0.0))
+		for d in w.dorpelingen.duplicate():     # direct contact met de vlam: meteen dood (een bouwer dooft hem hierboven al)
+			if not d.binnen and d.pos.distance_to(m) <= kern:
+				d.raak(w, d.gezondheid, "vuur")
 		var oud := float(ob["puls"])
 		ob["puls"] = oud + dt
 		if floor(oud) != floor(float(ob["puls"])):      # elke seconde schade
@@ -186,3 +193,23 @@ static func _olie_op(w: Wereld, t: Vector2i) -> bool:
 		if ob["naam"] == "olie" and ob["x"] == t.x and ob["y"] == t.y:
 			return true
 	return false
+
+
+## Spies (spike trap, klasse 36; objecten.json naam "spies"): een dorpeling die binnen `raak` komt krijgt `schade`
+## (overleefbaar, besluit gebruiker 2026-10-31); daarna doet de val `herlaad_s` niets.
+static func _spiezen(w: Wereld, dt: float) -> void:
+	var c := _vallen(w, "spies")
+	if c.is_empty():
+		return
+	for ob in w.objecten:
+		if ob["naam"] != "spies":
+			continue
+		if float(ob.get("herlaad", 0.0)) > 0.0:
+			ob["herlaad"] = float(ob["herlaad"]) - dt
+			continue
+		var m := Vector2(ob["x"], ob["y"]) + Vector2(0.5, 0.5)
+		for d in w.dorpelingen.duplicate():
+			if not d.binnen and d.pos.distance_to(m) <= float(c.get("raak", 0.6)):
+				d.raak(w, float(c.get("schade", 40)), "spies")
+				ob["herlaad"] = float(c.get("herlaad_s", 5.0))
+				break

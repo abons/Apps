@@ -25,6 +25,7 @@ func _hut_met_bouwers(samen: bool) -> Array:
 	w.laad()
 	for d in w.dorpelingen:
 		d.leeftijd = "volwassen"
+		d.geslacht = "man"         # alleen mannen en bouwers bouwen (besluit gebruiker 2026-10-31)
 	var p: Plan = null
 	for r in 10:
 		for dy in range(-r, r + 1):
@@ -100,7 +101,7 @@ func _test_hek() -> void:
 	_check(p.stapels.is_empty(), "hek: geen stapels")
 	var vol: Array[Dorpeling] = []
 	for d in w.dorpelingen:
-		if d.volwassen():
+		if d.kan_bouwen():         # de twee mannen (alleen mannen en bouwers bouwen)
 			vol.append(d)
 	w.geef_bouwbevel([vol[0].id], p)
 	w.geef_bouwbevel([vol[1].id], p)

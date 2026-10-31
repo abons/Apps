@@ -126,6 +126,7 @@ func _vrij_vak(w: Wereld, bij: Vector2i) -> Vector2i:
 func _test_weide() -> void:
 	var w := _wereld()
 	w.alles_open = true
+	w.overal_bouwen = true          # weide bij de wolf, ver van het dorp
 	var wf: Wolf = w.wolven[0]
 	var o := _vrij_vak(w, wf.tegel())
 	_check(o.x >= 0, "vrij vak voor een weide bij de wolf (%s)" % o)

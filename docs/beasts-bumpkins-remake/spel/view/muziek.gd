@@ -8,8 +8,10 @@ extends Node
 ## De exe speelt er maar twee: **track 2** in het hoofdmenu (en de outro), **track 3** zolang de missiebriefing open
 ## staat. In de missie zelf **geen muziek**, bij winst of verlies een stemfragment en geen muziek. Elke track speelde
 ## een keer (de exe stopte hem na een vaste duur, 67 en 109 s) en lus niet; er was geen volume-instelling in het spel.
-## Wij: dezelfde indeling, maar menu en briefing lussen (je blijft er langer dan 67 s), met overvloeien, een volume en
-## dempen (Shift+M altijd, M waar geen bouwtoets hem vangt, knop in het pauzemenu), bewaard in user://.
+## Wij: menu en briefing lussen (je blijft er langer dan 67 s), met overvloeien, een volume en dempen (M overal, sinds
+## 2026-10-31; de molen kreeg Z; knop in het pauzemenu), bewaard in user://. Afwijking van het origineel (besluit
+## gebruiker 2026-10-31): in de missie een zachte afspeellijst van tracks 4..8, na elke track een pauze (LIJST_PAUZE_S),
+## op MISSIE_GAIN van het volume.
 ##
 ## Bestanden: assets/audio/muziek/track02.ogg .. track08.ogg (niet in git: `assets/` staat in .gitignore), gemaakt door
 ## audio/haal_muziek.ps1 uit je eigen cd-rip. Ontbreekt een track, dan blijft die context stil (een melding).
@@ -21,11 +23,14 @@ const BUS := "Muziek"
 const FADE := 1.5                    ## s overvloeien
 const STIL_DB := -60.0
 const VOLUME_STANDAARD := 0.7
-## Per context: cd-track (0 = stilte) en of hij lust. De indeling van het origineel; zie de kop.
+const LIJST_PAUZE_S := 30.0          ## s stilte tussen twee tracks van een afspeellijst (missie)
+const MISSIE_GAIN := 0.45            ## missiemuziek zachter dan het menu (lineair, bovenop het volume)
+## Per context: cd-track (0 = stilte) en of hij lust, of een afspeellijst `tracks` (elk een keer, dan pauze, dan de
+## volgende, rond en rond) met `gain` (lineair, 1 = vol). Menu en briefing zoals het origineel; zie de kop.
 const CONTEXTEN := {
 	&"menu": {"track": 2, "lus": true},
 	&"briefing": {"track": 3, "lus": true},
-	&"missie": {"track": 0, "lus": false},
+	&"missie": {"tracks": [4, 5, 6, 7, 8], "lus": false, "gain": MISSIE_GAIN},
 	&"gewonnen": {"track": 0, "lus": false},
 	&"verloren": {"track": 0, "lus": false},
 	&"stil": {"track": 0, "lus": false},
@@ -44,6 +49,9 @@ var _spelers: Array[AudioStreamPlayer] = []
 var _actief := 0
 var _tweens := {}                    ## speler -> Tween van zijn lopende fade
 var _uit := false                    ## --write-movie: stil (zie geluid.gd, lek bij afsluiten)
+var lijst_pauze_s := LIJST_PAUZE_S   ## tests zetten hem korter
+var _lijst_i := 0                    ## volgende track uit de afspeellijst (blijft over missies heen, de node blijft bestaan)
+var _wacht_s := -1.0                 ## >= 0: pauze tot de volgende track van de afspeellijst
 
 
 ## De ene muziekspeler: bestaat hij nog niet, dan komt hij onder de root (uitgesteld: de root kan bezig zijn).
@@ -68,6 +76,7 @@ func _init() -> void:
 		p.bus = BUS
 		p.volume_db = STIL_DB
 		add_child(p)
+		p.finished.connect(_track_af.bind(p))
 		_spelers.append(p)
 	lees()
 
@@ -148,7 +157,8 @@ func _speel() -> void:
 	if _uit:
 		return
 	var c: Dictionary = CONTEXTEN[context]
-	var s := stream_voor(int(c["track"]))
+	_wacht_s = -1.0
+	var s := stream_voor(_kies_track(c))
 	var nu := _spelers[_actief]
 	if s != null and nu.stream == s and nu.playing:
 		zet_lus(s, bool(c["lus"]))
@@ -165,7 +175,34 @@ func _speel() -> void:
 	p.stream = s
 	p.volume_db = STIL_DB
 	p.play()
-	_fade(p, 1.0, false)
+	_fade(p, float(c.get("gain", 1.0)), false)
+
+
+## De track voor context `c`: `track`, of de volgende uit de afspeellijst `tracks` die er is (0 = geen).
+func _kies_track(c: Dictionary) -> int:
+	if not c.has("tracks"):
+		return int(c.get("track", 0))
+	var lijst: Array = c["tracks"]
+	for i in lijst.size():
+		var n := int(lijst[(_lijst_i + i) % lijst.size()])
+		if stream_voor(n) != null:
+			_lijst_i = (_lijst_i + i + 1) % lijst.size()
+			return n
+	return 0
+
+
+## Een track is uit (alleen zonder lus): in een afspeellijst begint de pauze naar de volgende.
+func _track_af(p: AudioStreamPlayer) -> void:
+	if p == speler() and CONTEXTEN.get(context, {}).has("tracks"):
+		_wacht_s = lijst_pauze_s
+
+
+func _process(dt: float) -> void:
+	if _wacht_s < 0.0:
+		return
+	_wacht_s -= dt
+	if _wacht_s < 0.0 and CONTEXTEN.get(context, {}).has("tracks"):
+		_speel()
 
 
 func _fade(p: AudioStreamPlayer, doel: float, stop_na: bool) -> void:
@@ -263,20 +300,8 @@ func bewaar() -> void:
 
 # ---------------------------------------------------------------- toetsen
 
-## Shift+M dempt altijd (ook in een missie, waar M de molen is: Bouwmenu.GEBOUWEN).
+## M dempt overal, met of zonder Shift (besluit gebruiker 2026-10-31; de molen kreeg Z in Bouwmenu.GEBOUWEN).
 func _input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and (e as InputEventKey).keycode == KEY_M \
-			and (e as InputEventKey).shift_pressed:
-		wissel_stil()
-		get_viewport().set_input_as_handled()
-
-
-## Gewone M: alleen zonder bouwmenu in de scène (startmenu). In een missie is M de molen; deze node staat onder de
-## root en krijgt de toets afhankelijk van de volgorde soms eerder dan het bouwmenu, dus expliciet kijken.
-func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo and (e as InputEventKey).keycode == KEY_M:
-		var cs := get_tree().current_scene
-		if cs != null and cs.get_node_or_null("Bouwmenu") != null:
-			return
 		wissel_stil()
 		get_viewport().set_input_as_handled()

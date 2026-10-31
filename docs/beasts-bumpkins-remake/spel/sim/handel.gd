@@ -127,8 +127,9 @@ func start(w: Wereld) -> void:
 func tik(w: Wereld, dt: float) -> void:
 	var doel := geluk_doel()
 	var stap := float(_c.get("geluk_per_s", 0.01)) * dt
-	for d in w.dorpelingen:
-		d.geluk = move_toward(d.geluk, doel, stap)
+	var honger := float(w.spel["leven"].get("honger", {}).get("ongeluk", 0.0))
+	for d in w.dorpelingen:     # honger maakt ongelukkig (besluit gebruiker 2026-10-31, spel.json leven.honger)
+		d.geluk = move_toward(d.geluk, maxf(0.0, doel - honger) if honger > 0.0 and Leven.hongerig(w, d) else doel, stap)
 	if not misdaad_aan(w):
 		return
 	_t += dt
