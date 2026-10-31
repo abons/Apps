@@ -1657,6 +1657,8 @@ func bouw_reden(p: Plan) -> String:
 		return "Hier kan het niet"
 	if not binnen_bouwafstand(p):
 		return REDEN_TE_VER              # origineel "Too far from your existing buildings"
+	if Plan.DEUREN.has(p.soort) and weg_route(p.deur_tegel(), p).is_empty():
+		return REDEN_GEEN_PAD            # bereikbaar, maar de deurweg kan niet (door een plan in aanbouw heen)
 	return ""
 
 
@@ -1695,27 +1697,49 @@ func binnen_bouwafstand(p: Plan) -> bool:
 	return afstand_tot_dorp(p) <= int(c.get("max_tegels", 12))
 
 
-## Zet het plan neer en betaal de prijs uit de kas (origineel: bij het bestellen). False als het niet kan of te duur is.
+## Zet het plan neer en betaal de prijs uit de kas (origineel: bij het bestellen). Een gebouw met een deur krijgt
+## meteen zijn deurweg (weg_route, de route die de ghost toonde), betaald per nieuwe padtegel (besluit 2026-10-31,
+## was: pas bij afbouwen). False als het niet kan, er geen route is, of prijs plus pad te duur is.
 func plan_zet(p: Plan) -> bool:
 	if not ontgrendeld(p.soort) or not kan_bouwen(p) or not binnen_bouwafstand(p) or not kan_betalen(p.soort):
 		return false
+	var route: Array[Vector2i] = []
+	if Plan.DEUREN.has(p.soort):
+		route = weg_route(p.deur_tegel(), p)
+		if route.is_empty():
+			return false
+		if kas < prijs(p.soort) + weg_nieuw(route) * int(spel.get("weg_per_tegel", 0)):
+			return false
 	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(p.soort), p.bouwtijd_s))
 	kas -= prijs(p.soort)
 	plannen.append(p)
+	_leg_route(route)                 # voor de stapels: die mijden het pad
 	p.stapels = stapel_plekken(p)     # zaagbok en steenhoop: de view zet ze neer, de werkplekken volgen eruit
 	plan_gezet.emit(p)
 	return true
 
 
-## Weg van `van` (de deurtegel) naar het dichtste stuk pad, zoals beasts-src de weg naar de deur meebestelt
-## (World.aim). Kortste route over loopbare tegels (BFS, 8 richtingen via kan_stap); elke nieuwe padtegel kost
-## `weg_per_tegel` uit de kas. Water en rots worden nooit pad (niet loopbaar); bestaat er geen pad, dan naar het
-## kampvuur. Geeft het aantal nieuwe padtegels.
-func leg_weg(van: Vector2i) -> int:
+## De deurweg: route van `van` (de deurtegel) naar het dichtste stuk pad, deurtegel eerst, het bestaande pad (of de
+## tegel bij het kampvuur) als laatste. Origineel: een nieuw gebouw wordt met een pad aan het dorp gekoppeld ("Cannot
+## link path to your village", MISC.BOX), elke padtegel kost de wegprijs (klasse 206, 20); beasts-src bestelt de weg
+## mee (World.aim). Kortste route over loopbare tegels (BFS, 8 richtingen via kan_stap), niet door de voetafdruk van
+## `p` (het gebouw zelf, dat er straks staat), niet door plannen in aanbouw en hun stapels. Verandert niets: de ghost
+## toont precies deze route (view/bouwmenu.gd) en plan_zet legt hem. Leeg = geen route.
+func weg_route(van: Vector2i, p: Plan = null) -> Array[Vector2i]:
+	var route: Array[Vector2i] = []
 	var pad := raster.namen.find("pad")
 	var start := dichtstbij_loopbaar(van)
 	if start.x < 0 or pad < 0:
-		return 0
+		return route
+	var muren: Array[Rect2i] = []
+	if p != null:
+		muren.append(p.afdruk())
+	for q in plannen:
+		if q.klaar or q == p or q.soort == &"weg":
+			continue
+		muren.append(q.afdruk())
+		for s in q.stapels:
+			muren.append(Rect2i(s, Vector2i.ONE))
 	var vorige := {start: start}
 	var rij: Array[Vector2i] = [start]
 	var doel := Vector2i(-1, -1)
@@ -1730,20 +1754,64 @@ func leg_weg(van: Vector2i) -> int:
 			var n := t + Vector2i(Raster.DC[d], Raster.DR[d])
 			if vorige.has(n) or not raster.kan_stap(t.x, t.y, n.x, n.y):
 				continue
+			var vrij := true
+			for m in muren:
+				if m.has_point(n):
+					vrij = false
+					break
+			if not vrij:
+				continue
 			vorige[n] = t
 			rij.append(n)
 	if doel.x < 0:
-		return 0
-	var nieuw := 0
+		return route
 	var t := doel
 	while true:
+		route.append(t)
+		if t == start:
+			break
+		t = vorige[t]
+	route.reverse()
+	return route
+
+
+## Nieuwe padtegels in `route` (wat al pad is kost niets).
+func weg_nieuw(route: Array[Vector2i]) -> int:
+	var pad := raster.namen.find("pad")
+	var n := 0
+	for t in route:
+		if raster.soort[raster.idx(t.x, t.y)] != pad:
+			n += 1
+	return n
+
+
+## Wat de deurweg van `p` kost: nieuwe padtegels x `weg_per_tegel` (0 voor een soort zonder deur of zonder route).
+func pad_kosten(p: Plan) -> int:
+	if not Plan.DEUREN.has(p.soort):
+		return 0
+	return weg_nieuw(weg_route(p.deur_tegel(), p)) * int(spel.get("weg_per_tegel", 0))
+
+
+## Prijs plus deurweg: wat plan_zet van de kas afhaalt.
+func kan_betalen_plan(p: Plan) -> bool:
+	return kas >= prijs(p.soort) + pad_kosten(p)
+
+
+## Leg de deurweg van `van` (weg_route) en betaal elke nieuwe padtegel. Geeft het aantal nieuwe padtegels.
+func leg_weg(van: Vector2i, p: Plan = null) -> int:
+	return _leg_route(weg_route(van, p))
+
+
+func _leg_route(route: Array[Vector2i]) -> int:
+	var pad := raster.namen.find("pad")
+	if route.is_empty() or pad < 0:
+		return 0
+	var nieuw := 0
+	for t in route:
 		var ix := raster.idx(t.x, t.y)
 		if raster.soort[ix] != pad:
 			raster.soort[ix] = pad
 			nieuw += 1
-		if t == start:
-			break
-		t = vorige[t]
 	kas = maxi(0, kas - nieuw * int(spel.get("weg_per_tegel", 0)))
 	wegen_veranderd.emit()      # ook zonder nieuwe tegels: de stoep naar de deur (view/wegen.gd)
 	return nieuw
@@ -2084,7 +2152,7 @@ func _rond_af(p: Plan) -> void:
 			geef_bouwbevel([d.id], volgende)
 	bereik = Router.bereikbaar(raster, _vrij_naast(kampvuur))   # nieuwe muren kunnen een doorgang afsluiten
 	if Plan.DEUREN.has(p.soort):
-		leg_weg(p.deur_tegel())
+		leg_weg(p.deur_tegel(), p)     # bij plan_zet al gelegd (dan gratis); voorgebouwd en een doorgesneden weg hier
 	if p.soort == &"kippenhok":
 		_maak_kippen(p)
 	if p.soort == &"poort":

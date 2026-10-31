@@ -144,9 +144,15 @@ zodat ze niet langs de poort snijden). Origineel: "Don't forget a fenced-in encl
 Padtegels (uit de kaart: `road` 1/2/6, plus wat er later bijkomt) worden een keienstrook van 1,3 m (`view/wegen.gd`,
 `shaders/weg.gdshader`: procedurele kinderkopjes, rafelrand, sneeuw en nat), van tegelmidden naar tegelmidden; het terrein
 eronder is alleen wat vertrapte grond. Onder een blokkerend object (de vlag staat op het kaartpad en blokkeert nu)
-komt geen weg; de stroken lopen eromheen, en nieuwe wegen zoeken er een omweg langs. Elk afgebouwd gebouw met een deur (`Plan.DEUREN`: hut, molen, melkerij, kippenhok,
-loods) krijgt meteen een weg van zijn deur naar het dichtste pad of het kampvuur (`Wereld.leg_weg`, BFS; beasts-src
-`World.aim` bestelt die weg mee), `weg_per_tegel` (2) kas per nieuwe tegel, zonder bouwtijd. De laatste meters, van de
+komt geen weg; de stroken lopen eromheen, en nieuwe wegen zoeken er een omweg langs. **Deurweg** (gebruiker 2026-10-31;
+origineel "Cannot link path to your village" in MISC.BOX, weg 20 per tegel): elk gebouw met een deur (`Plan.DEUREN`) krijgt
+bij `plan_zet` meteen een weg van zijn deurtegel naar het dichtste pad of het kampvuur (`Wereld.weg_route`: BFS, niet door
+de eigen voetafdruk, plannen in aanbouw of hun stapels), `weg_per_tegel` (20) kas per nieuwe tegel, zonder bouwtijd; geen
+route of prijs + pad te duur = niet gezet. De ghost toont precies die route als stippen (`Bouwmenu._toon_pad`, groen; rood
+bij te ver of te duur; wit = het pad waar hij op aansluit), alleen opnieuw gerekend als tegel, draai, wegen, plannen of kas
+veranderen; de hint zegt "Hut 300 + pad 6 x 20 = 420"; geen route = rood "Geen pad naar je dorp" zonder stippen. Bij
+afbouwen legt `leg_weg` hem nog eens (gratis; voorgebouwd en een doorgesneden weg). Test `test/deurweg_test.gd`, frames
+`test/deurweg_frames.sh` (`--proef=bouw --proef_pad`). De laatste meters, van de
 deurtegel tot de echte deur binnen de voetafdruk, tekent `Wegen` als stoep naar `Plan.deur_punt`.
 Zelf wegen leggen (2026-10-30): bouwsoort **weg** (vanaf de start, `prijzen.weg` 2 kas en `bouwtijd_s.weg` 3 s per tegel,
 beasts-src). Slepen legt een rij (`sim/bouwrij.gd`, ook voor hek): A* over 4 richtingen met een strafje per bocht, dus op

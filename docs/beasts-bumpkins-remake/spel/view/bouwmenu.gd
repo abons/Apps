@@ -87,6 +87,13 @@ var _gmodel_sleutel := []   ## [tegel, draai] waarop _gmodel nu staat
 var _gsurf: Array = []      ## [MeshInstance3D, surface, mat_kan, mat_niet] per oppervlak van _gmodel
 var _gkan := -1             ## kleur van _gmodel nu: 1 kan, 0 niet, -1 nog niet gezet
 var _pijl: MeshInstance3D   ## deurpijl op de grond: op de deurtegel (Plan.deur_tegel), wijst naar de deur
+var _pad_mi: MeshInstance3D ## deurweg-voorbeeld: stippen van de deur naar het pad (Wereld.weg_route), zie _toon_pad
+var _pad_sleutel := []      ## [soort, tegel, draai, _pad_rev, kas]: alleen bij verandering opnieuw (BFS, reden)
+var _pad_rev := 0           ## +1 bij wegen_veranderd, plan_gezet en plan_klaar: de route kan anders zijn
+var pad_route: Array[Vector2i] = []   ## de getoonde deurweg (deurtegel eerst); leeg = geen (of geen deur)
+var pad_nieuw := 0          ## nieuwe padtegels daarin: elk weg_per_tegel
+var _pad_reden := ""        ## Wereld.bouw_reden van de ghost bij _pad_sleutel
+var prijs_tekst := ""       ## "Hut 300 + pad 4 x 20 = 380" (of "Hut 300"), in de hint
 static var _gmat := {}      ## bronmateriaal -> [kan, niet]: doorzichtige getinte kopieen (texturen gedeeld)
 var _proef_tegel := Vector2i(-1, -1)   ## alleen --proef=bouw op de pc: de ghost staat hier in plaats van onder de wijzer
 var _rechts_start := Vector2.ZERO
@@ -153,6 +160,22 @@ func bouw(wereld: Wereld, b: Bestuur, parent3d: Node3D) -> void:
 	_pijl = _maak_pijl()
 	_pijl.visible = false
 	parent3d.add_child(_pijl)
+	_pad_mi = MeshInstance3D.new()
+	_pad_mi.name = "DeurwegVoorbeeld"
+	_pad_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var pm := StandardMaterial3D.new()
+	pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pm.vertex_color_use_as_albedo = true
+	pm.no_depth_test = true          # zoals de pijl: altijd boven het terrein te zien
+	pm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_pad_mi.material_override = pm
+	_pad_mi.visible = false
+	parent3d.add_child(_pad_mi)
+	var nieuw_pad := func(_a = null) -> void: _pad_rev += 1
+	w.wegen_veranderd.connect(nieuw_pad)
+	w.plan_gezet.connect(nieuw_pad)
+	w.plan_klaar.connect(nieuw_pad)
 	w.plan_gezet.connect(_toon_plan)
 	w.plan_klaar.connect(_plan_klaar)
 	_hekken = Node3D.new()
@@ -591,6 +614,9 @@ func zet_actief(aan: bool) -> void:
 		_gmodel.visible = false
 	if _pijl != null:
 		_pijl.visible = false
+	if _pad_mi != null:
+		_pad_mi.visible = false
+	_pad_sleutel = []
 	_drukt = false
 	_sleep_start = Vector2i(-1, -1)
 	_t_vinger = -1
@@ -696,6 +722,7 @@ func _process(_dt: float) -> void:
 	if soort in RIJ_SOORTEN and _drukt and _sleep_start.x >= 0:
 		ghost.visible = false
 		_pijl.visible = false
+		_pad_mi.visible = false
 		var eind := bestuur.tegel_onder(_wijzer)
 		if eind.x < 0:
 			return
@@ -721,21 +748,39 @@ func _toon_ghost(p: Plan) -> bool:
 		gm.visible = p != null
 	_pijl.visible = p != null and Plan.DEUREN.has(soort)
 	if p == null:
+		_pad_mi.visible = false
 		return false
 	ghost.position = _midden(p)
 	if soort == &"weg":
 		ghost.position.y = _grond(p.tegel).y + _hoogte(soort) * 0.5
 	ghost.rotation.y = draai * PI * 0.5
-	var reden := w.bouw_reden(p)     # te ver van het dorp, geen pad (besluit gebruiker 2026-10-31), of kan hier niet
-	if reden == "" and not w.kan_betalen(p.soort):
+	var sleutel := [soort, p.tegel, p.draai, _pad_rev, w.kas]
+	var nieuw := sleutel != _pad_sleutel
+	if nieuw:            # BFS en reden alleen als ghosttegel, draai, wegen, plannen of kas veranderen
+		_pad_sleutel = sleutel
+		_pad_reden = w.bouw_reden(p)     # te ver van het dorp, geen pad (besluit gebruiker 2026-10-31), of kan hier niet
+		pad_route = w.weg_route(p.deur_tegel(), p) if Plan.DEUREN.has(soort) \
+				and (_pad_reden == "" or _pad_reden == Wereld.REDEN_TE_VER) else ([] as Array[Vector2i])
+		pad_nieuw = w.weg_nieuw(pad_route)
+		var pp := w.prijs(soort)
+		var wpt := int(w.spel.get("weg_per_tegel", 0))
+		prijs_tekst = "%s %d" % [GEBOUWEN[soort]["tekst"], pp] if pad_nieuw == 0 \
+				else "%s %d + pad %d x %d = %d" % [GEBOUWEN[soort]["tekst"], pp, pad_nieuw, wpt, pp + pad_nieuw * wpt]
+	var reden := _pad_reden
+	if reden == "" and w.kas < w.prijs(soort) + pad_nieuw * int(w.spel.get("weg_per_tegel", 0)):
 		reden = "Te duur"
 	var kan := reden == ""
 	if soort in RIJ_SOORTEN:
 		kan = BouwRij.statussen(w, soort, [p.tegel])[0] == BouwRij.KAN
 		if kan:
 			reden = ""
+	if nieuw:
+		_toon_pad(kan)
 	if hint != null and _hint_basis != "":
-		hint.text = _hint_basis if kan or reden == "" else "%s   (%s)" % [_hint_basis, reden]
+		var t := _hint_basis
+		if not soort in RIJ_SOORTEN:
+			t += ("\n" if touch else "   ") + prijs_tekst
+		hint.text = t if kan or reden == "" else "%s   (%s)" % [t, reden]
 	(ghost.material_override as StandardMaterial3D).albedo_color = KLEUR_KAN if kan else KLEUR_NIET
 	if gm != null:
 		var sl := [p.tegel, p.draai]
@@ -753,6 +798,49 @@ func _toon_ghost(p: Plan) -> bool:
 		_pijl.rotation.y = atan2(-float(dr.y), float(dr.x))
 		(_pijl.material_override as StandardMaterial3D).albedo_color = PIJL_KAN if kan else PIJL_NIET
 	return kan
+
+
+const PAD_KAN := Color(0.4, 1.0, 0.3, 0.75)    ## deurweg-voorbeeld: kan (lichtgroen, zoals de pijl maar zachter)
+const PAD_NIET := Color(1.0, 0.35, 0.3, 0.7)     ## kan niet (te ver, te duur)
+const PAD_BESTAAT := Color(0.95, 0.92, 0.85, 0.75)   ## het bestaande pad waar hij op aansluit
+const PAD_STIP_M := 0.5      ## straal van een stip op een tegelmidden
+const PAD_TUSSEN_M := 0.22   ## straal van de stip halverwege twee tegels
+
+## Het deurweg-voorbeeld (gebruiker 2026-10-31: in het origineel zie je bij het plaatsen al de weg naar de deur): een
+## stip per tegel van pad_route plus een kleintje ertussen; het laatste stukje naar binnen wijst de deurpijl. Stippen
+## overlappen niet, dus geen dubbele doorzichtigheid. Leeg (geen route, of geen deur) = niets.
+func _toon_pad(kan: bool) -> void:
+	_pad_mi.visible = not pad_route.is_empty()
+	if pad_route.is_empty():
+		return
+	var tm := w.tegel_m
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pad_i := w.raster.namen.find("pad")
+	var kleur := PAD_KAN if kan else PAD_NIET
+	var midden := func(t: Vector2i) -> Vector2: return (Vector2(t) + Vector2(0.5, 0.5)) * tm
+	var vorig := Vector2.INF
+	for t in pad_route:
+		var c: Vector2 = midden.call(t)
+		var bestaat := w.raster.soort[w.raster.idx(t.x, t.y)] == pad_i
+		_stip(st, c, PAD_STIP_M * (0.7 if bestaat else 1.0), PAD_BESTAAT if bestaat else kleur)
+		if vorig != Vector2.INF:
+			_stip(st, (vorig + c) * 0.5, PAD_TUSSEN_M, kleur)
+		vorig = c
+	_pad_mi.mesh = st.commit()
+
+
+## Platte achthoek op de grond (meters x, z), iets erboven.
+func _stip(st: SurfaceTool, c: Vector2, r: float, kleur: Color) -> void:
+	var hoogte := func(x: float, z: float) -> float: return (terrein.hoogte_op(x, z) if terrein != null else GROND_Y) + 0.06
+	var m := Vector3(c.x, hoogte.call(c.x, c.y), c.y)
+	st.set_color(kleur)
+	for i in 8:
+		var a0 := TAU * i / 8.0
+		var a1 := TAU * (i + 1) / 8.0
+		st.add_vertex(m)
+		st.add_vertex(Vector3(c.x + cos(a0) * r, m.y, c.y + sin(a0) * r))
+		st.add_vertex(Vector3(c.x + cos(a1) * r, m.y, c.y + sin(a1) * r))
 
 
 ## De model-ghost van de huidige soort: een instantie van de af-glb met doorzichtige getinte materialen, zonder
@@ -1439,7 +1527,7 @@ func kan_bevestigen() -> bool:
 		_touch_rij()
 		return BouwRij.KAN in _t_st
 	var p := _plan_op(_t_tegel)
-	return p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p) and w.kan_betalen(p.soort)
+	return p != null and w.bouw_reden(p) == "" and w.kan_betalen_plan(p)     # incl. de deurweg
 
 
 ## Bouwen (touch): het plan of de rij neerzetten. De modus blijft aan; bij een rij wordt het eind het nieuwe begin.
@@ -1458,6 +1546,7 @@ func _toon_touch() -> void:
 	if soort in RIJ_SOORTEN:
 		ghost.visible = false
 		_pijl.visible = false
+		_pad_mi.visible = false
 		_touch_rij()
 		if _t_sleutel != _t_getoond:
 			_t_getoond = _t_sleutel
@@ -1472,7 +1561,8 @@ func _toon_touch() -> void:
 
 ## `--proef=bouw` (alleen frames, view/scherm.gd): bouwmodus voor `--proef_soort=` (standaard hut), `--proef_draai=0..3`;
 ## de ghost groen op de vrije plek die het dichtst bij het midden van het beeld ligt, of met `--proef_rood` op het
-## kampvuur (kan niet). De camera springt erheen; kas en menu staan open, zodat alleen de plek de kleur bepaalt.
+## kampvuur (kan niet); `--proef_pad`: de dichtste plek met een deurweg van 3+ nieuwe tegels. De camera springt erheen;
+## kas en menu staan open, zodat alleen de plek de kleur bepaalt.
 func _proef_bouw() -> void:
 	w.alles_open = true
 	w.kas = maxi(w.kas, 100000)
@@ -1483,6 +1573,7 @@ func _proef_bouw() -> void:
 	_scene(GEBOUWEN[s]["glb"], true)     # frames: wachten op de glb, anders hangt het van de laadtijd af of het de kist is
 	draai = posmod(int(Scherm.optie("proef_draai")), 4)
 	var t := w.kampvuur
+	var pad_proef := "--proef_pad" in OS.get_cmdline_user_args()     # een plek met een deurweg van 3+ nieuwe tegels
 	if not "--proef_rood" in OS.get_cmdline_user_args():
 		var mid := bestuur.tegel_onder(get_viewport().get_visible_rect().size * 0.5)
 		if mid.x < 0:
@@ -1494,7 +1585,8 @@ func _proef_bouw() -> void:
 					if best.x >= 0 or maxi(absi(dx), absi(dz)) != r:
 						continue
 					var p := _plan_op(mid + Vector2i(dx, dz))
-					if p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p):
+					if p != null and w.kan_bouwen(p) and w.binnen_bouwafstand(p) and (not pad_proef \
+							or (Plan.DEUREN.has(s) and w.weg_nieuw(w.weg_route(p.deur_tegel(), p)) >= 3)):
 						best = mid + Vector2i(dx, dz)
 		if best.x >= 0:
 			t = best

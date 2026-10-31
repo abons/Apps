@@ -660,8 +660,12 @@ func _test_wegen() -> void:
 			bochten += 1
 	_check(rij.size() == 11 and bochten == 1, "weg: op open grond een L met een bocht (%d tegels, %d bochten)" % [rij.size(), bochten])
 	var kas0 := wg.kas
+	var al := 0          # de deurweg van de hut (plan_zet legt hem meteen) kan de rij kruisen: die tegels zijn al pad
+	for t in rij:
+		if wg.raster.soort_naam(t.x, t.y) == "pad":
+			al += 1
 	var n := BouwRij.zet(wg, &"weg", rij)
-	_check(n == 11 and wg.kas == kas0 - 11 * wg.prijs(&"weg"), "weg: 11 plannen voor %d kas per tegel (kas %d -> %d)" % [wg.prijs(&"weg"), kas0, wg.kas])
+	_check(n == 11 - al and wg.kas == kas0 - n * wg.prijs(&"weg"), "weg: %d plannen (%d al pad) voor %d kas per tegel (kas %d -> %d)" % [n, al, wg.prijs(&"weg"), kas0, wg.kas])
 	var wp := wg.plan_op(a)
 	_check(wp != null and wp.soort == &"weg" and wp.bouwtijd_s == 3.0 and wg.raster.soort_naam(a.x, a.y) != "pad",
 		"weg: plan van 3 s, nog geen pad")
