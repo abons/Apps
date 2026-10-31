@@ -23,7 +23,7 @@ Driehoeken: LOD0 / LOD1 (+ sneeuwlaag).
 | klifrand recht / buitenhoek / binnenhoek | `klif_recht.glb`, `klif_hoek_buiten.glb`, `klif_hoek_binnen.glb` | ~3200 / ~800 | stap 2,0 m, hoge kant +y; lassen in elke draaiing |
 | paddenstoel (bruin), _rood, _blauw, _wit; 0,49 m (wit 0,52) | `paddenstoel*.glb` | 864 elk | eetbaar (poison.mfb-soorten); in het spel schaal 0,9 = kniehoogte (was 2,3) |
 | zilveren beker, 0,55 m | `zilveren_beker.glb` | 2288 | metaal, emissieve smaragden; normalen goed (stralentest 2026-10-30: 0,5 % achterkant, de open kasjes), spleet knoop-kelk dicht |
-| vlag, paal 2,4 m | `vlag.glb` | 1000 | doek fladdert (UV2), vertexgroep `doek` |
+| vlag, paal 2,05 m op een steenhoop (flag/1.png) | `vlag.glb` | 3432 | doek fladdert (UV2), vertexgroep `doek`; keien `vlag_stenen` gebakken, oranje aardbult; in het spel schaal 1,0 (was 1,5) |
 | kampvuur, 1,1 m | `kampvuur.glb` | 1452 | `kampvuur_gloed` + `kampvuur_vlam` emissief, Empty `vuur_bron` (0, 0, 0,22) |
 | houtstapel, 2,2 m | `houtstapel.glb` | 700 | 3 + 2 stammen |
 | steenhoop, ~2 m | `steenhoop.glb` | 1520 | gebakken |

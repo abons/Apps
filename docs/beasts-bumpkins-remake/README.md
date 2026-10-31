@@ -66,7 +66,7 @@ Grotendeels wel, maar niet volledig.
 ## Stand na sessie 2026-10-29 (volgende stappen)
 
 - **Lokale data (niet in git):** `lokaal/` — originele sprites/frames/portretten (`bb_original/`), concepten en beoordelingspagina (`concept/lijst.html`), `map1/`, `missies/`, `bumpkin/ref/`, `audio_origineel/`. `spel/sync.ps1` leest de kaart hieruit.
-- **Speelbaar:** `spel/` (missie 1 Aorta: terrein met rotsplateau, natuur, seizoenen, zes bestuurbare dorpelingen). Starten: `spel/README.md`.
+- **Speelbaar:** `spel/` (missie 1 Aorta: terrein met een rotsboog van losse toppen, natuur, seizoenen, zes bestuurbare dorpelingen). Starten: `spel/README.md`.
 - **Modellen** (scripts in git, glb's lokaal): `modellen/bumpkin/` (6 personages, beoordeling 4,5-6,5), `dieren/koe` (6,5; Tripo-variant `koe_tripo.py` 7), `natuur/` (29), `gebouwen/` (loods, molen = bakkerij, melkerij, kippenhok; 6-7).
 - **Docs:** `gameplay.md` sectie 7 = besluiten gebruiker; `missies.md` (30 missies); `map1.md`; `audio.md` (besluiten onderaan); `concept/lijst.md`.
 - **Volgende:**

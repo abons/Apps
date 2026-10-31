@@ -513,20 +513,27 @@ def vlag_textuur():
 
 
 def vlag():
-    b = L.Bouwer()           # 0 paal, 1 doek, 2 touw
-    paal_h = 2.4
-    P = [Vector((0, 0, -0.1)), Vector((0.005, 0, 1.2)), Vector((0, 0.004, paal_h))]
-    L.buis(b, P, [0.055, 0.05, 0.042], zijden=8, uvschaal=1 / 0.6, mat=0, dop=True)
+    """De flagpost (klasse 98) zoals flag/1.png van het origineel (2026-10-31): korte paal (~1,2 dorpeling boven de
+    hoop) in een steenhoop met een plek oranje aarde om de voet, klein doek. In het spel schaal 1,0 (was 1,5 met
+    een paal van 2,4 m zonder stenen)."""
+    rnd = random.Random(98)
+    b = L.Bouwer()           # 0 paal, 1 doek, 2 touw, 3 aarde
+    paal_h = 2.05
+    P = [Vector((0, 0, -0.1)), Vector((0.004, 0, 1.0)), Vector((0, 0.003, paal_h))]
+    L.buis(b, P, [0.045, 0.041, 0.035], zijden=8, uvschaal=1 / 0.6, mat=0, dop=True)
+    # aarde: lage bult om de voet (oranjebruin, als het origineel)
+    draai(b, [(0.56, 0.0), (0.5, 0.08), (0.36, 0.22), (0.18, 0.29), (0.0, 0.30)], 14, mat=3,
+          punt=lambda a, r, z: (r * (1 + 0.12 * math.sin(3 * a + 1)) * math.cos(a), r * (1 + 0.12 * math.sin(3 * a + 1)) * math.sin(a), z))
     # doek: 18 x 12, vast aan de paal, statische golf; fladdergewicht = afstand tot de paal
-    W, H, nu, nv = 1.35, 0.95, 18, 12
+    W, H, nu, nv = 1.0, 0.62, 18, 12
     z0 = paal_h - 0.05 - H
     idx = {}
     for j in range(nv + 1):
         for i in range(nu + 1):
             u, v = i / nu, j / nv
             x = 0.035 + u * W
-            golf = 0.13 * u * math.sin(u * 6.0 + v * 1.5) + 0.04 * u * math.sin(v * 8 + u * 3)
-            z = z0 + v * H - 0.08 * u * u
+            golf = 0.10 * u * math.sin(u * 6.0 + v * 1.5) + 0.03 * u * math.sin(v * 8 + u * 3)
+            z = z0 + v * H - 0.06 * u * u
             idx[i, j] = b.v((x, golf, z), (0.0, min(0.999, u), 0.0, 1))
     for j in range(nv):
         for i in range(nu):
@@ -539,12 +546,29 @@ def vlag():
             L.buis(b, P, [0.007] * 12, zijden=4, mat=2)
     doek = L.pbr("vlag_doek", vlag_textuur(), alpha=True, tweezijdig=True, ruw=0.85)
     touw = L.pbr("touw_licht", (0.62, 0.50, 0.32), ruw=0.9)
-    o = L.obj("vlag", b.mesh("vlag", [m("hout"), doek, touw]))
+    aarde = L.pbr("vlag_aarde", (0.30, 0.12, 0.035), ruw=0.95)
+    o = L.obj("vlag", b.mesh("vlag", [m("hout"), doek, touw, aarde]))
     # vertexgroep `doek` (zelfde gewicht) voor wie liever een bot of cloth-sim gebruikt
     vg = o.vertex_groups.new(name="doek")
     for vi, c in enumerate(b.C):
         if c[1] > 0:
             vg.add([vi], c[1], "REPLACE")
+    # steenhoop: grijze keien in twee lagen om de aarde (r 0,45..0,85 m laag, 0,25..0,45 m half erop), als flag/1.png
+    keien = []
+    for k in range(20):
+        a = 2 * math.pi * k / 20 + rnd.uniform(-0.12, 0.12)
+        r = rnd.uniform(0.5, 0.85)
+        sz = rnd.uniform(0.15, 0.25)
+        keien.append((L_kei(rnd), (sz * rnd.uniform(1.0, 1.35), sz, sz * rnd.uniform(0.7, 0.95)),
+                      Vector((r * math.cos(a), r * math.sin(a), sz * 0.4)), rnd.uniform(0, 6.28)))
+    for k in range(9):
+        a = 2 * math.pi * k / 9 + rnd.uniform(-0.25, 0.25)
+        r = rnd.uniform(0.28, 0.45)
+        sz = rnd.uniform(0.14, 0.2)
+        keien.append((L_kei(rnd), (sz * 1.2, sz, sz * 0.8), Vector((r * math.cos(a), r * math.sin(a), 0.18 + sz * 0.3)),
+                      rnd.uniform(0, 6.28)))
+    stenen = gebakken_keien("vlag_stenen", keien, res=512, mos=0.05)
+    stenen.parent = o
     return [o]
 
 

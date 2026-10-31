@@ -10,7 +10,7 @@ const ISO_YAW := PI / 4.0
 const ISO_PITCH := 31.0
 const OPNAMES := [
 	# naam, tegel, yaw, helling (graden), afstand (m), hud
-	["start_remake", Vector2i(-1, -1), 0.6, 38.0, 24.0, true],
+	["start_remake", Vector2i(-1, -1), PI / 4.0, 32.0, 18.0, true],   # main.gd START_*
 	["start_iso", Vector2i(103, 67), ISO_YAW, ISO_PITCH, 16.0, false],
 	["bos_no_iso", Vector2i(107, 51), ISO_YAW, ISO_PITCH, 16.0, false],
 	["oost_iso", Vector2i(112, 58), ISO_YAW, ISO_PITCH, 16.0, false],

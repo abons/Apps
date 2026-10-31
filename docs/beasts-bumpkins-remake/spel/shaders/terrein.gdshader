@@ -16,11 +16,18 @@ uniform vec3 pad_kleur : source_color = vec3(0.50, 0.36, 0.22);
 uniform vec3 aarde_kleur : source_color = vec3(0.75, 0.56, 0.40);
 uniform vec3 zeebodem : source_color = vec3(0.20, 0.25, 0.22);   // gelijk aan het Zeebodem-vlak buiten het venster
 uniform float normaal_sterkte = 0.8;
+// Gras (2026-10-31, als het origineel: diep donkergroen 8,85,7 met rode en gele stipjes): de graslaag wordt
+// herkleurd naar gras_kleur (alleen de helderheid van de textuur blijft, de witte/gele bloemetjes vallen weg), in de
+// lichte vlekken uit de kaart (UV2.x, view/terrein_view.gd GRAS_LICHT) naar gras_licht; stipjes per cel van 0,5 m.
+uniform vec3 gras_kleur : source_color = vec3(0.075, 0.25, 0.035);
+uniform vec3 gras_licht : source_color = vec3(0.115, 0.34, 0.05);
+uniform float stip_kans = 0.04;
 
 varying vec3 wp;
 varying vec4 vc;
 varying vec2 pa;
 varying vec3 nw;
+varying float lv;
 
 float hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -39,12 +46,23 @@ float fbm(vec2 p) {
 	for (int k = 0; k < 4; k++) { s += a * ruis(p); p = rot * p * 2.03 + 3.1; a *= 0.5; }
 	return s;
 }
+// rode en gele stipjes: een op de 1/stip_kans cellen van 0,5 m, rondje van ~5 cm, ver weg uitgedoofd
+float stipjes(vec2 xz, out vec3 kleur) {
+	vec2 sc = xz * 2.0;
+	vec2 ci = floor(sc);
+	vec2 jp = vec2(hash(ci + 3.1), hash(ci + 7.7)) * 0.6 + 0.2;
+	float s = step(1.0 - stip_kans, hash(ci + 17.0)) * (1.0 - smoothstep(0.06, 0.1, length(fract(sc) - jp)));
+	s *= 1.0 - smoothstep(0.12, 0.3, length(fwidth(sc)));
+	kleur = hash(ci + 29.0) < 0.55 ? vec3(0.45, 0.04, 0.02) : vec3(0.70, 0.58, 0.08);
+	return s;
+}
 
 void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vc = COLOR;
 	pa = UV;
 	nw = NORMAL;
+	lv = UV2.x;
 	// planaire afbeelding langs wereld-x (u) en wereld-z (v): raakvlak = +x, binormaal volgt de OpenGL-normaalmap (Y+ = omhoog)
 	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
 	BINORMAL = normalize(cross(NORMAL, TANGENT));
@@ -91,6 +109,9 @@ void fragment() {
 			}
 			vec3 a2 = textureGrad(kleur_tex, vec3(uv * 0.29 + vec2(0.37, 0.61), float(i)), dx * 0.29, dy * 0.29).rgb;
 			vec3 a = mix(a1, a2, 0.38);
+			if (i == 0) {
+				a = mix(gras_kleur, gras_licht, lv) * clamp(dot(a, vec3(0.3, 0.59, 0.11)) / 0.105, 0.6, 1.3);
+			}
 			alb += a * wi;
 			nrm += (textureGrad(normaal_tex, vec3(uv, float(i)), dx, dy).rgb * 2.0 - 1.0) * wi * (i == 2 ? 1.0 - steil : 1.0);
 			ruw += textureGrad(ruw_tex, vec3(uv, float(i)), dx, dy).r * wi;
@@ -100,6 +121,9 @@ void fragment() {
 	float n = fbm(wp.xz * 0.18);
 	float fijn = ruis(wp.xz * 9.0);
 	alb *= (0.78 + 0.5 * n) * (0.94 + 0.12 * fijn);
+	vec3 sk;
+	float st = stipjes(wp.xz, sk) * smoothstep(0.5, 0.8, b[0] / tot);
+	alb = mix(alb, sk, st);
 	alb = mix(alb, alb * gras_droog, clamp(droog * droogw * (0.75 + 0.5 * n), 0.0, 1.0));
 	alb = mix(alb, alb * pad_kleur, clamp(pa.x, 0.0, 1.0));
 	alb = mix(alb, alb * aarde_kleur, clamp(pa.y, 0.0, 1.0));

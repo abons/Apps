@@ -19,6 +19,12 @@ var voorwerpen: Node3D            # view/voorwerpen_view.gd
 var hints: Hints                  # sim/hints.gd, alleen in gewoon spel en --scenario=hints
 var szt := 0.0
 const RAND_M := 12.0              ## m marge buiten het 192x192-raster voor de camera (alleen met mist)
+## Startcamera (2026-10-31, gebruiker): noordwest boven zoals het origineel (yaw 45 graden; was 34), dichterbij en
+## vlakker dan 38 graden / 24 m (~40 m breed). Het origineel: helling ~31 graden, ~23 m breed; 32 graden / 18 m is
+## ~30 m breed, nog overzicht. Staand zet rts_camera.gd er 1,3x afstand en +12 graden bij.
+const START_YAW := PI / 4.0
+const START_PITCH := 32.0
+const START_AFSTAND := 18.0
 var _stap := 0
 var startmenu: Startmenu           # alleen als er (nog) geen missie gekozen is
 var pauzemenu: Pauzemenu          # view/pauzemenu.gd: menuknop of Esc, en na de missie
@@ -119,7 +125,7 @@ func _ready() -> void:
 	if w.mist.aan:   # het origineel liet je ver het zwart in scrollen: het hele raster plus marge (mist maakt alles zwart)
 		cam.grens = Rect2(-RAND_M, -RAND_M, w.raster.kolommen * m + 2.0 * RAND_M, w.raster.rijen * m + 2.0 * RAND_M)
 	var vuur := view.terrein.tegel_midden(w.kampvuur)
-	cam.zet_direct(vuur, 0.6, deg_to_rad(38), 24.0)
+	cam.zet_direct(vuur, START_YAW, deg_to_rad(START_PITCH), START_AFSTAND)
 	cam.make_current()
 
 	bestuur = Bestuur.new()

@@ -16,6 +16,13 @@ var br := 0
 var ho := 0
 const SUB := 2              # mesh-cellen per tegel (per as)
 const GRAS_RUIS := 0.05     # m, hoogteruis op gras en zand
+## Rotsplateau met kliffen (besluit 8a89bdf) of, sinds 2026-10-31 (gebruiker, lokaal/concept/m1_kaart.html), losse
+## gekartelde toppen als het origineel: elke rotstegel een rots_1..6 (de 2x2-tegels rock01..06), grond eronder alleen
+## een lage bult (tegelhoogte rots 1,3 / rotsrand 0,7 m), geen kliffen.
+const PLATEAU := false
+## Tegelframes van de lichtere grasvlekken in het origineel (maptile 53-58 gem. 13,100,10 en 81-97 gem. 11,94,8 tegen
+## gewoon gras 8,85,7): per hoekpunt in UV2.x, de shader tint het gras daar lichter (2026-10-31).
+const GRAS_LICHT := [53, 54, 55, 56, 57, 58, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97]
 var _sw := 0                # (br*SUB+1) x (ho*SUB+1) hoogtes van het mesh
 var _sh := 0
 var _sub_h := PackedFloat32Array()
@@ -140,7 +147,7 @@ func _bereken_hoeken() -> void:
 				for di in 2:
 					var c := x0 + i - 1 + di
 					var r := y0 + j - 1 + dj
-					if not _is_m(c, r):
+					if not (PLATEAU and _is_m(c, r)):
 						som += _tegel_h(c, r)
 						gr_n += 1
 						if _tegel_h(c, r) < 0.1:
@@ -190,23 +197,35 @@ func _bouw_terrein() -> void:
 	var normals := PackedVector3Array()
 	var kleuren := PackedColorArray()
 	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
 	var idx := PackedInt32Array()
 	# splat per hoek (gemiddelde van de vier tegels), daarna bilineair naar de mesh-hoekpunten
 	var hoek_c := PackedColorArray()
 	var hoek_u := PackedVector2Array()
+	var hoek_l := PackedFloat32Array()
 	hoek_c.resize((br + 1) * (ho + 1))
 	hoek_u.resize((br + 1) * (ho + 1))
+	hoek_l.resize((br + 1) * (ho + 1))
+	var licht := {}
+	for f in GRAS_LICHT:
+		licht[f] = true
 	for j in ho + 1:
 		for i in br + 1:
 			var c := Color(0, 0, 0, 0)
 			var u := Vector2.ZERO
+			var l := 0.0
 			for dj in 2:
 				for di in 2:
-					var sw := _splat(w.raster.soort_naam(x0 + i - 1 + di, y0 + j - 1 + dj))
+					var tc := x0 + i - 1 + di
+					var tr := y0 + j - 1 + dj
+					var sw := _splat(w.raster.soort_naam(tc, tr))
 					c += Color(sw[0], sw[1], sw[2], sw[3])
 					u += Vector2(sw[4], sw[5])
+					if w.raster.in_kaart(tc, tr) and licht.has(int(w.raster.tex[w.raster.idx(tc, tr)])):
+						l += 1.0
 			hoek_c[_ci(i, j)] = c / 4.0
 			hoek_u[_ci(i, j)] = u / 4.0
+			hoek_l[_ci(i, j)] = l / 4.0
 	for j in _sh:
 		for i in _sw:
 			_sub_h[j * _sw + i] = _hoogte_hoek(float(i) / SUB, float(j) / SUB)
@@ -231,6 +250,7 @@ func _bouw_terrein() -> void:
 			var wd := fx * fy
 			kleuren.append(hoek_c[a] * wa + hoek_c[a + 1] * wb + hoek_c[a + br + 1] * wc + hoek_c[a + br + 2] * wd)
 			uvs.append(hoek_u[a] * wa + hoek_u[a + 1] * wb + hoek_u[a + br + 1] * wc + hoek_u[a + br + 2] * wd)
+			uv2s.append(Vector2(hoek_l[a] * wa + hoek_l[a + 1] * wb + hoek_l[a + br + 1] * wc + hoek_l[a + br + 2] * wd, 0.0))
 	for j in _sh - 1:
 		for i in _sw - 1:
 			var a := j * _sw + i
@@ -244,6 +264,7 @@ func _bouw_terrein() -> void:
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = kleuren
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -474,6 +495,8 @@ func _grondhoeken(c: int, r: int) -> int:
 ## Kliffen: een klif_*-stuk op elke rotstegel met grond- en plateauhoeken, gekozen op het patroon van de grondhoeken
 ## (2 naburige = recht, 3 = buitenhoek, 1 = binnenhoek), y-geschaald van de grondhoogte naar het plateau (stuk = 2,0 m stap).
 func _bouw_kliffen(deco: Node3D) -> void:
+	if not PLATEAU:
+		return
 	var kl := Node3D.new()
 	kl.name = "Kliffen"
 	deco.add_child(kl)
@@ -520,6 +543,9 @@ func _bouw_kliffen(deco: Node3D) -> void:
 ## rots in het water) krijgen er een uit de grond.
 func _bouw_rotsen(deco: Node3D, d: Dictionary) -> void:
 	var lijst: Array = d["modellen"]
+	if not PLATEAU:
+		_bouw_toppen(deco, lijst)
+		return
 	var kans: float = float(d.get("kans", 0.2))
 	var sc: Array = d.get("schaal", [0.9, 1.6])
 	var sink: float = float(d.get("zak", 0.3))
@@ -547,5 +573,32 @@ func _bouw_rotsen(deco: Node3D, d: Dictionary) -> void:
 			p.y = (hoogte_op(p.x, p.z) - sink * s) if not zuil else -0.7
 			var yaw := _hash(c, r, 66) * TAU
 			n.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s * lerpf(0.9, 1.15, _hash(c, r, 67)), s)), p)
+			deco.add_child(n)
+			aantallen[naam] = int(aantallen.get(naam, 0)) + 1
+
+
+## Zonder plateau: op elke rotstegel een rotstegel-model (de vormen van rock01..06), in kwartslagen gedraaid zodat
+## de 2x2-voeten aansluiten, iets breder dan de tegel zodat er geen naden vallen. Rotsrand (de buitenste ring, het
+## origineel tekent daar lagere brokken) lager. Hoogte en vorm per tegel uit de hash: een band losse toppen.
+func _bouw_toppen(deco: Node3D, lijst: Array) -> void:
+	for r in range(y0, y0 + ho):
+		for c in range(x0, x0 + br):
+			if not _is_m(c, r):
+				continue
+			var rand := w.raster.soort_naam(c, r) == "rotsrand"
+			var naam: String = lijst[int(_hash(c, r, 62) * lijst.size()) % lijst.size()]
+			var n := Natuur.instantie(naam)
+			if n == null:
+				continue
+			var s := lerpf(1.02, 1.14, _hash(c, r, 63))
+			var sy := lerpf(0.65, 0.95, _hash(c, r, 67)) if rand else lerpf(1.0, 1.6, _hash(c, r, 67))
+			var p := Vector3((c + 0.5 + (_hash(c, r, 64) - 0.5) * 0.15) * tegel_m, 0, (r + 0.5 + (_hash(c, r, 65) - 0.5) * 0.15) * tegel_m)
+			# voetplaat op de laagste hoek van de tegel: anders steekt hij aan de graskant over de bult uit
+			var laag := hoogte_op(p.x, p.z)
+			for k in 4:
+				laag = minf(laag, hoogte_op((c + (k & 1)) * tegel_m, (r + (k >> 1)) * tegel_m))
+			p.y = laag - 0.08
+			var yaw := floorf(_hash(c, r, 66) * 4.0) * PI * 0.5
+			n.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, sy, s)), p)
 			deco.add_child(n)
 			aantallen[naam] = int(aantallen.get(naam, 0)) + 1

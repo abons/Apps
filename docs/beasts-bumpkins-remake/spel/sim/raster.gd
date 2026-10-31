@@ -16,6 +16,7 @@ var hoogte_soort := PackedFloat32Array()
 var gras_soort := PackedFloat32Array()
 var soort := PackedByteArray()      # per tegel: index in namen
 var blok := PackedByteArray()       # per tegel: 1 = object blokkeert
+var tex := PackedByteArray()        # per tegel: tegelframe uit de kaart (alleen weergave: lichte grasvlekken)
 var max_factor := 1.0
 
 
@@ -38,6 +39,8 @@ func maak(k: int, r: int) -> void:
 	soort.fill(namen.find("leeg"))
 	blok.resize(k * r)
 	blok.fill(0)
+	tex.resize(k * r)
+	tex.fill(0)
 
 
 func idx(c: int, r: int) -> int:
