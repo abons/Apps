@@ -598,6 +598,9 @@ func _start_scenario() -> void:
 		"showcase":
 			# voorbeeldbeelden: druk dorp, dieren (test/showcase_scenario.gd, --stap=dorp|dieren|put)
 			add_child(load("res://test/showcase_scenario.gd").new().start(self))
+		"gedachten":
+			# gedachtewolkjes en het portret: elke dorpeling een andere behoefte, een gekozen (test/gedachten_scenario.gd)
+			add_child(load("res://test/gedachten_scenario.gd").new().start(self))
 		"deur":
 			# een dorpeling loopt door de voordeur naar binnen en weer naar buiten (test/deur_scenario.gd, --gebouw= --draai=)
 			add_child(load("res://test/deur_scenario.gd").new().start(self))

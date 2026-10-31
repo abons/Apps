@@ -12,6 +12,8 @@ extends CanvasLayer
 ## Stilstaan (besluit gebruiker 2026-10-31, "alleen stilstaan knop", origineel de hand): naast de menuknop een hand-knop,
 ## alleen zichtbaar met een selectie, of X: de gekozen dorpelingen blijven staan zonder eigen klussen (Wereld.geef_stilstaan).
 ## Melding (midden boven, 2,5 s): een geweigerd bevel (Wereld.bevel_geweigerd, bv. een vrouw laten bouwen).
+## Portret (besluit gebruiker 2026-10-31, view/portret.gd): rechtsonder de (eerste) gekozen dorpeling met zijn gedachte;
+## op de pc inklapbaar (bewaard in hud.cfg), staand weg zolang het bouwmenu de onderkant gebruikt.
 
 var w: Wereld
 var bestuur: Bestuur
@@ -47,6 +49,8 @@ var hulp_open := false           ## pc: sneltoetsuitleg zichtbaar
 ## blijven gelijk), `--hud=details|hulp|beide` klapt voor frames uit.
 static var cfg_pad := "" if Scherm.optie("scenario") != "" else "user://hud.cfg"
 var _was_staand := false
+var portret: Portret             ## rechtsonder: de gekozen dorpeling (view/portret.gd)
+var _bm: Bouwmenu                ## broer in de boom (main.gd, tests), voor het portret staand
 
 
 func bouw(wereld: Wereld, b: Bestuur) -> void:
@@ -186,6 +190,11 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	melding.visible = false
 	add_child(melding)
 	w.bevel_geweigerd.connect(_geweigerd)
+	portret = Portret.new()
+	portret.bouw(w, Bouwmenu.touch, schaal if Bouwmenu.touch else 1.0)
+	add_child(portret)
+	portret.zet_ingeklapt(_portret_cfg())
+	portret.ingeklapt_gewisseld.connect(_bewaar_cfg)
 	if is_inside_tree():
 		get_viewport().size_changed.connect(_indeling)
 	if Scherm.optie("proef") == "prijzen":     # alleen voor frames (view/scherm.gd)
@@ -257,6 +266,7 @@ func _process(dt: float) -> void:
 	if w.handel.misdaad_aan(w):
 		geluk += "   misdaden: %d" % w.handel.totaal_misdaden()
 	tellers.zet(kas_toon)
+	_werk_portret()
 	if Bouwmenu.touch:
 		return
 	tellers.zet_tempo(w.gepauzeerd, int(w.tempo))
@@ -289,6 +299,44 @@ func _leg_links_neer(staand: bool) -> void:
 	else:
 		knop_hulp.position = Vector2(12, vp.y - knop_hulp.size.y - 12)
 		pc2.position = Vector2(12, knop_hulp.position.y - pc2.size.y - 6)
+
+
+## Portret van de eerste gekozen dorpeling rechtsonder; staand weg als het bouwmenu onderin bezig is (bouwmodus of
+## lade open).
+func _werk_portret() -> void:
+	if portret == null or bestuur == null:
+		return
+	var d: Dorpeling = null
+	for id in bestuur.gekozen:
+		for x in w.dorpelingen:
+			if x.id == id:
+				d = x
+				break
+		if d != null:
+			break
+	if _bm == null and get_parent() != null:
+		for c in get_parent().get_children():
+			if c is Bouwmenu:
+				_bm = c
+	var vp := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1600, 900)
+	if _bm != null and Scherm.staand(vp) and (_bm.actief or _bm.lade_open):
+		d = null
+	portret.zet(d)
+	if portret.visible:
+		portret.reset_size()
+		var marge := 12.0 * maxf(1.0, schaal)
+		portret.position = vp - portret.size - Vector2(marge, marge)
+
+
+## Ingeklapt portret uit hud.cfg (pc), standaard uit.
+func _portret_cfg() -> bool:
+	if cfg_pad == "" or Bouwmenu.touch:
+		return false
+	var cf := ConfigFile.new()
+	if cf.load(cfg_pad) != OK:
+		return false
+	var v: Variant = cf.get_value("hud", "portret_in", false)
+	return v if v is bool else false
 
 
 ## Pc: details (Tab / I, of het pijltje) uit- of inklappen.
@@ -338,6 +386,7 @@ func _bewaar_cfg() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("hud", "details", details_open)
 	cf.set_value("hud", "hulp", hulp_open)
+	cf.set_value("hud", "portret_in", portret != null and portret.ingeklapt)
 	var fout := cf.save(cfg_pad)
 	if fout != OK:
 		push_warning("hud: %s niet bewaard (%s)" % [cfg_pad, error_string(fout)])

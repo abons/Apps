@@ -22,6 +22,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/paddenstoel_test.gd  # paddenstoelen eten: rood heelt, bruin voedt, wit doodt, blauw mana
 "$G" --headless --path . --script res://test/besluiten_test.gd   # besluiten 2026-10-31: wie bouwt, bouwafstand, bron, honger, stilstaan, M1 met 2 bouwers
+"$G" --headless --path . --script res://test/gedachten_test.gd   # gedachtewolkjes: elke behoefte de goede gedachte, volgorde, ikonen
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken, muziekspeler
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
 "$G" --headless --path . --script res://test/indeling_test.gd    # staand/liggend, pc/touch: niets buiten beeld of over elkaar
@@ -118,6 +119,15 @@ Besluiten gebruiker 2026-10-31 (`spel.json` `_wie_bouwt`, `_bouw_afstand`, `leve
   staan, geen eigen klussen, niet zwerven, slapen of zelf vechten; vluchten wel. Elk nieuw bevel heft het op.
 - **Vallen** (M4): mijn meteen dodelijk voor iedereen binnen de straal, direct contact met het vuur (binnen `vuur.kern` 0,6)
   ook, de rand doet schade per s; spies (klasse 36, vanaf M6) schade 40, overleefbaar.
+- **Gedachten en portret** (origineel thoughts + statbust, duidelijker gemaakt): `sim/gedachten.gd` leest trek, dorst, geluk,
+  hp, `geraakt_s` en `wieg` (verandert niets) en geeft de zwaarste: geraakt > honger > dorst > ziek > wil_<waar> > boos >
+  somber > verliefd > blij. Wens en dorst pas als ze onvervuld blijven (60 s trek, 1,5 x `dorst_s`) en er iets aan te doen
+  is (winkel staat of is bouwbaar; bron of put). Drempels in `Gedachten.STANDAARD`, te overschrijven met `spel.json`
+  `gedachten`. `view/gedachten_view.gd`: wolkje (Sprite3D, vaste schermgrootte, rode rand = dringend) alleen bij een
+  behoefte of op de gekozen, pc met korte tekst erboven. `view/portret.gd`: rechtsonder kop (eigen render van zijn model in
+  een SubViewport, 6 frames na een wissel), naam, hp-balk, gedachte met uitleg (pc; inklapbaar, `hud.cfg` `portret_in`);
+  touch compact zonder tekst, staand weg zolang het bouwmenu onderin bezig is. Ikonen: `view/gedachte_ikonen.gd` (eigen SVG).
+  Frames: scenario `gedachten` (`--stap=verliefd`).
 
 ## Weide
 

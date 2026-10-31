@@ -8,6 +8,8 @@ extends SceneTree
 ## Pc (2026-10-31): ook op 1600x900; standaard alleen de tellerrij en de knop "? Toetsen", en met de details (Tab) en de
 ## sneltoetsuitleg (F1) uitgeklapt, apart en samen, weer niets buiten beeld of over elkaar. De menuknop (2026-10-31) telt
 ## mee als vast deel. Start- en pauzemenu: test/menu_test.gd.
+## Portret (2026-10-31, view/portret.gd): met een gekozen dorpeling rechtsonder in beeld, zonder overlap; staand weg in de
+## bouwmodus en met de lade open.
 
 var fouten := 0
 var cam: Camera3D
@@ -56,6 +58,7 @@ func _ronde(touch: bool) -> void:
 	cam.pan_blokkade = func() -> bool: return bm.actief and not Bouwmenu.touch
 	var h := Hints.new().bouw(w)
 	hud.zet_hints(h)
+	b.gekozen.append(w.dorpelingen[0].id)      # portret rechtsonder
 	for s in bm.knoppen:          # alles_open: alle negen knoppen, de volste rij
 		(bm.knoppen[s] as Button).visible = w.ontgrendeld(s)
 
@@ -91,6 +94,8 @@ func _ronde(touch: bool) -> void:
 		maten = [Vector2i(1600, 900)] + maten
 	for maat in maten:
 		root.size = maat
+		if b.gekozen.is_empty():      # de bouwmodus wist de selectie
+			b.gekozen.append(w.dorpelingen[0].id)
 		await _frames(3)
 		var tag := "%s %dx%d" % [naam, maat.x, maat.y]
 		_check(hud.brief.visible, "%s: briefing open" % tag)
@@ -98,6 +103,7 @@ func _ronde(touch: bool) -> void:
 		_check(cam.keep_aspect == (Camera3D.KEEP_WIDTH if maat.y > maat.x else Camera3D.KEEP_HEIGHT), "%s: camera houdt de %s vast" % [tag, "breedte" if maat.y > maat.x else "hoogte"])
 		hud.brief.sluit()
 		await _frames(2)
+		_check(hud.portret.visible, "%s: portret van de gekozen dorpeling" % tag)
 		# gewoon, bouwmodus, (staand) lade open; op de pc ingeklapt en uitgeklapt
 		_indeling(hud, bm, "%s rust" % tag)
 		if not touch:
@@ -114,6 +120,7 @@ func _ronde(touch: bool) -> void:
 			await _frames(2)
 			_check(bm.rij.visible, "%s: Gebouwen opent de lade" % tag)
 			_indeling(hud, bm, "%s lade open" % tag)
+			_check(not hud.portret.visible, "%s: portret weg bij de open lade" % tag)
 			(bm.knoppen[&"kippenhok"] as Button).button_pressed = true
 			await _frames(2)
 			_check(bm.soort == &"kippenhok" and bm.actief and not bm.rij.visible, "%s: keuze in de lade sluit hem" % tag)
@@ -184,7 +191,7 @@ func _indeling(hud: Hud, bm: Bouwmenu, wat: String) -> void:
 	_check(buiten.is_empty(), "%s: alles in beeld %s" % [wat, buiten])
 	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "menu": hud.menu_knop, "stand": hud.kop if hud.kop != null else hud.tellers,
 		"details": hud.stand, "toetsen-knop": hud.knop_hulp, "hulpregels": hud.hulp.get_parent(),
-		"lade-knop": bm.knop_lade, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
+		"lade-knop": bm.knop_lade, "portret": hud.portret, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
 	var namen := delen.keys().filter(func(k: String) -> bool:
 		var c: Control = delen[k]
 		return c != null and c.is_visible_in_tree() and c.size.x >= 1.0 and c.size.y >= 1.0 and _heeft_inhoud(c))

@@ -21,6 +21,7 @@ var _nat := 0.0
 var _vuur: Node3D
 var wegen: Wegen
 var wolven: Node3D             # view/wolven_view.gd
+var gedachten: GedachtenView   # view/gedachten_view.gd
 
 
 func bouw(wereld: Wereld, l: Licht) -> void:
@@ -90,6 +91,10 @@ func bouw(wereld: Wereld, l: Licht) -> void:
 	wolven = preload("res://view/wolven_view.gd").new()
 	add_child(wolven)
 	wolven.bouw(w, self)
+	# gedachtewolkjes boven de dorpelingen (view/gedachten_view.gd, sim/gedachten.gd)
+	gedachten = GedachtenView.new()
+	add_child(gedachten)
+	gedachten.bouw(w, self)
 
 
 func _wissel_model(d: Dorpeling) -> void:
