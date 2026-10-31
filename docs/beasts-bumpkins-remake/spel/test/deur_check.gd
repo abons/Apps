@@ -3,7 +3,7 @@ extends SceneTree
 # (deur_voor_drempel / deur_drempel) met Plan.deur_punt() en Plan.deur_tegel(). Draaien:
 #   Godot --headless --path . --script res://test/deur_check.gd     (faalt als een anker > 0,1 m van deur_punt ligt)
 const GLB := {&"hut": "peasant_hut_rt", &"molen": "molen_rt", &"melkerij": "melkerij_boerderij_rt",
-	&"kippenhok": "kippenhok_rt", &"gereedschapsloods": "gereedschapsloods_rt"}
+	&"kippenhok": "kippenhok_rt", &"gereedschapsloods": "gereedschapsloods_rt", &"put": "bron"}
 func _init():
 	var fout := 0
 	for soort in GLB:

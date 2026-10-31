@@ -808,37 +808,65 @@ def ring_blokken(b, rnd, punten, z, h, diep, mat, lengte=0.42, verspring=0.0):
 
 
 def bron():
-    """Bronhuisje met paars pannendak op een getrapte sokkel, in een veelhoekig bassin; ca. 5 x 4,6 m."""
+    """Bronhuisje met paars pannendak op een getrapte sokkel, in een achthoekig bassin; ca. 4,9 x 4,9 m.
+    Voorkant = -y (Godot +z, Plan.DEUREN &"put"): boogdeur, en een trap over het water naar een opening in de rand
+    (origineel well.png: ze gaan het huisje in via trapje en deur). Witte nis met tuit op +x (Godot +x: rechts in
+    beeld bij de standaardcamera). Anker `deur_drempel` op het bordes voor de deur (test/deur_check.gd); de
+    traphoogtes staan ook in view/deur_loop.gd (PUT_TRAP). Omhulsel symmetrisch om (0, 0): Bouwmenu zet het midden
+    van het omhulsel op het midden van de voetafdruk."""
     rnd = random.Random(31)
     b = L.Bouwer()       # 0 steen, 1 dak, 2 planken, 3 ijzer, 4 wit, 5 rand-steen
-    # bassin (concept: veelhoek met een inham linksvoor)
-    poly = [(2.3, 1.2), (1.2, 2.3), (-1.0, 2.3), (-2.3, 1.0), (-2.3, -0.4), (-1.5, -0.4), (-1.5, -1.6), (-0.6, -2.4),
-            (1.2, -2.4), (2.3, -1.3)]
-    poly = [Vector((x, y, 0)) for x, y in poly]
+    # bassin: achthoek, rand van twee lagen blokken, met een opening voor de trap in de voorrand
+    R, K = 2.3, 1.15
+    poly = [Vector((x, y, 0)) for x, y in ((R, K), (K, R), (-K, R), (-R, K), (-R, -K), (-K, -R), (K, -R), (R, -K))]
+    n = len(poly)
+    TRAP_B = 0.55                                  # halve trapbreedte = halve opening in de rand
     for laag in range(2):
-        ring_blokken(b, rnd, poly, -0.05 + laag * 0.24, 0.24, 0.3, 0, lengte=0.45, verspring=0.12 * laag)
+        z = -0.05 + laag * 0.24
+        for i in range(n):
+            p0, p1 = poly[i], poly[(i + 1) % n]
+            if i == 5:                             # voorrand (-K,-R) -> (K,-R): opening
+                blok_rij(b, rnd, p0, Vector((-TRAP_B, -R, 0)), z, 0.24, 0.3, 0, lengte=0.45)
+                blok_rij(b, rnd, Vector((TRAP_B, -R, 0)), p1, z, 0.24, 0.3, 0, lengte=0.45)
+            else:
+                d = (p1 - p0).normalized()
+                blok_rij(b, rnd, p0 + d * 0.12 * laag, p1 + d * 0.12 * laag, z, 0.24, 0.3, 0, lengte=0.45)
     # bodem en water
     w = L.Bouwer()
     c = w.v((0, 0, 0.3))
-    n = len(poly)
     ring = [w.v((p.x * 0.97, p.y * 0.97, 0.3)) for p in poly]
     for i in range(n):
         p, q = poly[i], poly[(i + 1) % n]
         w.f([ring[i], ring[(i + 1) % n], c], [(p.x / 2, p.y / 2), (q.x / 2, q.y / 2), (0, 0)], 0)
-    # sokkel: drie treden (vierkant om het huisje)
-    hx, hy = 0.35, 0.35
-    for t, (half, z0) in enumerate(((1.35, 0.0), (1.1, 0.25), (0.88, 0.5))):
+    # sokkel: drie treden (vierkant om het huisje), het huisje iets naar achteren voor de trap
+    hx, hy = 0.0, 0.2
+    for t, (half, z0) in enumerate(((1.25, 0.0), (1.02, 0.25), (0.82, 0.5))):
         pts = [Vector((hx + sx * half, hy + sy * half, 0)) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
         ring_blokken(b, rnd, pts, z0, 0.25, 0.5, 0, lengte=0.5, verspring=0.15 * t)
-        # bovenvlak van de trede
         doos = L.blok((half * 2 - 0.3, half * 2 - 0.3, 0.05), afkant=0)
         L.bm_naar_bouwer(doos, b, mat=0, uvschaal=1 / 1.2, M=Matrix.Translation(Vector((hx, hy, z0 + 0.22))))
         doos.free()
-    # huisje: wanden 1,4 x 1,4, 1,55 hoog, van blokken in lagen; openingen voor deur (-x) en tuit (-y)
-    half, z0, zh = 0.7, 0.75, 1.55
+    # trap voor de deur: vier treden van ~0,19 m, de onderste in de opening van de rand, de bovenste een bordes tot de
+    # deur. (voorkant y, bovenkant z); elke trede loopt door tot de muur, een vulblok eronder tot de grond.
+    huis_half, muur_d = 0.7, 0.3
+    gevel = hy - huis_half - muur_d / 2             # buitenkant voormuur (y)
+    treden = ((-R - 0.15, 0.19), (-2.1, 0.375), (-1.7, 0.56), (-1.25, 0.75))
+    for k, (y0, top) in enumerate(treden):
+        y1 = treden[k + 1][0] if k + 1 < len(treden) else gevel
+        h = 0.19 if k else top + 0.05
+        blok_rij(b, rnd, Vector((-TRAP_B, (y0 + y1) / 2, 0)), Vector((TRAP_B, (y0 + y1) / 2, 0)), top - h, h, y1 - y0, 5,
+                 lengte=0.37)
+        if k:
+            vul = L.blok((TRAP_B * 2 - 0.04, gevel - y0 - 0.02, top - h + 0.05), afkant=0)
+            L.bm_naar_bouwer(vul, b, mat=0, uvschaal=1 / 1.2,
+                             M=Matrix.Translation(Vector((0, (y0 + gevel) / 2, (top - h - 0.05) / 2))))
+            vul.free()
+    # huisje: wanden 1,4 x 1,4, 1,55 hoog, van blokken in lagen; openingen voor deur (-y, voor) en tuit (+x)
+    half, z0, zh = huis_half, 0.75, 1.55
     laagh = 0.22
     lagen = int(zh / laagh)
     hoeken = [Vector((hx + sx * half, hy + sy * half, 0)) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
+    WAND_DEUR, WAND_NIS = 2, 3                     # wand i = hoeken[i] -> hoeken[i+1]; 2 = -y-wand, 3 = +x-wand
     for k in range(lagen):
         z = z0 + k * laagh
         for i in range(4):
@@ -846,73 +874,70 @@ def bron():
             d = (p1 - p0).normalized()
             off = 0.13 if k % 2 else 0.0
             open_ = None
-            if i == 1 and z < z0 + 1.15:         # -x-wand: deur
+            if i == WAND_DEUR and z < z0 + 1.15:
                 open_ = 0.38
-            if i == 2 and z < z0 + 1.15 and z >= z0 + 0.0:   # -y-wand: witte nis
+            if i == WAND_NIS and z < z0 + 1.15:
                 open_ = 0.34
             if open_:
                 m_ = (p0 + p1) / 2
-                blok_rij(b, rnd, p0 + d * off * 0, m_ - d * open_, z, laagh, 0.3, 0, lengte=0.36)
-                blok_rij(b, rnd, m_ + d * open_, p1, z, laagh, 0.3, 0, lengte=0.36)
+                blok_rij(b, rnd, p0, m_ - d * open_, z, laagh, muur_d, 0, lengte=0.36)
+                blok_rij(b, rnd, m_ + d * open_, p1, z, laagh, muur_d, 0, lengte=0.36)
             else:
-                blok_rij(b, rnd, p0 + d * off, p1 + d * off * 0, z, laagh, 0.3, 0, lengte=0.42)
-    # bogen boven deur en nis (voegstenen in een halve cirkel)
-    for i, br in ((1, 0.38), (2, 0.34)):
+                blok_rij(b, rnd, p0 + d * off, p1, z, laagh, muur_d, 0, lengte=0.42)
+
+    def wand(i):
+        """(midden, langs, naar buiten) van wand i."""
         p0, p1 = hoeken[i], hoeken[(i + 1) % 4]
         d = (p1 - p0).normalized()
-        nrm = Vector((d.y, -d.x, 0))
-        m_ = (p0 + p1) / 2
+        return (p0 + p1) / 2, d, Vector((d.y, -d.x, 0))
+    # bogen boven deur en nis (voegstenen in een halve cirkel)
+    for i, br in ((WAND_DEUR, 0.38), (WAND_NIS, 0.34)):
+        m_, d, _ = wand(i)
         zc = z0 + 1.1
         for k in range(7):
-            a0 = math.pi * k / 7
-            a1 = math.pi * (k + 1) / 7
-            am = (a0 + a1) / 2
+            am = math.pi * (k + 0.5) / 7
             c = m_ + d * (math.cos(am) * (br + 0.08)) + Vector((0, 0, zc + math.sin(am) * (br + 0.08)))
             bm = L.blok((0.18, 0.34, 0.15), afkant=0.02)
             M = Matrix.Translation(c) @ Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z") @ Matrix.Rotation(-(am - math.pi / 2), 4, "Y")
             L.bm_naar_bouwer(bm, b, mat=5, uvschaal=1 / 1.2, M=M)
             bm.free()
-    # deur (-x-wand)
-    p0, p1 = hoeken[1], hoeken[2]
-    d = (p1 - p0).normalized()
-    m_ = (p0 + p1) / 2
+    # deur (voor): planken op de middellijn van de muur, beslag ervoor (vroeger zat het beslag achter de planken)
+    m_, d, uit = wand(WAND_DEUR)
+    rot = Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z")
     for k in range(4):
         x = -0.36 + 0.18 * k + 0.09
         bm = L.blok((0.17, 0.05, 1.3), afkant=0.01)
-        c = m_ + d * x + Vector((0.05, 0, z0 + 0.65))
-        L.bm_naar_bouwer(bm, b, mat=2, uvschaal=1 / 1.0, M=Matrix.Translation(c) @ Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z"))
+        L.bm_naar_bouwer(bm, b, mat=2, uvschaal=1 / 1.0, M=Matrix.Translation(m_ + d * x + Vector((0, 0, z0 + 0.65))) @ rot)
         bm.free()
-    # deur: bovenkant rond (halve schijf van planken)
-    for k in range(6):
+    for k in range(6):                         # bovenkant rond (halve schijf van planken)
         a0, a1 = math.pi * k / 6, math.pi * (k + 1) / 6
-        q = [m_ + Vector((0.025, 0, 0)) + d * (math.cos(a) * 0.36) + Vector((0, 0, z0 + 1.3 + math.sin(a) * 0.3)) for a in (a0, a1)]
-        cc = m_ + Vector((0.025, 0, z0 + 1.3))
+        cc = m_ + uit * 0.026 + Vector((0, 0, z0 + 1.3))
+        q = [cc + d * (math.cos(a) * 0.36) + Vector((0, 0, math.sin(a) * 0.3)) for a in (a0, a1)]
         vi = [b.v(q[0]), b.v(q[1]), b.v(cc)]
-        b.f([vi[1], vi[0], vi[2]], [(q[1].y, q[1].z), (q[0].y, q[0].z), (cc.y, cc.z)], 2)
+        b.f([vi[1], vi[0], vi[2]], [((q[1] - m_).dot(d), q[1].z), ((q[0] - m_).dot(d), q[0].z), (0, cc.z)], 2)
     for z in (z0 + 0.3, z0 + 1.0):            # hengsels
         bm = L.blok((0.5, 0.015, 0.06), afkant=0.003)
-        c = m_ + d * 0.1 + Vector((0.08, 0, z))
-        L.bm_naar_bouwer(bm, b, mat=3, M=Matrix.Translation(c) @ Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z"))
+        L.bm_naar_bouwer(bm, b, mat=3, M=Matrix.Translation(m_ + d * 0.1 + uit * 0.035 + Vector((0, 0, z))) @ rot)
         bm.free()
     bm = L.blok((0.03, 0.06, 0.12), afkant=0.005)  # slot
-    L.bm_naar_bouwer(bm, b, mat=3, M=Matrix.Translation(m_ + d * -0.22 + Vector((0.08, 0, z0 + 0.7))))
+    L.bm_naar_bouwer(bm, b, mat=3, M=Matrix.Translation(m_ - d * 0.22 + uit * 0.035 + Vector((0, 0, z0 + 0.7))) @ rot)
     bm.free()
-    # witte nis met tuit (-y-wand)
-    p0, p1 = hoeken[2], hoeken[3]
-    d = (p1 - p0).normalized()
-    m_ = (p0 + p1) / 2
+    drempel = m_ + uit * 0.25                  # op het bordes, net voor de deur: hier loopt de dorpeling naar binnen
+    # witte nis met tuit (+x)
+    m_, d, uit = wand(WAND_NIS)
+    rot = Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z")
     nis = L.blok((0.66, 0.08, 1.12), afkant=0.02)
-    L.bm_naar_bouwer(nis, b, mat=4, uvschaal=1.0, M=Matrix.Translation(m_ + Vector((0, 0.06, z0 + 0.56))))
+    L.bm_naar_bouwer(nis, b, mat=4, uvschaal=1.0, M=Matrix.Translation(m_ - uit * 0.06 + Vector((0, 0, z0 + 0.56))) @ rot)
     nis.free()
     for k in range(8):
         a0, a1 = math.pi * k / 8, math.pi * (k + 1) / 8
-        q = [m_ + Vector((0, 0.02, 0)) + d * (math.cos(a) * 0.34) + Vector((0, 0, z0 + 1.1 + math.sin(a) * 0.3)) for a in (a0, a1)]
-        cc = m_ + Vector((0, 0.02, z0 + 1.1))
+        cc = m_ - uit * 0.02 + Vector((0, 0, z0 + 1.1))
+        q = [cc + d * (math.cos(a) * 0.34) + Vector((0, 0, math.sin(a) * 0.3)) for a in (a0, a1)]
         vi = [b.v(q[0]), b.v(q[1]), b.v(cc)]
-        b.f([vi[0], vi[1], vi[2]], [(q[0].x, q[0].z), (q[1].x, q[1].z), (cc.x, cc.z)], 4)
+        b.f([vi[0], vi[1], vi[2]], [((q[0] - m_).dot(d), q[0].z), ((q[1] - m_).dot(d), q[1].z), (0, cc.z)], 4)
     tuit_z = z0 + 0.45
-    P = [m_ + Vector((0, 0.05, tuit_z)), m_ + Vector((0, -0.25, tuit_z - 0.02))]
-    rr = L.buis(b, P, [0.12, 0.11], zijden=14, mat=4)
+    L.buis(b, [m_ - uit * 0.05 + Vector((0, 0, tuit_z)), m_ + uit * 0.38 + Vector((0, 0, tuit_z - 0.02))], [0.12, 0.11],
+           zijden=14, mat=4)
     # dakrand (steen) en schilddak met paarse pannen
     zr = z0 + lagen * laagh
     rand = L.blok((half * 2 + 0.36, half * 2 + 0.36, 0.14), afkant=0.03)
@@ -933,15 +958,15 @@ def bron():
         q = Vector((hx, hy, zr + 0.14 + dh))
         Q = [p.lerp(q, t) + Vector((0, 0, 0.03)) for t in np.linspace(0, 1, 6)]
         L.buis(b, Q, [0.045] * 6, zijden=6, mat=1)
-    # waterstraal (doorzichtig, met fladder-uv voor een golvende shader)
+    # waterstraal: een gebogen band uit de tuit over de sokkel het bassin in; uv v = 2 * t langs de straal, zodat
+    # view/bron_water.gd het water omlaag laat stromen
     s = L.Bouwer()
-    start = m_ + Vector((0, -0.3, tuit_z))
-    for j in range(10):
-        t0, t1 = j / 10, (j + 1) / 10
+    for j in range(12):
+        t0, t1 = j / 12, (j + 1) / 12
+
         def pt(t, k):
-            y = -0.3 - t * 0.55
             z = tuit_z - 0.02 - (t ** 2) * (tuit_z - 0.3) - t * 0.05
-            return Vector((m_.x + k * (0.11 + t * 0.05), m_.y + y, z))
+            return m_ + uit * (0.36 + t * 0.75) + d * (k * (0.10 + t * 0.06)) + Vector((0, 0, z))
         a, bb, c2, d2 = pt(t0, -1), pt(t0, 1), pt(t1, 1), pt(t1, -1)
         vi = [s.v(a, (0, t0, 0, 1)), s.v(bb, (0, t0, 0, 1)), s.v(c2, (0, t1, 0, 1)), s.v(d2, (0, t1, 0, 1))]
         s.f(vi, [(0, t0 * 2), (1, t0 * 2), (1, t1 * 2), (0, t1 * 2)], 0)
@@ -957,7 +982,12 @@ def bron():
     wo = L.obj("bron_water", w.mesh("bron_water", [water]))
     straal_m = L.pbr("waterstraal", (0.72, 0.80, 0.86), nrm=wn, ruw=0.05, alfa_waarde=0.8, blend=True, tweezijdig=True)
     so = L.obj("bron_straal", s.mesh("bron_straal", [straal_m]))
-    for o in (wo, so):
+    e = bpy.data.objects.new("deur_drempel", None)     # looppunt voor de deur (Plan.DEUREN, test/deur_check.gd)
+    e.empty_display_type = "PLAIN_AXES"
+    e.empty_display_size = 0.2
+    e.location = (drempel.x, drempel.y, 0.75)
+    bpy.context.scene.collection.objects.link(e)
+    for o in (wo, so, e):
         o.parent = huis
     return [huis]
 

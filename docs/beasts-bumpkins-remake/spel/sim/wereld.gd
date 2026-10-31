@@ -698,8 +698,8 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 			if d.melk_koe != null:
 				d.melk_koe.gemolken = true
 		"koop":
-			if d.koopt == "water":
-				d.bezig = float(e.get("drink_s", 2.0))
+			if d.koopt == "water":      # put: de trap op en naar binnen (deur_loop_s); bij de plas 0
+				d.bezig = float(e.get("drink_s", 2.0)) + 2.0 * deur_loop_s(d)
 			else:
 				d.bezig = float(e["toonbank_s"]) + 2.0 * deur_loop_s(d)
 		"raap": d.bezig = float(e["raap_s"])
@@ -709,8 +709,8 @@ func klus_aangekomen(d: Dorpeling, soort: String) -> void:
 ## Leveren of kopen in een gebouw met een deur: de tijd voor het stukje door de deur (heen = terug); de view laat hem
 ## dat lopen (view/deur_loop.gd). 0 zonder deur.
 func deur_loop_s(d: Dorpeling) -> float:
-	if not (d.klus is Plan) or not Plan.DEUREN.has((d.klus as Plan).soort) or (d.klus as Plan).soort == &"put":
-		return 0.0                 # bij de put drinken ze buiten
+	if not (d.klus is Plan) or not Plan.DEUREN.has((d.klus as Plan).soort):
+		return 0.0
 	return (d.klus as Plan).deur_loop_m(tegel_m) / (loop_mps * looptempo)
 
 

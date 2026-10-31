@@ -8,6 +8,11 @@ extends RefCounted
 const BINNEN_M := Plan.BINNEN_M   ## voorbij de drempel tot hij verdwijnt (muur en deur dekken hem dan af)
 const UIT_MAX_S := 2.5      ## naar buiten hooguit zo lang: de sim kan hem al verder hebben laten lopen
 const ZOEK_TEGELS := 5.0    ## deur zoeken als de view niet weet welk gebouw (bijv. bij de start al binnen)
+## Put (bron.glb): de trap over het water naar de deur, als (meters vóór deur_punt, hoogte boven de grond), van ver
+## naar dichtbij, ertussen lineair; treden uit modellen/natuur/props.py bron() (voorkanten 1,7 / 1,35 / 0,95 / 0,5 m
+## voor het anker, bovenkanten 0,19 / 0,375 / 0,56 / 0,75 m).
+const PUT_TRAP := [Vector2(1.75, 0.0), Vector2(1.65, 0.19), Vector2(1.40, 0.19), Vector2(1.30, 0.375),
+	Vector2(1.00, 0.375), Vector2(0.90, 0.56), Vector2(0.55, 0.56), Vector2(0.45, 0.75)]
 
 
 ## Gebouw waar hij in gaat of uit komt: slaapplek, gezinshut, anders de dichtste afgebouwde deur binnen ZOEK_TEGELS.
@@ -44,6 +49,21 @@ static func punt(buiten: Vector2, p: Plan, tm: float, f: float) -> Vector2:
 	if s <= l1:
 		return buiten.lerp(b, s / l1) if l1 > 1e-4 else b
 	return b.lerp(c, (s - l1) / BINNEN_M)
+
+
+## Hoogte boven de grond op punt `q` (meters x, z) van het pad naar de deur: de trap van de put, anders 0.
+static func hoogte(p: Plan, q: Vector2, tm: float) -> float:
+	if p.soort != &"put":
+		return 0.0
+	var s := (q - p.deur_punt(tm)).dot(Vector2(p.deur_richting()))
+	if s >= PUT_TRAP[0].x:
+		return 0.0
+	for i in range(1, PUT_TRAP.size()):
+		var b: Vector2 = PUT_TRAP[i]
+		if s >= b.x:
+			var a: Vector2 = PUT_TRAP[i - 1]
+			return lerpf(b.y, a.y, (s - b.x) / (a.x - b.x))
+	return PUT_TRAP[-1].y
 
 
 ## Nieuwe f na dt (spelseconden): naar 1 als hij binnen is, naar 0 als niet; v_mps is de loopsnelheid in de sim.

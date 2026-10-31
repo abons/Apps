@@ -28,7 +28,7 @@ Driehoeken: LOD0 / LOD1 (+ sneeuwlaag).
 | houtstapel, 2,2 m | `houtstapel.glb` | 700 | 3 + 2 stammen |
 | steenhoop, ~2 m | `steenhoop.glb` | 1520 | gebakken |
 | zaagbok op gaasmat, 1,6 m | `zaagbok.glb` | 812 | bouwplaats; oranje hout (`textures/zaagbok_kleur.jpg`), 2 stammen |
-| bron (put, well 47/118, pas in latere missies), 4,6 x 4,7 m | `bron.glb` | 9988 | `bron_water` en `bron_straal` (BLEND, straal heeft trilling in UV2) |
+| bron (put, well 47/118, missie 3), 4,9 x 4,9 m; deur + trap + randopening op -y (Godot +z), tuit op +x, anker `deur_drempel` | `bron.glb` | 10114 | `bron_water` en `bron_straal`: in Godot vervangen door shaders (`spel/view/bron_water.gd`) |
 | bronplas (spring 144, missie 1), 2 m | `bronplas.glb` | 1464 | kring keien (gebakken, steen-shader) + `bronplas_water` (BLEND) |
 | hekpaal | `hek_paal.glb` | 50 | |
 | heksegment, 2 m (palen op x = +-1) | `hek_segment.glb` | 2676 | oranje touw om de kruisingen |

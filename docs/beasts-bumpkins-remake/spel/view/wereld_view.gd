@@ -383,7 +383,7 @@ func _process(dt: float) -> void:
 		var zichtbaar := _deur_loop(d, u, wp, dt)
 		if u["deur_f"] > 0.0 and u["deur_plan"] != null:       # het laatste stukje door de deur (view/deur_loop.gd)
 			var dp := DeurLoop.punt(Vector2(wp.x, wp.z), u["deur_plan"], w.tegel_m, u["deur_f"])
-			wp = Vector3(dp.x, terrein.hoogte_op(dp.x, dp.y), dp.y)
+			wp = Vector3(dp.x, terrein.hoogte_op(dp.x, dp.y) + DeurLoop.hoogte(u["deur_plan"], dp, w.tegel_m), dp.y)
 			if u["deur_loopt"]:
 				v = w.loop_mps * w.looptempo * w.tempo
 		b.volg(wp, v)

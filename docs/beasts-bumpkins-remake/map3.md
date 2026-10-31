@@ -21,7 +21,8 @@ Laden: `--missie=3`; test `test/missie3_test.gd`.
 - **Gouden kelk**: op te rapen, naar de vlag = +7.000 (`sim/voorwerpen.gd`); de tweede regel (+6.000) vuurt niet
   (eigen keuze, `spel.json` `_doel_kelk`).
 - **Put** (2026-10-30): voorgebouwd Plan 3x3 (`bron.glb`) en bouwbaar vanaf M3 (40 kas); dorst > 90 s = gratis water
-  halen (2 s). Effect op de levensduur nog niet.
+  halen (2 s): sinds 2026-10-31 de trap op en naar binnen (deur op de voorkant, `DeurLoop.PUT_TRAP`); bassin en straal
+  bewegen (`view/bron_water.gd`). Effect op de levensduur nog niet.
 - **Voetvolkgilde**: voorgebouwd 3x3, niet over vlag of kampvuur, bouwbaar vanaf M3 (50); man + klik op het gilde =
   voetsoldaat (30 kas, max 6 per gilde, hint 3-5), zwaard (`prop_zwaard`, schade 6, slag 0,8 s, bereik 1,5), boert
   niet, valt wolven binnen 8 tegels zelf aan. Gebouw = `voetvolkgilde_rt.glb` + standen (2026-10-31, `modellen/gebouwen/README.md`); zonder glb het blok uit `view/props.gd`.

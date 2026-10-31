@@ -37,7 +37,7 @@ const GEBOUWEN := {
 	&"weg": {"tekst": "Weg", "toets": KEY_T, "glb": "", "hoogte": 0.15},      # af = padtegel, view/wegen.gd (slepen = rij)
 	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
 	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 1.3},   # hek_poort.glb, vleugel draait open (klik)
-	# missie 3 (Wereld.VANAF_MISSIE): put = bron.glb (well, 4,9 x 5,0 m); gilde = voetvolkgilde_rt.glb (zonder glb het
+	# missie 3 (Wereld.VANAF_MISSIE): put = bron.glb (well, 4,9 x 4,9 m, deur en trap op +Z, tuit op +X); gilde = voetvolkgilde_rt.glb (zonder glb het
 	# blok uit Props). De gildedeur zit in de glb op -X, Plan.DEUREN wil +Z: `draai` = extra hoek om Y bovenop
 	# Plan.draai, alleen voor het beeld (afdruk en deur blijven die van de sim).
 	&"put": {"tekst": "Put", "toets": KEY_U, "glb": "res://assets/bron.glb", "hoogte": 2.0},
@@ -763,6 +763,8 @@ func _plan_klaar(p: Plan) -> void:
 		return
 	var hut: Node3D = ps.instantiate()
 	_zet_op_plek(hut, p)
+	if p.soort == &"put":
+		BronWater.zet(hut)          # rimpelend bassin en stromende straal (view/bron_water.gd)
 	ghost.get_parent().add_child(hut)
 	var wk := hut.find_child("wieken", true, false) as Node3D
 	if wk != null:
