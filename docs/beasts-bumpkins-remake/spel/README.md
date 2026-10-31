@@ -27,6 +27,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --script res://test/menu_test.gd        # startmenu, pauzemenu, opnieuw, andere/volgende missie
 "$G" --headless --path . --script res://test/ghost_test.gd       # bouw-ghost: gebouw-glb, groen/rood, deurpijl, = gebouwd
 "$G" --headless --path . --script res://test/bouw_plek_test.gd   # bouwers: elk een eigen plek, zagen bij de zaagbok, hakken bij de steenhoop
+"$G" --path . -s test/m1_frames.gd -- --missie=1 --scenario=m1frames --seizoen=zomer --uur=12 --uit=out/m1   # vergelijkingsframes M1 (kijkrichting origineel)
 "$G" --path . --write-movie out/x/f.png --fixed-fps 10 --quit-after 60 -- --scenario=selectie   # frames (map out/x moet bestaan)
 ```
 

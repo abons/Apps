@@ -31,6 +31,8 @@ Terrein binnenste eiland (1714 tegels, uit de tegelkleuren): gras 1044 (incl. do
 
 Tegel-id naar frame in `maptile` (132 frames, contactsheet `SC/map1/maptile_sheet.png`): 0-5 gras (3-5 met bloemetjes), 6-7 water, 11-26 water/zand-overgangen, 48-93 gras/zand/aarde-overgangen en donker gras, 98-113 rotsrand (`rockrim`), 227-231 rots (`rock0n`), 225/226 `tester` = bruine bosgrond onder dennen (twee vlekken NO van de start en W), 234-250 = id minus 119, 200/201 bos. Wegen: apart veld, 4 tegels bij (101,65) = het pad naar de vlag. Spelerseigendom per tegel: alles 0.
 
+⚠️ **De `kinds` zitten op drie plekken naast het beeld** (vergelijking 2026-10-31, `lokaal/concept/m1_kaart.html`): `dirt` 24/26/71-79 en `other` 64-70 = licht zandstrand, `rock` 13-25 = water/zand-rand (werden rotsblokken in zee), `sand` 243/245 en `other` 236-240 = oranje bosgrondrand. De remake corrigeert per frame in `spel/data/tegels.json` `tex_naar_tegel` (gaat voor `kind_naar_tegel`), voor alle kaarten.
+
 ## Geplaatste objecten (60)
 
 Klasse-ids uit `objects_list.txt`/BBTools-README. Posities zijn tegel (x,y). Lijst: `SC/map1/map1.json`.

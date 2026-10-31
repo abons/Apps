@@ -16,5 +16,12 @@
     "void": "leeg", "water": "water", "grass": "gras", "dirt": "aarde", "sand": "zand",
     "special": "bosgrond", "other": "overig", "rockrim": "rotsrand", "rock": "rots"
   },
+  "_tex_naar_tegel": "Per tegelframe (tex-id uit de kaart), gaat voor kind_naar_tegel. De kinds zijn gegokt uit gemiddelde kleuren en zitten op drie plekken naast het origineel (m1-vergelijking 2026-10-31, maptile_sheet.png): dirt 24/26/71-79 is het lichte zandstrand (gem. 126,115,62), other 64-70 zand met grashoekjes; rock 13-25 zijn water/zand-randtegels (werden rotsblokken in zee); sand 243/245 en other 236-240 (frames 117-126) zijn de oranje bosgrondrand. Water en rots lopen allebei niet, dus 13-25 verandert niets aan routes.",
+  "tex_naar_tegel": {
+    "24": "zand", "26": "zand", "71": "zand", "72": "zand", "73": "zand", "74": "zand", "79": "zand",
+    "64": "zand", "66": "zand", "68": "zand", "70": "zand",
+    "13": "water", "15": "water", "17": "water", "23": "water", "25": "water",
+    "236": "aarde", "238": "aarde", "240": "aarde", "243": "aarde", "245": "aarde"
+  },
   "weg_naar_tegel": {"1": "pad", "2": "pad", "3": "pad", "4": "pad", "5": "pad", "6": "pad"}
 }

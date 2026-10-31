@@ -183,11 +183,15 @@ func _vul_raster(kaart: Dictionary, tegels: Dictionary) -> void:
 	raster.maak(k, r)
 	var map_kind: Dictionary = tegels["kind_naar_tegel"]
 	var wegen: Dictionary = tegels["weg_naar_tegel"]
+	var map_tex: Dictionary = tegels.get("tex_naar_tegel", {})   # per tegelframe, gaat voor de grove kind (tegels.json)
 	for y in r:
 		var rij_kind: Array = kaart["kinds"][y]
 		var rij_weg: Array = kaart["road"][y]
+		var rij_tex: Array = kaart["tex"][y] if kaart.has("tex") else []
 		for x in k:
 			var naam: String = map_kind.get(rij_kind[x], "leeg")
+			if rij_kind[x] != "void" and x < rij_tex.size():
+				naam = map_tex.get(str(int(rij_tex[x])), naam)
 			var i := raster.idx(x, y)
 			raster.soort[i] = _soort_index(naam)
 			var weg := str(int(rij_weg[x]))

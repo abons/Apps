@@ -69,7 +69,7 @@
   "kas_teller": {"hz": 20, "stappen": [[10000, 4700], [1000, 470], [100, 47], [10, 7], [0, 1]]},
   "_missies": "Per missie (main.gd --missie=<nr>, standaard 1): kaart, start_kas, doel (alles moet: dorpelingen >=, koeien = eigen koeien >=, kas_boven = kas >), verlies (dorpelingen_onder), koe_generator (klasse 171: start, max wilde, interval_s), optioneel bos_dichtheid (anders de algemene). Optioneel voorwerpen: {klasse: {naar: objectnaam, kas}} (sim/voorwerpen.gd; origineel conditie type 12 + acties 0x16 kas, 0x17 weg). Optioneel beloningen: [{id, trigger: {type: start|timer (tikken, vanaf de start of vanaf de na-regel)|kas_boven (bedrag), na, kas}] (sim/beloningen.gd; origineel actie 0x16 kas erbij), wolf_generator (zie _wolf_prooi). Waarden uit lokaal/missies/m<nn>.json.",
   "missies": {
-    "1": {"naam": "Aorta", "dorp": "Moonton", "kaart": "res://data/origineel/map1.json", "start_kas": 10000,
+    "1": {"naam": "Aorta", "dorp": "Moonton", "kaart": "res://data/origineel/map1.json", "start_kas": 10000, "bos_dichtheid": 0.7,
       "doel": {"dorpelingen": 6, "koeien": 4}, "verlies": {"dorpelingen_onder": 2},
       "voorwerpen": {"159": {"naar": "vlag", "kas": 5000}},
       "koe_generator": {"start": 1, "max": 3, "interval_s": 45}},
