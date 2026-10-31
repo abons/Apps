@@ -76,8 +76,12 @@ func _ready() -> void:
 	w.mist.zet_aan(mist_aan)
 	if opt.has("voordraai"):
 		w.voorgebouwd_draai = int(opt["voordraai"])
-	if opt.has("camyaw"):      # alleen voor frames: --camyaw=<graden> overschrijft na het scenario de camerahoek
-		call_deferred("_camyaw", deg_to_rad(float(opt["camyaw"])))
+	if opt.has("camyaw") or opt.has("campitch") or opt.has("camafstand") or opt.has("camfocus"):
+		# alleen voor frames: --camyaw=<graden> --campitch=<graden> --camafstand=<m> --camfocus=<tx>,<ty>[,<dy m>]
+		# overschrijven na het scenario de camera (wat ontbreekt blijft zoals het scenario het zette)
+		call_deferred("_cam_opties", opt)
+	if opt.has("geen_hud"):    # alleen voor frames (showcase): geen HUD, minikaart en bouwknoppen
+		call_deferred("_geen_hud")
 	if opt.has("camwolf"):     # alleen voor frames: --camwolf=<afstand> volgt de eerste wolf van dichtbij (wolfmodel vergelijken)
 		_camwolf = float(opt["camwolf"])
 	_fps_aan = opt.has("fps")
@@ -585,6 +589,9 @@ func _start_scenario() -> void:
 		"missie4":
 			# missie 4: overzicht, poort, beker, wezens, muur (test/missie4_scenario.gd, --stap=overzicht|poort|beker|wezens|muur)
 			add_child(load("res://test/missie4_scenario.gd").new().start(self))
+		"showcase":
+			# voorbeeldbeelden: druk dorp, dieren (test/showcase_scenario.gd, --stap=dorp|dieren|put)
+			add_child(load("res://test/showcase_scenario.gd").new().start(self))
 		"deur":
 			# een dorpeling loopt door de voordeur naar binnen en weer naar buiten (test/deur_scenario.gd, --gebouw= --draai=)
 			add_child(load("res://test/deur_scenario.gd").new().start(self))
@@ -709,8 +716,24 @@ func _hints_stap() -> void:
 		_stap = 3
 
 
-func _camyaw(y: float) -> void:
-	cam.zet_direct(cam.focus, y, cam.pitch, cam.afstand)
+func _cam_opties(opt: Dictionary) -> void:
+	var f: Vector3 = cam.focus
+	if opt.has("camfocus"):
+		var d := String(opt["camfocus"]).split(",")
+		f = view.terrein.tegel_midden(Vector2i(int(d[0]), int(d[1])))
+		if d.size() > 2:
+			f.y += float(d[2])
+	var y: float = deg_to_rad(float(opt["camyaw"])) if opt.has("camyaw") else cam.yaw
+	var p: float = deg_to_rad(float(opt["campitch"])) if opt.has("campitch") else cam.pitch
+	var a: float = float(opt["camafstand"]) if opt.has("camafstand") else cam.afstand
+	cam.zet_direct(f, y, p, a)
+
+
+func _geen_hud() -> void:
+	hud.visible = false
+	for c in bouwmenu.get_children():
+		if c is CanvasLayer:
+			c.visible = false
 
 
 func _scenario_stap() -> void:
