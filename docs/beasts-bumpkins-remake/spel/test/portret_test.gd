@@ -22,7 +22,7 @@ func _start() -> void:
 	var verwacht := [["man", "volwassen", "", "bust12.png"], ["vrouw", "volwassen", "", "bust13.png"],
 		["man", "kind", "", "bust02.png"], ["vrouw", "kind", "", "bust07.png"],
 		["man", "oud", "", "bust00.png"], ["vrouw", "oud", "", "bust17.png"],
-		["man", "volwassen", "bouwer", "bust03.png"], ["man", "volwassen", "voetsoldaat", "bust04.png"]]
+		["man", "volwassen", "bouwer", "bust03.png"], ["man", "volwassen", "voetsoldaat", "bust06.png"]]
 	# de data zelf (los van of de png er is)
 	for v in verwacht:
 		var sl := Portret.soort_sleutel(v[0], v[1])
