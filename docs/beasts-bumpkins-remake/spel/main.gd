@@ -261,6 +261,14 @@ func _start_scenario() -> void:
 			bestuur.geef_loopbevel(w.dichtstbij_loopbaar(w.kampvuur + Vector2i(22, -4)))
 			w.tempo = 4.0
 			cam.zet_direct(vuur + Vector3(16, 0, -4), 0.6, deg_to_rad(52), 62.0)
+		"mist_zicht":
+			# zichtveld (../mist.md): een dorpeling loopt 18 tegels het onverkende in (4x); de gewone startcamera
+			# (hoek, afstand) staat op zijn doel, zodat de mistrand om hem heen te zien is
+			var doel := w.dichtstbij_loopbaar(w.kampvuur + Vector2i(18, -4))
+			bestuur.gekozen = [w.dorpelingen[0].id]
+			bestuur.geef_loopbevel(doel)
+			w.tempo = 4.0
+			cam.zet_direct(view.terrein.tegel_midden(doel), 0.6, deg_to_rad(40), 26.0)
 		"minikaart":
 			# gewone startcamera; alle dorpelingen lopen 22 tegels naar het oosten (4x); na 8 s een klik op de minikaart
 			# op de voorste dorpeling: de camera springt erheen (view/minikaart.gd)

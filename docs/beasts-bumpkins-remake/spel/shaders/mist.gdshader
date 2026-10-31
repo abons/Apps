@@ -10,9 +10,12 @@ uniform sampler2D verkend : filter_nearest;    // R8, kolommen x rijen
 uniform vec2 maat = vec2(192.0, 192.0);
 uniform float tegel_m = 2.0;
 uniform float aan = 1.0;
-uniform float drempel = 0.62;  // > 0,5: bolle zwarte bogen
-uniform float golf = 0.5;      // ruis op de drempel: hoe grillig de rand
-uniform float zoom = 0.10;      // breedte van de gerasterde zoom (in drempeleenheden)
+// Drempel onder 0,5 (2026-10-31): zwart en zoom liggen buiten het verkende land, zoals het origineel de gerasterde
+// rand op de buurtegels van de onthulde cirkel zet (0x447a80: kern 0x800, buren alleen 0x4000 eraf). Max dr + zoom = 0,50,
+// dus een verkende tegel verliest niets meer; vroeger (0,62 / 0,5 / 0,10) at de rand tot bijna een tegel weg.
+uniform float drempel = 0.27;
+uniform float golf = 0.24;     // ruis op de drempel: hoe grillig de rand
+uniform float zoom = 0.11;     // breedte van de gerasterde zoom (in drempeleenheden)
 
 float hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -50,7 +53,7 @@ void fragment() {
 		f = f * f * (3.0 - 2.0 * f);          // ronder dan bilineair
 		float a = mix(mix(vk(i), vk(i + ivec2(1, 0)), f.x), mix(vk(i + ivec2(0, 1)), vk(i + ivec2(1, 1)), f.x), f.y);
 		float n = ruis(wp.xz / tegel_m * 0.8) * 0.7 + ruis(wp.xz / tegel_m * 2.1 + 7.3) * 0.3;
-		// drempel boven 0,5: het zwart steekt in bolle bogen het verkende land in, zoals in het origineel
+		// drempel onder 0,5: het zwart begint pas voorbij het midden tussen verkend en onverkend
 		float dr = drempel + (n - 0.5) * golf;
 		if (a >= dr + zoom) {
 			discard;

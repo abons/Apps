@@ -12,8 +12,8 @@ var aan := true
 var verkend := PackedByteArray()   ## per tegel (Raster.idx): 1 = verkend
 var versie := 0                    ## telt op bij elke wijziging (view: textuur bijwerken)
 var start_straal := 8.0
-var zicht_dorpeling := 4.0
-var zicht_gebouw := 4.0
+var zicht_dorpeling := 7.0      ## origineel: object +0x12c, minstens 7 (../mist.md)
+var zicht_gebouw := 12.0
 var start_objecten: Array = ["put", "voetvolkgilde"]
 var _laatst := {}                  ## dorpeling-id -> tegel waarop hij het laatst verkende
 var _gebouwd := {}                 ## Plan -> true: al verkend
