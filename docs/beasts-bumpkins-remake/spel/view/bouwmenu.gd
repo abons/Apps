@@ -53,9 +53,8 @@ const KLEUR_BESTAAT := Color(0.85, 0.85, 0.85, 0.25)
 const POORT_OPEN_RAD := deg_to_rad(100.0)
 const WIEKEN_RAD_S := 0.9      ## draaisnelheid van de molenwieken
 
-const STAPELS := ["zaagbok", "steenhoop"]   ## bouwplaats (besluit gebruiker, origineel woodpile + rockpile)
+const STAPELS := ["zaagbok", "steenhoop"]   ## bouwplaats (besluit gebruiker, origineel woodpile + rockpile); = Plan.STAPELS
 const STAPEL_TERUG := {"zaagbok": "houtstapel"}   ## als de eerste ontbreekt
-const KIJK_M := 2.6           ## een bouwer binnen deze afstand van de zaagbok of steenhoop kijkt ernaartoe
 const STAPEL_RESTANT := 0.35   ## schaal van een stapel vlak voor klaar
 const VOLWASSENE_M := 1.37     ## de man, langste volwassene (bumpkin_basis.py; vrouw en ouderen 1,31-1,33)
 const DEUR_M := VOLWASSENE_M * 1.15   ## gewenste hoogte van de voordeur: iets groter dan een volwassene
@@ -658,7 +657,7 @@ func _toon_plan(p: Plan) -> void:
 	_getoond[p] = 0
 	ghost.get_parent().add_child(mi)
 	var lijst: Array[Node3D] = []
-	var plekken := _stapelplekken(p, STAPELS.size() if not p.soort in [&"akker", &"hek", &"poort", &"weg"] else 0)
+	var plekken := p.stapels      # sim: Wereld.stapel_plekken (bij plan_zet), leeg voor akker, hek, poort, weg
 	for i in plekken.size():
 		var naam: String = STAPELS[i]
 		if not Natuur.bestaat(naam) and STAPEL_TERUG.has(naam):
@@ -667,7 +666,7 @@ func _toon_plan(p: Plan) -> void:
 		if n == null:
 			continue
 		n.position = _grond(plekken[i])
-		n.rotation.y = p.draai * PI * 0.5 + i * 0.7
+		n.rotation.y = p.stapel_hoek(i)
 		n.set_meta("stapel", STAPELS[i])
 		ghost.get_parent().add_child(n)
 		lijst.append(n)
@@ -679,41 +678,6 @@ func _grond(t: Vector2i) -> Vector3:
 	if terrein != null:
 		v.y = terrein.hoogte_op(v.x, v.z)
 	return v
-
-
-## Stapelplekken: tegels net buiten de voetafdruk aan de deurkant (sim/plan.gd deur_richting, ook na draaien), naast de
-## deurtegel en niet op het pad ervoor of op een weg, dichtstbij de deur eerst; pas als die kant vol is de andere
-## kanten. Zo staan zaagbok en steenhoop voor het gebouw bij de deur, nooit erachter of erin (2026-10-30).
-func _stapelplekken(p: Plan, n: int) -> Array[Vector2i]:
-	var uit: Array[Vector2i] = []
-	if n <= 0:
-		return uit
-	var r := p.afdruk()
-	var deur := p.deur_tegel()
-	var dr := p.deur_richting()
-	var pad_i := w.raster.namen.find("pad")
-	var vrij := func(t: Vector2i) -> bool:
-		if r.has_point(t) or t == deur or t == deur + dr or not w.raster.loopbaar_v(t) or w.plan_op(t) != null:
-			return false
-		return pad_i < 0 or w.raster.soort[w.raster.idx(t.x, t.y)] != pad_i
-	var zij := Vector2i(-dr.y, dr.x)       # langs de gevel
-	var kand: Array[Vector2i] = []
-	for k in range(1, maxi(r.size.x, r.size.y) + 2):   # deurkant: om en om naast de deur, eerst dichtbij
-		kand.append(deur + zij * k)
-		kand.append(deur - zij * k)
-	for k in range(1, 4):                  # een rij verder van de gevel
-		kand.append(deur + dr + zij * k)
-		kand.append(deur + dr - zij * k)
-	for c in range(r.position.x - 1, r.end.x + 1):     # noodgeval: de rest van de rand
-		kand.append(Vector2i(c, r.end.y))
-		kand.append(Vector2i(c, r.position.y - 1))
-	for rij in range(r.position.y, r.end.y):
-		kand.append(Vector2i(r.end.x, rij))
-		kand.append(Vector2i(r.position.x - 1, rij))
-	for t in kand:
-		if uit.size() < n and not t in uit and vrij.call(t):
-			uit.append(t)
-	return uit
 
 
 ## Plan af: stapels weg, de kist wordt het gebouw (glb op ware grootte, of op de mensendeur geschaald).
@@ -917,10 +881,9 @@ func _werk_stand(p: Plan) -> bool:
 	return true
 
 
-## Een bouwer die aan een plan werkt en binnen KIJK_M van de zaagbok of steenhoop staat, kijkt ernaartoe en pakt
-## het gereedschap van het origineel: bij de zaagbok de zaag (`saw`), bij de steenhoop de houweel (`pick`).
-const STAPEL_WERK := {"zaagbok": &"zagen", "steenhoop": &"houweel"}
-
+## Een dorpeling die aan een plan werkt doet wat zijn werkplek zegt (sim: Wereld.werk_plekken, Dorpeling.werk_soort):
+## zagen bij de zaagbok (origineel `saw`), hakken met de houweel bij de steenhoop (`pick`), anders hameren aan de
+## gevel (`hammer`); hij kijkt naar `werk_kijk` (de stam, de keien, de gevel).
 func _kijk_bouwers() -> void:
 	if view == null:
 		return
@@ -930,18 +893,12 @@ func _kijk_bouwers() -> void:
 			continue
 		var b: Bumpkin = u["bump"]
 		b.werk_voorkeur = &""
-		if not d.bouwt or d.werk_plan == null or d.werk_plan.klaar or not _stapels.has(d.werk_plan):
+		if not d.bouwt or d.werk_plan == null or d.werk_plan.klaar or d.werk_soort == &"":
 			continue
-		var best: Node3D = null
-		var best_d := KIJK_M
-		for s: Node3D in _stapels[d.werk_plan]:
-			var a := Vector2(s.global_position.x - b.global_position.x, s.global_position.z - b.global_position.z).length()
-			if a < best_d:
-				best_d = a
-				best = s
-		if best != null:
-			b.kijk_naar(best.global_position - b.global_position)
-			b.werk_voorkeur = STAPEL_WERK.get(best.get_meta("stapel", ""), &"")
+		b.werk_voorkeur = d.werk_soort
+		if d.werk_kijk.is_finite():
+			var k := Vector3(d.werk_kijk.x * w.tegel_m, 0.0, d.werk_kijk.y * w.tegel_m)
+			b.kijk_naar(k - b.global_position)
 
 ## Hekken opnieuw: een paal op elk hektegelmidden, een segment (2 m, palen op x = +-1) naar elk hek- of poortbuur
 ## (recht; schuin alleen zonder rechte tussenburen, dan 1,41x lang). Een poort draait zijn doorgang langs de hekken.

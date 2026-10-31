@@ -14,6 +14,16 @@ var voortgang := 0.0       ## 0..1
 var klaar := false
 var voorraad := 0          ## molen: brood op het schap (beasts-src Building.stock)
 var open := false          ## poort: open = loopbaar
+## Bouwplaats (origineel woodpile/rockpile, klasse 115/114): tegel van de zaagbok [0] en de steenhoop [1], door
+## Wereld.plan_zet gezet (Wereld.stapel_plekken); leeg voor akker, hek, poort en weg. De view zet ze daar neer.
+var stapels: Array[Vector2i] = []
+const STAPELS: Array[StringName] = [&"zaagbok", &"steenhoop"]
+const STAPEL_HOEK_STAP := 0.7    ## rad: de steenhoop staat iets anders gedraaid dan de zaagbok
+
+
+## Draaiing (rotation.y) van stapel i: met het gebouw mee, plus een slag per stapel.
+func stapel_hoek(i: int) -> float:
+	return draai * PI * 0.5 + i * STAPEL_HOEK_STAP
 
 ## Voordeur per soort bij draai 0, in meters vanaf het midden van de voetafdruk (x, z), uit de glb-ankers
 ## (`deur_voor_drempel`, `deur_drempel`) min het midden van het omhulsel; de deur kijkt langs `richting`.

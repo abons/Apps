@@ -1643,6 +1643,7 @@ func plan_zet(p: Plan) -> bool:
 	p.bouwtijd_s = float(spel.get("bouwtijd_s", {}).get(String(p.soort), p.bouwtijd_s))
 	kas -= prijs(p.soort)
 	plannen.append(p)
+	p.stapels = stapel_plekken(p)     # zaagbok en steenhoop: de view zet ze neer, de werkplekken volgen eruit
 	plan_gezet.emit(p)
 	return true
 
@@ -1770,20 +1771,161 @@ func plan_op(t: Vector2i) -> Plan:
 	return null
 
 
-## Stuur volwassenen in `ids` naar het plan om te bouwen (elk naar een eigen tegel van de voetafdruk). Geeft het aantal.
+## Stuur volwassenen in `ids` naar het plan om te bouwen, elk naar een eigen werkplek (`werk_plekken`): wie er al
+## aan werkt houdt zijn plek, een nieuwe krijgt de eerste vrije. Geeft het aantal.
 func geef_bouwbevel(ids: Array, p: Plan) -> int:
-	var r := p.afdruk()
-	var tegels: Array[Vector2i] = []
-	for c in range(r.position.x, r.end.x):
-		for rij in range(r.position.y, r.end.y):
-			tegels.append(Vector2i(c, rij))
 	var n := 0
 	for id in ids:
 		var d := dorpeling(id)
-		if d != null and d.geef_bevel(self, "werk", tegels[n % tegels.size()]):
-			d.werk_plan = p
+		if d != null and d.kan_bevel("werk") and _wijs_werkplek(d, p):
 			n += 1
 	return n
+
+
+const WERKPLEK_BEZET := 0.3    ## tegels: twee werkplekken dichter bij elkaar dan dit zijn dezelfde
+const ZAAG_PLEK_M := Vector2(0.5, 0.62)     ## bij draai 0, vanaf het midden van de zaagbok (stam langs x, 2e stam aan -z)
+const ZAAG_KIJK_M := Vector2(0.5, 0.0)      ## het stuk stam waar hij zaagt (tussen schraag en eind)
+const HOUWEEL_PLEK_M := Vector2(-0.15, 0.95)   ## vanaf het midden van de steenhoop (keien tot ~0,9 m)
+const HAMER_NAAR_GEVEL := 0.45              ## tegels: hamerplek van het tegelmidden tot net voor de rand van de voetafdruk
+
+## Geef `d` de eerste werkplek van `p` die niemand anders van dit plan heeft en waar hij kan komen.
+func _wijs_werkplek(d: Dorpeling, p: Plan) -> bool:
+	var bezet: Array[Vector2] = []
+	for x in dorpelingen:
+		if x != d and x.werk_plan == p and x.werk_punt.x >= 0.0:
+			bezet.append(x.werk_punt)
+	for pl: Dictionary in werk_plekken(p):
+		var punt: Vector2 = pl["punt"]
+		var vrij := true
+		for b in bezet:
+			if b.distance_to(punt) < WERKPLEK_BEZET:
+				vrij = false
+				break
+		if not vrij:
+			continue
+		if not d.geef_bevel(self, "werk", Vector2i(int(floor(punt.x)), int(floor(punt.y)))):
+			continue
+		d.route.append(punt)            # het laatste stukje: van het tegelmidden naar de plek zelf
+		d.werk_plan = p
+		d.werk_punt = punt
+		d.werk_soort = pl["soort"]
+		d.werk_kijk = pl["kijk"]
+		return true
+	return false
+
+
+## Werkplekken van een plan, in toewijsvolgorde: {punt (tegels, continu), soort (bouwen|zagen|houweel), kijk (tegels,
+## INF = geen)}. Gebouw met stapels: eerst een hamerplek aan de gevel, dan zagen bij de zaagbok, hakken bij de
+## steenhoop, dan de overige hamerplekken (origineel: een `saw`-sprite bij de woodpile, een `pick` bij de rockpile,
+## de rest `hammer` op een hammer point, klasse 114-116). De hamerplekken liggen op de rand rond de voetafdruk
+## (rechte buren, geen hoeken, niet op de deurtegel of een stapel), telkens de verste van wat al gekozen is.
+## Akker, hek, poort, weg: de tegels van de voetafdruk, dan de rand.
+func werk_plekken(p: Plan) -> Array[Dictionary]:
+	var uit: Array[Dictionary] = []
+	var r := p.afdruk()
+	var midden := Vector2(r.position) + Vector2(r.size) * 0.5
+	var vrij := func(t: Vector2i) -> bool:
+		if not raster.loopbaar_v(t) or bereik[raster.idx(t.x, t.y)] == 0:
+			return false
+		var q := plan_op(t)
+		return q == null or q == p
+	if p.stapels.is_empty():
+		for c in range(r.position.x, r.end.x):
+			for rij in range(r.position.y, r.end.y):
+				var t := Vector2i(c, rij)
+				if vrij.call(t):
+					uit.append({"punt": Vector2(t) + Vector2(0.5, 0.5), "soort": &"bouwen", "kijk": Vector2.INF})
+	# rand: rechte buren van de voetafdruk, eerst ring 1 en dan ring 2
+	var hamer: Array[Dictionary] = []
+	for ring in [1, 2]:
+		var kand: Array[Vector2i] = []
+		for c in range(r.position.x, r.end.x):
+			kand.append(Vector2i(c, r.position.y - ring))
+			kand.append(Vector2i(c, r.end.y - 1 + ring))
+		for rij in range(r.position.y, r.end.y):
+			kand.append(Vector2i(r.position.x - ring, rij))
+			kand.append(Vector2i(r.end.x - 1 + ring, rij))
+		var gekozen: Array[Vector2i] = p.stapels.duplicate()
+		if Plan.DEUREN.has(p.soort):
+			gekozen.append(p.deur_tegel())
+		var open: Array[Vector2i] = []
+		for t in kand:
+			if not t in p.stapels and not (Plan.DEUREN.has(p.soort) and t == p.deur_tegel()) and vrij.call(t):
+				open.append(t)
+		while not open.is_empty():      # de verste van wat al gekozen is (zonder stapels: de eerste van de rij)
+			var bi := 0
+			if not gekozen.is_empty():
+				var bd := -1.0
+				for i in open.size():
+					var m := INF
+					for g in gekozen:
+						m = minf(m, Vector2(open[i]).distance_squared_to(Vector2(g)))
+					if m > bd + 1e-6:
+						bd = m
+						bi = i
+			var t: Vector2i = open[bi]
+			open.remove_at(bi)
+			gekozen.append(t)
+			var c := Vector2(t) + Vector2(0.5, 0.5)
+			var gevel := Vector2(clampf(c.x, r.position.x, r.end.x), clampf(c.y, r.position.y, r.end.y))
+			var punt := c + (gevel - c).normalized() * HAMER_NAAR_GEVEL * (1.0 if ring == 1 else 0.0)
+			hamer.append({"punt": punt, "soort": &"bouwen", "kijk": gevel})
+	var tm := tegel_m
+	var stapel_plekken_: Array[Dictionary] = []
+	for i in p.stapels.size():
+		var c := Vector2(p.stapels[i]) + Vector2(0.5, 0.5)
+		var hoek := p.stapel_hoek(i)
+		if Plan.STAPELS[i] == &"zaagbok":
+			stapel_plekken_.append({"punt": c + ZAAG_PLEK_M.rotated(-hoek) / tm, "soort": &"zagen",
+					"kijk": c + ZAAG_KIJK_M.rotated(-hoek) / tm})
+		else:
+			stapel_plekken_.append({"punt": c + HOUWEEL_PLEK_M.rotated(-hoek) / tm, "soort": &"houweel", "kijk": c})
+	if not hamer.is_empty() and not stapel_plekken_.is_empty():
+		uit.append(hamer.pop_front())
+	uit.append_array(stapel_plekken_)
+	uit.append_array(hamer)
+	if uit.is_empty():           # alles dicht: dan maar ergens bij het plan
+		var t := dichtstbij_loopbaar(Vector2i(midden.floor()))
+		if t.x >= 0:
+			uit.append({"punt": Vector2(t) + Vector2(0.5, 0.5), "soort": &"bouwen", "kijk": midden})
+	return uit
+
+
+## Stapelplekken (zaagbok, steenhoop): tegels net buiten de voetafdruk aan de deurkant (Plan.deur_richting, ook na
+## draaien), naast de deurtegel en niet op het pad ervoor of op een weg, dichtstbij de deur eerst; pas als die kant
+## vol is de andere kanten. Zo staan ze voor het gebouw bij de deur, nooit erachter of erin (2026-10-30; was
+## Bouwmenu._stapelplekken, nu in de sim zodat de werkplekken ervan afhangen). Leeg voor akker, hek, poort, weg.
+func stapel_plekken(p: Plan) -> Array[Vector2i]:
+	var uit: Array[Vector2i] = []
+	if p.soort in [&"akker", &"hek", &"poort", &"weg"]:
+		return uit
+	var n := Plan.STAPELS.size()
+	var r := p.afdruk()
+	var deur := p.deur_tegel()
+	var dr := p.deur_richting()
+	var pad_i := raster.namen.find("pad")
+	var vrij := func(t: Vector2i) -> bool:
+		if r.has_point(t) or t == deur or t == deur + dr or not raster.loopbaar_v(t) or plan_op(t) != null:
+			return false
+		return pad_i < 0 or raster.soort[raster.idx(t.x, t.y)] != pad_i
+	var zij := Vector2i(-dr.y, dr.x)       # langs de gevel
+	var kand: Array[Vector2i] = []
+	for k in range(1, maxi(r.size.x, r.size.y) + 2):   # deurkant: om en om naast de deur, eerst dichtbij
+		kand.append(deur + zij * k)
+		kand.append(deur - zij * k)
+	for k in range(1, 4):                  # een rij verder van de gevel
+		kand.append(deur + dr + zij * k)
+		kand.append(deur + dr - zij * k)
+	for c in range(r.position.x - 1, r.end.x + 1):     # noodgeval: de rest van de rand
+		kand.append(Vector2i(c, r.end.y))
+		kand.append(Vector2i(c, r.position.y - 1))
+	for rij in range(r.position.y, r.end.y):
+		kand.append(Vector2i(r.end.x, rij))
+		kand.append(Vector2i(r.position.x - 1, rij))
+	for t in kand:
+		if uit.size() < n and not t in uit and vrij.call(t):
+			uit.append(t)
+	return uit
 
 
 ## Het dichtste onafgebouwde plan van dezelfde soort binnen 8 tegels (een rij hek bouwt zo door), of null.

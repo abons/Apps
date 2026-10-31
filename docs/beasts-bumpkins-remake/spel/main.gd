@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3|4 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
+## Opties na `--`:  --missie=1|2|3|4 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|bouwploeg|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -69,6 +69,7 @@ func _ready() -> void:
 	if opt.has("regen"):
 		w.regen_handmatig = 1
 	scenario = opt.get("scenario", "")
+	_stap_arg = int(opt.get("stap", "0")) if String(opt.get("stap", "0")).is_valid_int() else 0
 	var mist_aan := scenario == "" or scenario.begins_with("mist") or scenario == "minikaart"
 	if opt.has("mist"):
 		mist_aan = opt["mist"] != "uit"
@@ -196,6 +197,7 @@ func _opties() -> Dictionary:
 
 
 var _trace := false
+var _stap_arg := 0          ## --stap=N als getal (scenario bouwploeg: camerastand)
 var _camwolf := 0.0
 var _fps_aan := false
 var _prestatie: Prestatie
@@ -410,22 +412,30 @@ func _start_scenario() -> void:
 			var dt_ := ld.deur_tegel() if ld != null else Vector2i(101, 63)
 			cam.zet_direct(view.terrein.tegel_midden(dt_ + Vector2i(0, 1)) + Vector3(0, 0.8, 0), 0.6, deg_to_rad(22), 6.0)
 		"zagen", "houweel":
-			# houweel: hetzelfde, maar de bouwer begint met de houweel (werk_zaad 2 in _scenario_stap, Bumpkin.WERK_REEKS).
-			# een hut naast het kampvuur, twee mannen bouwen; de eerste is meteen bouwer (eigen model), dichtbij, de camera van voren.
-			# Bouwers wisselen hamer, zaag en houweel af (Bumpkin.WERK_WISSEL, per id een ander begin); bij de zaagbok de zaag,
-			# bij de steenhoop de houweel (Bouwmenu.STAPEL_WERK)
+			# een hut naast het kampvuur, de volwassenen bouwen (Wereld.werk_plekken: de eerste hamert aan de gevel, de
+			# tweede zaagt bij de zaagbok, de derde hakt bij de steenhoop); de eerste man is bouwer (eigen model). De camera
+			# volgt wie zaagt of hakt (_scenario_stap).
 			var ids := []
 			for d in w.dorpelingen:
-				if d.volwassen() and d.geslacht == "man":
+				if d.volwassen():
 					ids.append(d.id)
 			var p := _vrij_plan(&"hut", Vector2i(99, 62))
 			if p != null and w.plan_zet(p) and not ids.is_empty():
-				_wolf_man = w.dorpeling(ids[0])           # de camera volgt hem (_scenario_stap)
-				_wolf_man.rol = "bouwer"
-				w.rol_veranderd.emit(_wolf_man)
-				w.geef_bouwbevel(ids.slice(0, 2), p)
+				p.bouwtijd_s = 9999.0
+				var b0 := w.dorpeling(ids[0])
+				if b0.geslacht == "man":
+					b0.rol = "bouwer"
+					w.rol_veranderd.emit(b0)
+				w.geef_bouwbevel(ids, p)
+				for d in w.dorpelingen:
+					if d.werk_soort == (&"zagen" if scenario == "zagen" else &"houweel"):
+						_wolf_man = d
 			var pt: Vector2i = p.deur_tegel() if p != null else Vector2i(99, 62)
-			cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0, 0.6, 0), 3.7, deg_to_rad(26), 5.0)
+			var cyaw := 3.7
+			if _wolf_man != null and _wolf_man.werk_kijk.is_finite():   # van zijn kant, schuin: het werk niet achter de stapel
+				var kd := _wolf_man.werk_punt - _wolf_man.werk_kijk
+				cyaw = atan2(kd.x, kd.y) + 0.6
+			cam.zet_direct(view.terrein.tegel_midden(pt) + Vector3(0, 0.6, 0), cyaw, deg_to_rad(26), 5.0)
 		"hek":
 			# een weide van 6x5 tegels met een poort in de onderkant, meteen af; de poort gaat na 2 s open (via _scenario_stap)
 			# en na 12 s weer dicht
@@ -495,6 +505,30 @@ func _start_scenario() -> void:
 				if dp != null and w.plan_zet(dp):
 					w._rond_af(dp)
 			cam.zet_direct(view.terrein.tegel_midden(Vector2i(104, 61)) + Vector3(0, 1.0, 0), 0.7, deg_to_rad(36), 17.0)
+		"bouwploeg":
+			# een hut, alle zes bouwen (kinderen even volwassen): elk een eigen werkplek (Wereld.werk_plekken), een zaagt
+			# bij de zaagbok, een hakt bij de steenhoop, de rest hamert aan de gevel. --stap=0..3 kiest de camera.
+			for d in w.dorpelingen:
+				if d.leeftijd == "kind":
+					d.leeftijd = "volwassen"
+					w.rol_veranderd.emit(d)
+			var ids := []
+			for d in w.dorpelingen:
+				ids.append(d.id)
+			var p := _vrij_plan(&"hut", Vector2i(97, 61))
+			if p != null and w.plan_zet(p):
+				p.bouwtijd_s = 9999.0
+				p.voortgang = 0.4
+				w.geef_bouwbevel(ids, p)
+			var m := (Vector2(p.afdruk().position) + Vector2(p.afdruk().size) * 0.5) if p != null else Vector2(99, 63)
+			var yaw: float = [deg_to_rad(-90), deg_to_rad(-120), deg_to_rad(-60), deg_to_rad(-90)][clampi(_stap_arg, 0, 3)]
+			var af: float = [13.0, 7.0, 7.0, 20.0][clampi(_stap_arg, 0, 3)]
+			var focus := Vector3(m.x * w.tegel_m - 3.0, 0.8, m.y * w.tegel_m)
+			if _stap_arg == 1 and p != null and not p.stapels.is_empty():
+				focus = view.terrein.tegel_midden(p.stapels[0]) + Vector3(0, 0.7, 0)
+			elif _stap_arg == 2 and p != null and p.stapels.size() > 1:
+				focus = view.terrein.tegel_midden(p.stapels[1]) + Vector3(0, 0.7, 0)
+			cam.zet_direct(focus, yaw, deg_to_rad(30), af)
 		"stapels":
 			# vijf bouwplaatsen in alle vier draaiingen: zaagbok en steenhoop staan aan de deurkant, naast de deur
 			w.alles_open = true
@@ -664,8 +698,6 @@ func _scenario_stap() -> void:
 		"zagen", "houweel":
 			if _wolf_man != null:
 				cam.doel_focus = cam.doel_focus.lerp(view.unit_pos(_wolf_man.id) + Vector3(0, 0.6, 0), 0.05)
-				if scenario == "houweel" and view.units.has(_wolf_man.id):
-					(view.units[_wolf_man.id]["bump"] as Bumpkin).werk_zaad = 2   # leest hij bij de eerste werkstart
 		"ei":
 			if _stap == 0 and szt >= 6.0:
 				_stap = 1

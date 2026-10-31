@@ -745,7 +745,7 @@ func _test_kalveren() -> void:
 		z.tik(z.tik_dt)
 	_check(z.kalveren() == 0, "in de zomer geen kalveren")
 
-## Bouwplaatsstapels (view/bouwmenu.gd _stapelplekken): voor elk gebouw in elke draaiing twee tegels buiten de
+## Bouwplaatsstapels (sim/wereld.gd stapel_plekken): voor elk gebouw in elke draaiing twee tegels buiten de
 ## voetafdruk, aan de deurkant (langs de gevel of een rij verder), niet op de deurtegel of het pad ervoor.
 
 	# wilde koeien kalven ook, ongeacht eigenaar (gebruiker 2026-10-30)
@@ -829,8 +829,6 @@ func _test_bron() -> void:
 func _test_stapels() -> void:
 	var w := Wereld.new()
 	w.laad()
-	var bm := Bouwmenu.new()
-	bm.w = w
 	var goed := 0
 	var fout := []
 	for soort in [&"hut", &"melkerij", &"kippenhok", &"gereedschapsloods", &"molen"]:
@@ -844,7 +842,7 @@ func _test_stapels() -> void:
 			if p == null:
 				fout.append("%s/%d geen plek" % [soort, dr_])
 				continue
-			var pl: Array[Vector2i] = bm._stapelplekken(p, 2)
+			var pl: Array[Vector2i] = w.stapel_plekken(p)
 			var deur := p.deur_tegel()
 			var dr := p.deur_richting()
 			var ok := pl.size() == 2
@@ -856,5 +854,4 @@ func _test_stapels() -> void:
 				goed += 1
 			else:
 				fout.append("%s/%d %s deur %s" % [soort, dr_, pl, deur])
-	bm.free()
 	_check(fout.is_empty(), "stapels aan de deurkant, vrij van voetafdruk en pad: %d/20 %s" % [goed, fout])

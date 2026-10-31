@@ -20,6 +20,9 @@ var bevel := {}               ## {} (geen) of {"soort": "loop"|"vecht"|"werk", "
 var anker := Vector2i.ZERO    ## zwerfmiddelpunt: het kampvuur, na een bevel de plek waar hij bleef staan
 var wacht := 2.0
 var werk_plan: Plan = null   ## bouwplek waar hij heen loopt en aan werkt
+var werk_punt := Vector2(-1, -1)   ## zijn werkplek bij dat plan (tegels, continu; Wereld.werk_plekken), -1 = geen
+var werk_soort := &""        ## wat hij daar doet: bouwen (hamer), zagen (bij de zaagbok), houweel (bij de steenhoop)
+var werk_kijk := Vector2.INF  ## waar hij naar kijkt tijdens het werk (tegels), INF = geen
 var doel_koe: Vee = null     ## koe die hij gaat claimen (bevel "claim")
 var wieg: Dictionary = {}     ## gezin dat hij met een partner in een hut sticht (Wereld._gezin), {} = geen
 var binnen := false          ## in de hut (onzichtbaar, staat stil op de deurtegel)
@@ -134,6 +137,9 @@ func geef_bevel(w: Wereld, soort: String, doel: Vector2i) -> bool:
 		bezig = 0.0
 	binnen = false
 	werk_plan = null
+	werk_punt = Vector2(-1, -1)
+	werk_soort = &""
+	werk_kijk = Vector2.INF
 	doel_wolf = null             # elk nieuw bevel stopt het gooien; Wereld.geef_bevel("vecht") zet hem daarna weer
 	worp_t = -1.0
 	if doel_koe != null:          # een nieuw bevel laat de koe die hij ging claimen weer vrij
