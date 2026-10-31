@@ -28,6 +28,7 @@ $bron = @(
     '..\modellen\bumpkin\bumpkin_bouwer.glb',
     '..\modellen\bumpkin\bumpkin_voetsoldaat.glb',
     '..\modellen\bumpkin\bumpkin_anim.json',
+    '..\modellen\bumpkin\zombie_anim.json',
     '..\modellen\gebouwen\gereedschapsloods_rt.glb',
     '..\modellen\gebouwen\kippenhok_rt.glb',
     '..\modellen\gebouwen\molen_rt.glb',
@@ -41,6 +42,9 @@ foreach ($s in 1..3) {
     $bron += "..\modellen\peasant_hut_stand$s.glb"
     foreach ($g in @('gereedschapsloods', 'molen', 'melkerij_boerderij', 'kippenhok', 'voetvolkgilde')) { $bron += "..\modellen\gebouwen\${g}_stand$s.glb" }
 }
+# zombie (missie 4, modellen/bumpkin/zombie.py): de straat schrijft bumpkin_zombie.glb, het spel leest assets/zombie.glb
+$zg = Join-Path $PSScriptRoot '..\modellen\bumpkin\bumpkin_zombie.glb'
+if (Test-Path $zg) { Copy-Item $zg (Join-Path $assets 'zombie.glb') -Force; Write-Host "gekopieerd: assets/zombie.glb" }
 foreach ($b in $bron) {
     $src = Join-Path $PSScriptRoot $b
     if (Test-Path $src) {

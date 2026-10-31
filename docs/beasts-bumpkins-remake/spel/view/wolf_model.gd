@@ -208,13 +208,18 @@ static func _maak_wezen(soort: StringName, wc: Dictionary) -> Node3D:
 			lijf.name = "Lijf"
 			n.add_child(lijf)
 			var ap := _speler(lijf)
+			var anim := String(wc.get("anim", ""))         # eigen clip-tabel (zombie_anim.json): snelheden, duur
+			if anim != "" and ResourceLoader.exists(anim):
+				lijf.set_meta("anim", anim)
 			if ap:
 				for naam in ap.get_animation_list():
 					if naam in [&"idle", &"lopen", &"rennen"]:
 						ap.get_animation(naam).loop_mode = Animation.LOOP_LINEAR
 				if ap.has_animation(&"idle"):
 					ap.play(&"idle")
+			_gloei(lijf, float(wc.get("gloed", 0.0)))
 			_hp(n)
+			(n.get_node("Hp") as Node3D).position.y = float(wc.get("hp_y", 1.25))
 			return n
 		"boom":     # den met ogen (view/missie_props.gd)
 			var n := Node3D.new()
@@ -236,6 +241,22 @@ static func _maak_wezen(soort: StringName, wc: Dictionary) -> Node3D:
 	over.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_tint(lijf2, over)
 	return w
+
+
+## Emissieve materialen (het zombie-oog, glTF emissive) iets feller zetten: `gloed` = emission_energy_multiplier.
+static func _gloei(n: Node, gloed: float) -> void:
+	if gloed <= 0.0:
+		return
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(i) as StandardMaterial3D
+			if m and m.emission_enabled:
+				m = m.duplicate()
+				m.emission_energy_multiplier = gloed
+				mi.set_surface_override_material(i, m)
+	for c in n.get_children():
+		_gloei(c, gloed)
 
 
 static func _tint(n: Node, m: Material) -> void:
@@ -283,7 +304,7 @@ static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float, tempo :=
 	elif ap == null:
 		_werk_placeholder(n, wf, fase, t, dt)
 	else:
-		_werk_glb(ap, lijf, wf, tempo)
+		_werk_glb(ap, lijf, wf, tempo, dt)
 	var hp := n.get_node("Hp") as Node3D
 	hp.visible = wf.leeft() and (wf.hp < wf.hp_max or wf.geraakt < 3.0)
 	if hp.visible:
@@ -304,15 +325,15 @@ static func _werk_boom(lijf: Node3D, wf: Wolf, dt: float) -> void:
 		lijf.rotation.x = 0.0
 
 
-static func _clip_v(naam: String) -> float:
-	var d = Gegevens.lees(ANIM)
-	return float(d[naam]["snelheid_mps"]) if d is Dictionary and d.has(naam) else 1.0
+static func _clip(lijf: Node3D, naam: String, veld: String, standaard: float) -> float:
+	var d = Gegevens.lees(String(lijf.get_meta("anim", ANIM)))
+	return float(d[naam][veld]) if d is Dictionary and d.has(naam) and d[naam].get(veld) != null else standaard
 
 
 ## Clip op een vaste plek (bijten/dood volgen `slag` van de sim, dus geen eigen klok).
 static func _zet(ap: AnimationPlayer, naam: StringName, u: float) -> void:
 	if ap.current_animation != naam:
-		ap.play(naam, 0.12)
+		ap.play(naam)        # geen overvloeiing: met speed_scale 0 komt een blend nooit vooruit (bleef de vorige clip)
 	ap.speed_scale = 0.0
 	ap.seek(clampf(u, 0.0, 1.0) * ap.get_animation(naam).length, true)
 
@@ -323,20 +344,42 @@ static func _speel(ap: AnimationPlayer, naam: StringName, snelheid: float) -> vo
 	ap.speed_scale = snelheid
 
 
-static func _werk_glb(ap: AnimationPlayer, lijf: Node3D, wf: Wolf, tempo: float) -> void:
+## Na een beet zet de sim `slag` meteen op 0 (pauze); de view speelt de slag dan zelf af tot het eind, anders springt de
+## kop van de zombie (die op STRIKE_AT bij het slachtoffer is) in een frame terug op de romp. Meta `na_slag` = die eigen klok.
+static func _slag_u(lijf: Node3D, wf: Wolf, dt: float) -> float:
+	var vorig: float = lijf.get_meta("slag_vorig", 0.0)
+	var na: float = lijf.get_meta("na_slag", -1.0)
+	var aanval := wf.toestand == Wolf.ATTACK
+	lijf.set_meta("slag_vorig", wf.slag if aanval else 0.0)
+	if na < 0.0 and vorig >= Wolf.STRIKE_AT - 0.08 and (not aanval or wf.slag < vorig):
+		na = vorig                                        # beet gevallen (of prooi los): zelf afmaken
+	if na >= 0.0:
+		na += dt / maxf(0.1, _clip(lijf, "bijten", "duur_s", 0.9))
+		if na >= 1.0 or not wf.leeft():
+			na = -1.0
+	lijf.set_meta("na_slag", na)
+	return na if na >= 0.0 else (wf.slag if aanval else -1.0)
+
+
+static func _werk_glb(ap: AnimationPlayer, lijf: Node3D, wf: Wolf, tempo: float, dt := 0.0) -> void:
 	lijf.position.y = 0.0
+	var u := _slag_u(lijf, wf, dt)
 	match wf.toestand:
 		Wolf.DYING:
 			_zet(ap, &"dood", wf.slag)
 		Wolf.DEAD:
 			_zet(ap, &"dood", 1.0)
 			lijf.position.y = -0.5 * clampf((wf.slag - 0.7) / 0.3, 0.0, 1.0)   # laatste 30 %: zakt weg
-		Wolf.ATTACK:
-			_zet(ap, &"bijten", wf.slag)
 		_:
-			if wf.snelheid_mps > 0.05:
-				var clip := &"rennen" if wf.snelheid_mps > REN_MPS else &"lopen"
-				_speel(ap, clip, wf.snelheid_mps * tempo / _clip_v(String(clip)))
+			if u >= 0.0:
+				_zet(ap, &"bijten", u)
+			elif wf.snelheid_mps > 0.05:
+				# draf/galop: wolf vanaf REN_MPS; een wezen met eigen clips halverwege lopen en rennen (zombie 0,73 m/s)
+				var v_l := _clip(lijf, "lopen", "snelheid_mps", 1.0)
+				var v_r := _clip(lijf, "rennen", "snelheid_mps", 1.0)
+				var grens := (v_l + v_r) * 0.5 if lijf.has_meta("anim") else REN_MPS
+				var clip := &"rennen" if wf.snelheid_mps > grens else &"lopen"
+				_speel(ap, clip, wf.snelheid_mps * tempo / (v_r if clip == &"rennen" else v_l))
 			else:
 				_speel(ap, &"idle", tempo)
 
