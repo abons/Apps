@@ -3,6 +3,7 @@ extends SceneTree
 ## godot --headless --path . -s test/deurweg_test.gd
 ## De ghost toont Wereld.weg_route van de deurtegel naar het pad; plan_zet legt precies die tegels en rekent
 ## prijs + nieuwe padtegels x weg_per_tegel af; draaien geeft een andere route; de hint noemt "Hut 300 + pad n x 20";
+## de weg-ghost is de keienweg (shaders/weg_ghost.gdshader) in de ghost-tint;
 ## geen route -> rood met "Geen pad naar je dorp" en geen voorbeeld; te duur met het pad -> rood "Te duur".
 
 var fouten := 0
@@ -71,6 +72,8 @@ func _start() -> void:
 	_check(bm.pad_route == verwacht and not verwacht.is_empty(), "voorbeeld = weg_route (%d tegels)" % verwacht.size())
 	_check(bm.pad_route[0] == p0.deur_tegel(), "voorbeeld begint op de deurtegel")
 	_check(bm._pad_mi.visible and bm._pad_mi.mesh != null, "voorbeeld zichtbaar")
+	var gm := bm._pad_mi.material_override as ShaderMaterial
+	_check(gm != null and gm.shader.resource_path == "res://shaders/weg_ghost.gdshader" 			and gm.get_shader_parameter("ghost_tint") == Bouwmenu.GHOST_TINT_KAN 			and is_equal_approx(float(gm.get_shader_parameter("ghost_alfa")), Bouwmenu.GHOST_ALFA), "voorbeeld = keienweg-ghost, groen")
 	var n := bm.pad_nieuw
 	var tekst := "Hut %d + pad %d x %d = %d" % [w.prijs(&"hut"), n, wpt, w.prijs(&"hut") + n * wpt]
 	_check(tekst in bm.hint.text, "hint: '%s'" % bm.hint.text)
@@ -90,6 +93,8 @@ func _start() -> void:
 	bm.draai = d0
 	w.kas = w.prijs(&"hut") + n * wpt - 1
 	_check(not bm._toon_ghost(bm._plan_op(plek)) and "Te duur" in bm.hint.text, "prijs + pad te duur: rood (%s)" % bm.hint.text)
+	var rm := bm._pad_mi.material_override as ShaderMaterial
+	_check(bm._pad_mi.visible and rm.get_shader_parameter("ghost_tint") == Bouwmenu.GHOST_TINT_NIET, "prijs + pad te duur: weg-ghost rood")
 	_check(not w.plan_zet(bm._plan_op(plek)), "prijs + pad te duur: niet gezet")
 
 	# plaatsen: precies de getoonde tegels worden pad, kas = prijs + pad
