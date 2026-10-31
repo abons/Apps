@@ -135,15 +135,26 @@ func _initialize() -> void:
 	_check(not v2 in w.objecten, "een bouwer dooft het vuur (origineel 0x448f78)")
 	b.rol = ""
 
-	# zombie (type 18): standaard passief (besluit gebruiker): staat stil, kijkt naar een dorpeling, bijt niet
+	# zombie (type 18): standaard actief (gebruiker: de zombie valt aan); passief = staat stil, kijkt, bijt niet
 	var z: Wolf = zombies[1] if zombies[0] == bewaker else zombies[0]
-	_check(z.passief(w), "zombie is standaard passief (spel.json wezens.zombie.passief)")
+	_check(not z.passief(w), "zombie valt standaard aan (spel.json wezens.zombie.passief false)")
+	z._c["passief"] = true
+	for wf in w.wolven:         # de andere wezens jagen nu ook: even stil zetten, anders vlucht het slachtoffer
+		if wf != z:
+			wf.cfg(w)["passief"] = true
+			wf.prooi = null
+			wf.toestand = Wolf.ROAM if wf.leeft() else wf.toestand
 	z.zet_tegel(w.dichtstbij_loopbaar(Vector2i(100, 90)))
 	z.anker = z.tegel()
 	z.toestand = Wolf.ROAM
 	z.prooi = null
+	z.route.clear()
+	z.rust = 0.0                # kan eerder al gejaagd hebben: nu actief vanaf de start
+	z.pauze = 0.0
+	z.kijk = 0.0
 	for d in w.dorpelingen:
 		_zet(d, w.kampvuur + Vector2i(0, 2))
+		d.doel_wolf = null       # wie eerder door een (nu actieve) zombie is aangevallen, vecht anders nog terug
 	var slachtoffer: Dorpeling = w.dorpelingen[0]
 	slachtoffer.gezondheid = slachtoffer.gezondheid_max
 	_zet(slachtoffer, w.dichtstbij_loopbaar(z.tegel() + Vector2i(2, 0)))
@@ -156,8 +167,9 @@ func _initialize() -> void:
 	_check(geraakt.is_empty() and z.pos == zp, "passieve zombie loopt niet en bijt niet")
 	_check(z.kijkt_naar == slachtoffer, "passieve zombie kijkt naar de dorpeling naast hem")
 	_check(Leven.dreiging(w, slachtoffer) == null, "geen reden om voor een passieve zombie te vluchten")
-	# actief (passief false, open vraag aan de gebruiker): jaagt niet op koeien, wel op dorpelingen, bijt 22
+	# actief (de standaard): jaagt niet op koeien, wel op dorpelingen, bijt 22
 	z._c["passief"] = false
+	z.kijk = 0.0
 	if not w.vee.is_empty():
 		w.vee[0].zet_tegel(w.dichtstbij_loopbaar(z.tegel() + Vector2i(0, 2)))
 		_zet(slachtoffer, w.kampvuur + Vector2i(0, 2))
@@ -172,7 +184,8 @@ func _initialize() -> void:
 			break
 	_check(not geraakt.is_empty() and geraakt[0][1] == "zombie", "actieve zombie bijt een dorpeling (%s na %.1f s)" % [geraakt, w.tijd_s - t0])
 	_check(float(z.cfg(w)["snelheid_mps"]) < float(w.spel["wolf"]["snelheid_mps"]), "zombie is trager dan een wolf")
-	z._c["passief"] = true
+	for wf in w.wolven:
+		wf.cfg(w)["passief"] = w.spel["wezens"].get(String(wf.soort), {}).get("passief", false)
 
 	# zombie (47,12) dood -> oostmuur weg -> triggerplek bereikbaar -> gewonnen
 	bewaker.raak(w, 1000)
