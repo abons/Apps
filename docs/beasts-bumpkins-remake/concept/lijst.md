@@ -31,7 +31,7 @@ Bronnen: `../onderzoek.md` (aantallen, gilden, 33 units uit BBTools-catalogi), d
 | 1 | Vrouw | f_still / f_walk | `U/f_still.png`, `U/f_walk.png`, `U/f_sack.png`, `U/f_milk.png`, `U/fthrow.png`, `U/f_harvest.png`, `U/milking.png`, `U/d_fema.png` | geen | 1 r, 8 poses | 1 | 1 | Blond, grijsgroen jasje, paarse rok; melkt, oogst. Zelfde stijl als man (hergebruik) |
 | 2 | Jongen | kidm | `U/kidm.png`, `U/d_kidm.png` | geen | 1 r, 2 | 1 | 1 | 0,81x man; paars hemd, bruin haar |
 | 3 | Meisje | kidf | `U/kidf.png`, `U/d_kidf.png` | geen | 1 r, 2 | 1 | 1 | 0,81x man; blond, paarse jurk |
-| 4 | Oudere man | elderm | `U/elderm.png` | geen | 1 r, 1 | 1 | 1 | Wit haar, wandelstok met ranken, licht gebogen (0,96x) |
+| 4 | Oudere man | elderm | `U/elderm.png` | `bb_original/portret/bust00.png` | 1 r, 1 | 1 | 1 | Wit haar, wandelstok met ranken, licht gebogen (0,96x) |
 | 5 | Oudere vrouw | elderf | `U/elderf.png` | geen | 1 r, 1 | 1 | 1 | Zelfde stok-silhouet als oudere man |
 | 6 | Bouwer (bouwersgilde-eenheid) | reparman / rp_still / bushk_rp | `U/reparman.png`, `U/rp_still.png`, `U/bushk_rp.png`, `U/hammer.png`, `U/d_buil.png` | geen | 1 r, 5 | 1 | 1 | Blauwe tuniek, gele muts, hamer; bushk_rp lijkt rugaanzicht |
 | 7 | Baby | baby | `U/baby.png`, `bb_original/baby.png` | geen | 1 r, 4 frames | 2 | 2 | Ligt in doek; kan op de kinderplaat |
