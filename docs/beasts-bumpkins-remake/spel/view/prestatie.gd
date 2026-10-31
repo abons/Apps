@@ -8,13 +8,13 @@ extends Node
 ## De pc ziet hier niets van: zonder `mobile` en zonder `--prestatie` wordt de node niet gemaakt.
 
 const STANDAARD := {
-	"schaal": 0.75,         # Viewport.scaling_3d_scale (Motorola: 1.0 -> 0.75 = 7.5 -> 10 fps)
+	"schaal": 0.5,          # Viewport.scaling_3d_scale (Motorola: 1.0 -> 0.75 = 7.5 -> 10 fps; 0.5 + schaduw uit = 24 fps, besluit gebruiker 2026-10-31)
 	"fsr": false,           # true = FSR1-opschaling in plaats van bilineair
 	"msaa": 0,              # Viewport.MSAA_* (0 uit, 1 x2, 2 x4, 3 x8); -1 = projectinstelling (msaa_3d=2 = x4); uit: 10 -> 12,7 fps
 	"glow": false,          # 13,1 -> 13,5 fps
 	"ssao": true,
 	"fog": true,
-	"schaduw": 2048,        # directional-atlas in px; 0 = zon- en maanschaduw uit
+	"schaduw": 0,           # directional-atlas in px; 0 = zon- en maanschaduw uit (Motorola 11,8 -> 13,8 fps; met schaal 0.5 -> 24,4)
 	"splits": 2,            # 1, 2 of 4; 2: prims 1127k -> 640k
 	"schaduw_afstand": 140.0,
 	"zacht": 3,             # soft-shadow-kwaliteit 0..5
