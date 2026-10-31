@@ -6,6 +6,9 @@ extends CanvasLayer
 ## sneltoetsuitleg, alleen een rij icoon + getal (kas, dorpelingen en koeien met het missiedoel) op >= 16 dp; minikaart,
 ## munt-icoon en rolletjes groter. Staand (view/scherm.gd) op de pc: de stand in korte regels. Brief en prijzenscherm
 ## leggen zich opnieuw neer bij size_changed (`_indeling`).
+## Pc (2026-10-31, gebruiker: te veel tekst): dezelfde rij icoon + getal, met pauze-icoon / 2x / 4x erachter; de tekstregels
+## klappen uit met het pijltje of Tab / I, de sneltoetsuitleg met "? Toetsen" of F1. Beide standaard dicht, per speler
+## bewaard in user://hud.cfg.
 
 var w: Wereld
 var bestuur: Bestuur
@@ -26,8 +29,15 @@ var _kas_t := 0.0
 var stand: PanelContainer        ## de tekstregels (pc)
 var tellers: Tellers             ## touch: icoon + getal
 var schaal := 1.0                ## touch: minikaart, munt-icoon en rolletjes (1 op de pc)
+var kop: HBoxContainer           ## pc: tellers + pijltje naar de details
+var knop_details: Button         ## pc: pijltje (Tab / I) klapt de tekstregels (stand) uit en in
+var knop_hulp: Button            ## pc: "? Toetsen (F1)" klapt de sneltoetsuitleg uit en in
+var details_open := false        ## pc: tekstregels zichtbaar (standaard ingeklapt, gebruiker 2026-10-31)
+var hulp_open := false           ## pc: sneltoetsuitleg zichtbaar
+## Ingeklapt/uitgeklapt per speler; "" = niet lezen of schrijven (tests). Scenario's lezen en schrijven niet (frames
+## blijven gelijk), `--hud=details|hulp|beide` klapt voor frames uit.
+static var cfg_pad := "" if Scherm.optie("scenario") != "" else "user://hud.cfg"
 var _was_staand := false
-var _hulp_offsets: Array = []    ## liggend: linksonder (zoals altijd); staand onder de stand, want onderin zit het bouwmenu
 
 
 func bouw(wereld: Wereld, b: Bestuur) -> void:
@@ -52,26 +62,61 @@ func bouw(wereld: Wereld, b: Bestuur) -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc.add_child(label)
 	add_child(pc)
+	tellers = Tellers.new()
+	tellers.bouw(w, Scherm.dp(), not Bouwmenu.touch)
 	if Bouwmenu.touch:
 		pc.visible = false
-		tellers = Tellers.new()
-		tellers.bouw(w, Scherm.dp())
 		tellers.position = pc.position
 		add_child(tellers)
+	else:
+		# pc (2026-10-31, gebruiker: te veel tekst): dezelfde rij als touch, met pijltje (Tab / I) naar de details
+		kop = HBoxContainer.new()
+		kop.position = pc.position
+		kop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		kop.add_theme_constant_override("separation", 6)
+		kop.add_child(tellers)
+		knop_details = Pijl.new()
+		knop_details.tooltip_text = "details (Tab)"
+		knop_details.pressed.connect(wissel_details)
+		kop.add_child(knop_details)
+		add_child(kop)
 
 	var pc2 := PanelContainer.new()
 	pc2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pc2.add_theme_stylebox_override("panel", _stijl())
-	pc2.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	pc2.position = Vector2(12, -82)
 	hulp = Label.new()
 	hulp.add_theme_font_size_override("font_size", 13)
 	hulp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop"
+	hulp.text = "links: kader/klik = kiezen, klik grond = lopen, klik koe = claimen, klik loods = bouwer (75)   rechts klik = selectie weg   rechts slepen / Q E = draaien\nbouwen: knop rechtsboven, indrukken-slepen-loslaten = plaatsen (weg/hek: slepen = rij), blijft aan; Draai / wiel / R, Stop / rechts / Esc\nWASD/rand = pannen   wiel = zoom   Spatie pauze   O / munten = prijzen   1 2 4 tempo   K regen   N seizoen   Esc stop\nTab / I = details   F1 = deze uitleg"
 	pc2.add_child(hulp)
-	pc2.visible = not Bouwmenu.touch      # sneltoetsen en muisknoppen: zonder toetsenbord zinloos
 	add_child(pc2)
-	_hulp_offsets = [pc2.offset_left, pc2.offset_top, pc2.offset_right, pc2.offset_bottom]
+	knop_hulp = Button.new()
+	knop_hulp.text = "? Toetsen (F1)"
+	knop_hulp.focus_mode = Control.FOCUS_NONE
+	knop_hulp.add_theme_font_size_override("font_size", 13)
+	for st in ["normal", "hover", "pressed"]:
+		var sb := _stijl()
+		sb.set_content_margin_all(5)
+		sb.content_margin_left = 8
+		sb.content_margin_right = 8
+		if st != "normal":
+			sb.bg_color = Color(0.15, 0.15, 0.15, 0.7)
+		knop_hulp.add_theme_stylebox_override(st, sb)
+	knop_hulp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	knop_hulp.pressed.connect(wissel_hulp)
+	add_child(knop_hulp)
+	if Bouwmenu.touch:      # sneltoetsen en muisknoppen: zonder toetsenbord zinloos
+		pc2.visible = false
+		knop_hulp.visible = false
+	else:
+		_lees_cfg()
+		match Scherm.optie("hud"):      # alleen voor frames: --hud=details|hulp|beide
+			"details": details_open = true
+			"hulp": hulp_open = true
+			"beide":
+				details_open = true
+				hulp_open = true
+		_pas_inklap_toe()
 
 	uitslag = Label.new()
 	uitslag.add_theme_font_size_override("font_size", int(44 * maxf(1.0, Scherm.dp() * 0.8)))
@@ -167,37 +212,91 @@ func _process(dt: float) -> void:
 	var geluk := "geluk: %d%%" % roundi(w.handel.dorp_geluk(w) * 100.0)   # sim/handel.gd, prijzen via het munt-icoon
 	if w.handel.misdaad_aan(w):
 		geluk += "   misdaden: %d" % w.handel.totaal_misdaden()
-	if tellers != null:
-		tellers.zet(kas_toon)
+	tellers.zet(kas_toon)
+	if Bouwmenu.touch:
 		return
-	var regels := "%02d:%02d%s  dag %d  %s  %s
-kas: %s   dorpelingen: %s   koeien: %s   bedden: %d   brood: %d   melk: %d   eieren: %d
-%s   geselecteerd: %d   tempo: %s"
+	tellers.zet_tempo(w.gepauzeerd, int(w.tempo))
 	var staand: bool = is_inside_tree() and Scherm.staand(get_viewport().get_visible_rect().size)
-	if staand:      # smal: korte regels
-		regels = "%02d:%02d%s  dag %d  %s  %s
-kas: %s   dorpelingen: %s   koeien: %s
-bedden: %d   brood: %d   melk: %d   eieren: %d
-%s
-geselecteerd: %d   tempo: %s"
-	label.text = regels % [
-		h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer,
-		kas, dorp, koe, w.bedden(), w.brood(), w.melk(), w.eieren(),
-		geluk, bestuur.gekozen.size(), tempo]
+	if details_open:
+		var regels := ["%02d:%02d%s  dag %d  %s  %s" % [h, m, " (nacht)" if w.is_nacht() else "", w.dag_nr() + 1, w.seizoen_naam(), weer],
+			"kas: %s   dorpelingen: %s   koeien: %s" % [kas, dorp, koe],
+			"bedden: %d   brood: %d   melk: %d   eieren: %d" % [w.bedden(), w.brood(), w.melk(), w.eieren()],
+			geluk, "geselecteerd: %d   tempo: %s" % [bestuur.gekozen.size(), tempo]]
+		if staand:      # smal: korte regels
+			label.text = "\n".join(regels)
+		else:
+			label.text = "%s\n%s   %s\n%s   %s" % regels
 	if staand != _was_staand:      # van lange naar korte regels of terug: het paneel krimpt mee
 		_was_staand = staand
 		stand.reset_size()
-		var pc2 := hulp.get_parent() as Control
-		if staand:
-			pc2.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		else:
-			pc2.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-			pc2.offset_left = _hulp_offsets[0]
-			pc2.offset_top = _hulp_offsets[1]
-			pc2.offset_right = _hulp_offsets[2]
-			pc2.offset_bottom = _hulp_offsets[3]
+	_leg_links_neer(staand)
+
+
+## Pc: de rij (kop) onder de minikaart, de details eronder; de sneltoetsknop linksonder met de uitleg erboven, of
+## staand (onderin zit het bouwmenu) onder de details.
+func _leg_links_neer(staand: bool) -> void:
+	stand.position = Vector2(12, kop.position.y + kop.size.y + 6)
+	var pc2 := hulp.get_parent() as Control
+	var vp := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1600, 900)
 	if staand:
-		(hulp.get_parent() as Control).position = Vector2(12, stand.position.y + stand.size.y + 8)
+		var y := (stand.position.y + stand.size.y if stand.visible else kop.position.y + kop.size.y) + 8
+		knop_hulp.position = Vector2(12, y)
+		pc2.position = Vector2(12, y + knop_hulp.size.y + 6)
+	else:
+		knop_hulp.position = Vector2(12, vp.y - knop_hulp.size.y - 12)
+		pc2.position = Vector2(12, knop_hulp.position.y - pc2.size.y - 6)
+
+
+## Pc: details (Tab / I, of het pijltje) uit- of inklappen.
+func wissel_details() -> void:
+	details_open = not details_open
+	_pas_inklap_toe()
+	_bewaar_cfg()
+
+
+## Pc: sneltoetsuitleg (F1, of de knop) uit- of inklappen.
+func wissel_hulp() -> void:
+	hulp_open = not hulp_open
+	_pas_inklap_toe()
+	_bewaar_cfg()
+
+
+func _pas_inklap_toe() -> void:
+	if Bouwmenu.touch:
+		return
+	stand.visible = details_open
+	(knop_details as Pijl).open = details_open
+	knop_details.queue_redraw()
+	knop_details.tooltip_text = ("details dicht" if details_open else "details") + " (Tab)"
+	(hulp.get_parent() as Control).visible = hulp_open
+	knop_hulp.text = ("x Toetsen (F1)" if hulp_open else "? Toetsen (F1)")
+	knop_hulp.reset_size()
+	stand.reset_size()
+	if details_open:      # tekst meteen, niet pas na het volgende frame (anders een frame een leeg paneel)
+		_process(0.0)
+
+
+func _lees_cfg() -> void:
+	if cfg_pad == "":
+		return
+	var cf := ConfigFile.new()
+	if cf.load(cfg_pad) != OK:      # nog niet bewaard of onleesbaar: standaard (ingeklapt)
+		return
+	var d: Variant = cf.get_value("hud", "details", false)
+	var u: Variant = cf.get_value("hud", "hulp", false)
+	details_open = d if d is bool else false
+	hulp_open = u if u is bool else false
+
+
+func _bewaar_cfg() -> void:
+	if cfg_pad == "":
+		return
+	var cf := ConfigFile.new()
+	cf.set_value("hud", "details", details_open)
+	cf.set_value("hud", "hulp", hulp_open)
+	var fout := cf.save(cfg_pad)
+	if fout != OK:
+		push_warning("hud: %s niet bewaard (%s)" % [cfg_pad, error_string(fout)])
 
 
 # ---------------------------------------------------------------- briefing en hints (sim/hints.gd, data/hints.json)
@@ -257,9 +356,43 @@ func _brief_dicht() -> void:
 
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_O and prijzen != null:
+	if not (e is InputEventKey and e.pressed and not e.echo):
+		return
+	var k := (e as InputEventKey).keycode
+	if k == KEY_O and prijzen != null:
 		prijzen.wissel()
 		get_viewport().set_input_as_handled()
+	elif (k == KEY_TAB or k == KEY_I) and kop != null:
+		wissel_details()
+		get_viewport().set_input_as_handled()
+	elif k == KEY_F1 and kop != null:
+		wissel_hulp()
+		get_viewport().set_input_as_handled()
+
+
+## Pc: pijltje naast de tellers; omlaag = details uitklappen, omhoog = inklappen.
+class Pijl extends Button:
+	var open := false
+
+	func _init() -> void:
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		custom_minimum_size = Vector2(32, 32)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.65 if is_hovered() else 0.5)
+		sb.set_corner_radius_all(4)
+		draw_style_box(sb, r)
+		var c := r.get_center()
+		var s := minf(size.x, size.y) * 0.22
+		var d := -1.0 if open else 1.0
+		var punten := PackedVector2Array([c + Vector2(-s * 1.3, -s * 0.55 * d), c + Vector2(0, s * 0.65 * d), c + Vector2(s * 1.3, -s * 0.55 * d)])
+		draw_polyline(punten, Color(0, 0, 0, 0.8), 5.0, true)
+		draw_polyline(punten, Color.WHITE, 2.5, true)
 
 
 ## Goudstukken-icoon (eigen tekening naar de knop in de bovenbalk van het origineel): steenknop met een stapel munten.
@@ -320,8 +453,10 @@ class Tellers extends PanelContainer:
 	var kas: Label
 	var dorp: Label
 	var koe: Label
+	var tempo_ik: Ikoon          ## pc: pauze-icoon als de sim stilstaat
+	var tempo: Label             ## pc: 2x / 4x
 
-	func bouw(wereld: Wereld, dp: float) -> void:
+	func bouw(wereld: Wereld, dp: float, met_tempo := false) -> void:
 		w = wereld
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sb := StyleBoxFlat.new()
@@ -337,6 +472,21 @@ class Tellers extends PanelContainer:
 		kas = _teller(rij, "munt", px, false)
 		dorp = _teller(rij, "dorpeling", px, false)
 		koe = _teller(rij, "koe", px, true)
+		if met_tempo:      # pc: pauze en tempo blijven zichtbaar als de details dicht zijn
+			tempo_ik = Ikoon.new()
+			tempo_ik.soort = "pauze"
+			tempo_ik.custom_minimum_size = Vector2(px, px) * 1.15
+			tempo_ik.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			tempo_ik.visible = false
+			rij.add_child(tempo_ik)
+			tempo = Label.new()
+			tempo.add_theme_font_size_override("font_size", px)
+			tempo.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+			tempo.add_theme_color_override("font_outline_color", Color.BLACK)
+			tempo.add_theme_constant_override("outline_size", maxi(4, px / 6))
+			tempo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			tempo.visible = false
+			rij.add_child(tempo)
 
 	func _teller(rij: HBoxContainer, soort: String, px: int, laatste: bool) -> Label:
 		var ik := Ikoon.new()
@@ -368,6 +518,17 @@ class Tellers extends PanelContainer:
 			koe.text = t[2]
 			reset_size()
 
+	## Pc: pauze-icoon als de sim stilstaat, anders "2x"/"4x" als het tempo niet 1 is; bij 1x niets.
+	func zet_tempo(pauze: bool, x: int) -> void:
+		var t := "" if pauze or x == 1 else "%dx" % x
+		if pauze != tempo_ik.visible or t != tempo.text:
+			tempo_ik.visible = pauze
+			tempo.text = t
+			tempo.visible = t != ""
+			reset_size()
+			if get_parent() is Container:
+				(get_parent() as Control).reset_size()
+
 
 ## Zelf getekend icoon (geen lettertekens: het standaardlettertype heeft misschien geen emoji).
 class Ikoon extends Control:
@@ -377,6 +538,10 @@ class Ikoon extends Control:
 		var s := size.y
 		var c := size * 0.5
 		match soort:
+			"pauze":
+				for x in [-0.22, 0.08]:
+					draw_rect(Rect2(c + Vector2(x, -0.3) * s + Vector2(1, 1), Vector2(0.14, 0.6) * s), Color(0, 0, 0, 0.8))
+					draw_rect(Rect2(c + Vector2(x, -0.3) * s, Vector2(0.14, 0.6) * s), Color(1.0, 0.85, 0.3))
 			"munt":
 				for m in [Vector2(-0.2, 0.18), Vector2(0.2, 0.18), Vector2(0.0, -0.16)]:
 					var p: Vector2 = c + m * s

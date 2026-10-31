@@ -121,6 +121,12 @@ de glb-ankers in alle vier de draaiingen (faalt boven 0,1 m): na een nieuwe gebo
 | in de bouwmodus: knop Stop, nog eens op de bouwknop, rechts klikken, Esc | bouwmodus uit (rechts slepen draait gewoon de camera) |
 | links klikken op een poort | open of dicht: dicht houdt koeien tegen, dorpelingen lopen er altijd door |
 | K, N | regen automatisch/aan/uit, volgend seizoen (debug) |
+| Tab / I, of het pijltje naast de tellers | details uit/in: tijd, dag, seizoen, weer, voorraden, geluk, selectie, tempo |
+| F1, of de knop **? Toetsen** linksonder | sneltoetsuitleg uit/in |
+
+**HUD op de pc** (gebruiker 2026-10-31, te veel tekst): standaard alleen de rij icoon + getal (kas, dorpelingen x/doel,
+koeien x/doel, zoals touch) met een pauze-icoon of 2x/4x erachter; details en sneltoetsuitleg staan dicht en klappen uit
+met Tab/I en F1. De stand wordt per speler bewaard in `user://hud.cfg` (scenario's niet; `-- --hud=details|hulp|beide` voor frames).
 
 Alles van het bouwen kan met alleen een linkerknop of een vinger (besluit gebruiker 2026-10-30): kiezen, Draai en Stop
 zijn knoppen (44 px hoog), plaatsen is indrukken-slepen-loslaten, en de ghost volgt de laatste wijzerpositie uit de invoer

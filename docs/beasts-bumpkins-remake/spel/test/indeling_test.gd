@@ -5,6 +5,8 @@ extends SceneTree
 ## zichtbare Control buiten beeld, en de vaste delen (minikaart, munt-icoon, stand/tellers, bouwknoppen, lade-knop,
 ## hint, touchbalk) overlappen elkaar niet; ook met de bouwmodus aan en (staand) de lade open. Brief en prijzenscherm
 ## passen in beeld. Touch: de tellers zijn >= 16 dp (Scherm.dp), de stand-tekstregels zijn weg.
+## Pc (2026-10-31): ook op 1600x900; standaard alleen de tellerrij en de knop "? Toetsen", en met de details (Tab) en de
+## sneltoetsuitleg (F1) uitgeklapt, apart en samen, weer niets buiten beeld of over elkaar.
 
 var fouten := 0
 var cam: Camera3D
@@ -15,6 +17,7 @@ func _initialize() -> void:
 
 
 func _start() -> void:
+	Hud.cfg_pad = ""      # niet de bewaarde stand van deze pc lezen of overschrijven
 	for touch in [false, true]:
 		await _ronde(touch)
 	print("---- ", "ALLES OK" if fouten == 0 else "%d FOUTEN" % fouten)
@@ -60,8 +63,32 @@ func _ronde(touch: bool) -> void:
 		_check(not hud.stand.visible and hud.tellers != null and hud.tellers.visible, "%s: tekstregels weg, tellers aan" % naam)
 		_check(hud.tellers.kas.get_theme_font_size("font_size") >= roundi(16.0 * Scherm.dp()), "%s: tellers >= 16 dp" % naam)
 	else:
-		_check(hud.stand.visible and hud.tellers == null, "%s: tekstregels, geen tellers" % naam)
-	for maat in [Vector2i(2400, 1080), Vector2i(1080, 2400), Vector2i(2400, 1080), Vector2i(1080, 2400)]:
+		_check(not hud.stand.visible and hud.kop.visible and hud.tellers.is_visible_in_tree(), "%s: standaard tellerrij, tekstregels dicht" % naam)
+		_check(not hud.hulp.is_visible_in_tree() and hud.knop_hulp.visible, "%s: standaard sneltoetsuitleg dicht, knop zichtbaar" % naam)
+		_check(hud.tellers.tempo_ik != null and not hud.tellers.tempo_ik.visible, "%s: geen pauze-icoon bij 1x" % naam)
+		_toets(hud, KEY_TAB)
+		_check(hud.details_open and hud.stand.visible and hud.label.text.contains("geluk"), "%s: Tab klapt de details uit" % naam)
+		_toets(hud, KEY_I)
+		_check(not hud.details_open and not hud.stand.visible, "%s: I klapt ze weer in" % naam)
+		hud.knop_details.pressed.emit()
+		_check(hud.details_open, "%s: het pijltje klapt uit" % naam)
+		hud.knop_details.pressed.emit()
+		_toets(hud, KEY_F1)
+		_check(hud.hulp_open and hud.hulp.is_visible_in_tree(), "%s: F1 opent de sneltoetsuitleg" % naam)
+		hud.knop_hulp.pressed.emit()
+		_check(not hud.hulp_open and not hud.hulp.is_visible_in_tree(), "%s: de knop sluit hem" % naam)
+		w.gepauzeerd = true
+		await _frames(1)
+		_check(hud.tellers.tempo_ik.visible and not hud.tellers.tempo.visible, "%s: pauze-icoon bij pauze" % naam)
+		w.gepauzeerd = false
+		w.tempo = 4.0
+		await _frames(1)
+		_check(not hud.tellers.tempo_ik.visible and hud.tellers.tempo.visible and hud.tellers.tempo.text == "4x", "%s: 4x bij tempo 4" % naam)
+		w.tempo = 1.0
+	var maten := [Vector2i(2400, 1080), Vector2i(1080, 2400), Vector2i(2400, 1080), Vector2i(1080, 2400)]
+	if not touch:
+		maten = [Vector2i(1600, 900)] + maten
+	for maat in maten:
 		root.size = maat
 		await _frames(3)
 		var tag := "%s %dx%d" % [naam, maat.x, maat.y]
@@ -70,12 +97,16 @@ func _ronde(touch: bool) -> void:
 		_check(cam.keep_aspect == (Camera3D.KEEP_WIDTH if maat.y > maat.x else Camera3D.KEEP_HEIGHT), "%s: camera houdt de %s vast" % [tag, "breedte" if maat.y > maat.x else "hoogte"])
 		hud.brief.sluit()
 		await _frames(2)
-		# gewoon, bouwmodus, (staand) lade open
+		# gewoon, bouwmodus, (staand) lade open; op de pc ingeklapt en uitgeklapt
 		_indeling(hud, bm, "%s rust" % tag)
+		if not touch:
+			await _inklap_standen(hud, bm, "%s rust" % tag)
 		bm.kies(&"hut")
 		await _frames(2)
 		_check(bm.actief, "%s: bouwmodus aan" % tag)
 		_indeling(hud, bm, "%s bouwmodus" % tag)
+		if not touch:
+			await _inklap_standen(hud, bm, "%s bouwmodus" % tag)
 		if maat.y > maat.x:
 			_check(bm.knop_lade.visible and not bm.rij.visible, "%s: lade dicht, knop Gebouwen" % tag)
 			bm.knop_lade.button_pressed = true
@@ -99,6 +130,27 @@ func _ronde(touch: bool) -> void:
 		hud.brief.toon(h.briefing.get("titel", ""), h.briefing.get("tekst", ""), true)
 	bak.queue_free()
 	await _frames(2)
+
+
+## Pc: details, sneltoetsuitleg en beide uitgeklapt, telkens de indeling; daarna weer alles dicht.
+func _inklap_standen(hud: Hud, bm: Bouwmenu, wat: String) -> void:
+	for stand in [[true, false], [false, true], [true, true]]:
+		if hud.details_open != stand[0]:
+			hud.wissel_details()
+		if hud.hulp_open != stand[1]:
+			hud.wissel_hulp()
+		await _frames(2)
+		_indeling(hud, bm, "%s %s" % [wat, "details+uitleg" if stand[0] and stand[1] else ("details" if stand[0] else "uitleg")])
+	hud.wissel_details()
+	hud.wissel_hulp()
+	await _frames(2)
+
+
+func _toets(hud: Hud, k: Key) -> void:
+	var e := InputEventKey.new()
+	e.keycode = k
+	e.pressed = true
+	hud._unhandled_input(e)
 
 
 func _frames(n: int) -> void:
@@ -129,10 +181,9 @@ func _indeling(hud: Hud, bm: Bouwmenu, wat: String) -> void:
 			if not vp.encloses(_rect(c)):
 				buiten.append("%s %s" % [c.get_class() if c.name.begins_with("@") else String(c.name), _rect(c)])
 	_check(buiten.is_empty(), "%s: alles in beeld %s" % [wat, buiten])
-	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "stand": hud.tellers if hud.tellers != null else hud.stand,
+	var delen := {"minikaart": hud.minikaart, "munt": hud.munt_knop, "stand": hud.kop if hud.kop != null else hud.tellers,
+		"details": hud.stand, "toetsen-knop": hud.knop_hulp, "hulpregels": hud.hulp.get_parent(),
 		"lade-knop": bm.knop_lade, "knoppen": bm.rij, "hint/draai/stop": bm.rij2, "touchbalk": bm.balk}
-	if hud.hulp.get_parent().visible:
-		delen["hulpregels"] = hud.hulp.get_parent()
 	var namen := delen.keys().filter(func(k: String) -> bool:
 		var c: Control = delen[k]
 		return c != null and c.is_visible_in_tree() and c.size.x >= 1.0 and c.size.y >= 1.0 and _heeft_inhoud(c))
