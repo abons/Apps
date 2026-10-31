@@ -2,8 +2,9 @@ class_name GrasVarianten
 extends RefCounted
 ## Grasvarianten om naast elkaar te bekijken (2026-10-31, lokaal/concept/gras_vergelijk.html): `-- --gras=naam` zet een
 ## set shader-uniforms op het terreinmateriaal (pc en mobiel dezelfde namen, zie shaders/terrein*.gdshader); losse
-## uniforms erbovenop met `-- --gras.<uniform>=x` of `=r,g,b`. Zonder optie verandert er niets: de shader-standaarden
-## zijn het beeld van 144ea40. Alleen weergave; de sim ziet hier niets van.
+## uniforms erbovenop met `-- --gras.<uniform>=x` of `=r,g,b`. Zonder optie geldt het seizoensgras (view/gras_seizoen.gd,
+## sinds 2026-10-31 de standaard); met optie staat dat uit en gelden de shader-standaarden (beeld van 144ea40) plus de
+## set. Alleen weergave; de sim ziet hier niets van.
 
 const SETS := {
 	"a": {},   # huidig (144ea40): diep donkergroen
@@ -29,6 +30,14 @@ const SETS := {
 		"gras_macro_kleur": Color(0.27, 0.28, 0.04),
 	},
 }
+
+
+## Een --gras-optie op de opdrachtregel: dan blijft het seizoensgras (view/wereld_view.gd _werk_gras) eraf.
+static func actief() -> bool:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--gras=") or a.begins_with("--gras."):
+			return true
+	return false
 
 
 static func pas_toe(mat: ShaderMaterial) -> void:

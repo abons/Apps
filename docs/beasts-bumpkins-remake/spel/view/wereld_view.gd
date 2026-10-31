@@ -18,6 +18,10 @@ var _ring_mesh: TorusMesh
 var _ring_mat: StandardMaterial3D
 var _t := 0.0
 var _nat := 0.0
+var _gras_vast := GrasVarianten.actief()   # -- --gras=naam: geen seizoensgras
+var _gras_sleutel := Vector2(-1, -1)
+## >= 0: seizoensbeeld (gras, sneeuw, droog, gebladerte) vast op seizoen + voortgang, bv. 2,85 = herfst op 85 %; alleen beelden.
+var seizoen_vast := -1.0
 var _vuur: Node3D
 var wegen: Wegen
 var wolven: Node3D             # view/wolven_view.gd
@@ -432,18 +436,39 @@ func _process(dt: float) -> void:
 func werk_seizoen() -> void:
 	var sneeuw := w.sneeuw()
 	var droog := w.droog()
+	var sz := w.seizoen()
+	var sf := w.dag_t() / w.seizoen_duur()
+	if seizoen_vast >= 0.0:      # alleen voor beelden (test/gras_frames.gd): seizoensbeeld los van de klok, licht volgt de klok
+		sz = int(seizoen_vast) % 4
+		sf = fmod(seizoen_vast, 1.0)
+		var k := GrasSeizoen.meng(sf)
+		sneeuw = lerpf(Wereld.SNEEUW[sz], Wereld.SNEEUW[(sz + 1) % 4], k)
+		droog = lerpf(Wereld.DROOG[sz], Wereld.DROOG[(sz + 1) % 4], k)
 	_nat = lerpf(_nat, 1.0 if w.regent() else 0.0, 0.03)   # zacht aan- en uitgaan
 	var nat := _nat
 	terrein.terrein_mat.set_shader_parameter("sneeuw", sneeuw)
 	terrein.terrein_mat.set_shader_parameter("droog", droog)
 	terrein.terrein_mat.set_shader_parameter("nat", nat)
+	_werk_gras(sz, sf)
 	terrein.water_mat.set_shader_parameter("ijs", sneeuw)
 	licht.werk(w.uur(), w.kou(), nat)
 	regen.aan(w.regent())
 	# gebladerte (tint per seizoen), rotsen (sneeuwdek) en de sneeuwlaag op de bomen
-	Natuur.werk_seizoen(w.seizoen(), w.dag_t() / w.seizoen_duur(), sneeuw, nat)
+	Natuur.werk_seizoen(sz, sf, sneeuw, nat)
 	terrein.zet_sneeuwlaag(sneeuw > 0.3)
 	wegen.werk_seizoen(sneeuw, nat)
+
+
+## Seizoensgras (view/gras_seizoen.gd): alleen als seizoen of mengfactor veranderde, dus midden in een seizoen niets.
+## Met een --gras-optie (view/gras_varianten.gd) blijft de vaste variant staan.
+func _werk_gras(s: int, f: float) -> void:
+	if _gras_vast:
+		return
+	var sleutel := Vector2(s, snappedf(GrasSeizoen.meng(f), 0.002))
+	if sleutel == _gras_sleutel:
+		return
+	_gras_sleutel = sleutel
+	GrasSeizoen.pas_toe(terrein.terrein_mat, s, f)
 
 
 func _werk_vuur(donker: float) -> void:

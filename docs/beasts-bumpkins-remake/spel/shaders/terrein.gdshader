@@ -31,6 +31,9 @@ uniform float gras_macro = 0.0;          // grote vlekken (ruis) naar gras_macro
 uniform vec3 gras_macro_kleur : source_color = vec3(0.16, 0.20, 0.04);
 uniform float gras_macro_schaal = 0.1;   // ruisfrequentie per meter (0,1 = vlekken van ~10 m)
 uniform float stip_sterkte = 1.0;
+// Seizoensgras (2026-10-31, view/gras_seizoen.gd): hoeveel `droog` het gras zelf nog kleurt. 1 = als voorheen
+// (varianten); de seizoenssets zetten 0, want hun gras_kleur is al de herfstkleur. Bosgrond droogt altijd mee.
+uniform float gras_droog_mee = 1.0;
 
 varying vec3 wp;
 varying vec4 vc;
@@ -130,7 +133,7 @@ void fragment() {
 			alb += a * wi;
 			nrm += (textureGrad(normaal_tex, vec3(uv, float(i)), dx, dy).rgb * 2.0 - 1.0) * wi * (i == 2 ? 1.0 - steil : 1.0);
 			ruw += textureGrad(ruw_tex, vec3(uv, float(i)), dx, dy).r * wi;
-			if (i < 2) { droogw += wi; }
+			if (i < 2) { droogw += wi * (i == 0 ? gras_droog_mee : 1.0); }
 		}
 	}
 	float n = fbm(wp.xz * 0.18);
