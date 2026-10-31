@@ -77,6 +77,9 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
   `blender -b -P loods_molen_rt.py -- naam=gereedschapsloods vergelijk` (eerst de stap ervoor).
 - Maat: begane grond 2,3 x 1,9 m (stijlen), verdieping 3,65 x 2,47 m, muurplaat 3,45 m, nok 4,1 m;
   het aambeeld is 8,9 m lang (hoorn tot x = -3,6 m buiten de gevel, hiel 1,8 m uit de andere).
+  ⚠️ Dat is geen schaalfout (nagelopen 2026-10-31): `toolshed.png` en het goedgekeurde concept hebben het reuzenaambeeld
+  dwars door de verdieping, de mesh `ijzer` in de glb = hoorn + lijf + hiel, en de voetafdruk 5x2 (`Wereld.BOUWSOORTEN`)
+  rekent het ijzer al mee. Kleiner = ontwerpkeuze: `HOORN_TIP`/`HIEL_X1` in `gereedschapsloods.py`, dan rt, standen en de voetafdruk.
   Teruggerekend uit `toolshed.png` (162x129).
 - Driehoeken: LOD0 ~79k, LOD1 ~0,4k. Atlassen per groep (steen, dak, hout 2048; ijzer, pleister,
   rest 1024).

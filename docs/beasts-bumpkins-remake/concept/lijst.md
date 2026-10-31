@@ -190,3 +190,21 @@ Totaal **90 beelden in 7 batches** (slaapzak 2026-10-29 bij ronde 3, hut in 4 bo
 - `wizadie` lijkt de dode **minstreel**, niet de tovenaar.
 - `vampbat` hoort bij de **vampier**, niet bij de vleermuis.
 - **Bakkerij = molen**: het gebouw dat als bakkerij in ronde 3 staat, is hetzelfde als de molen uit ronde 1 (al gemodelleerd in `modellen/gebouwen/molen.py`). Geen apart concept nodig.
+
+## Wezen van missie 4: groep 21 / type 18 (2026-10-31)
+- **Geen aap.** Er is geen apensprite: `baboon.png` is de mandril-testfoto (125x120, RGB), geen spelsprite. Type 18 is
+  vermoedelijk de **struikman** (`bushman`, rij 34): uitsluiting via de missieteksten (type 27 = reus, M17/M26/M29;
+  31 = vampier Drapoga, M22; 23/29 = wolf/zwarte wolf) laat wesp, bloedwesp, vleermuis, demon, ogre en struikman over,
+  en type 18 staat steeds in **stilstaande groepjes**: M4 (71,89)-(75,82) en M9 (88,88)-(93,93) zonder bomen eromheen
+  (een nepbosje), M22 tussen 14 bomen, M24 zeven dicht op elkaar. Zeker is het pas met de typetabel in `BEASTS.EXE`
+  (`0x5e5e00 + 292 x type`); vleermuis en wesp hebben al een concept (ronde 3), de struikman niet.
+- Bijlage: `lokaal/concept/img/m4_struikman_origineel.png` (= `upload/r5_struikman.png`: de 6 frames van
+  `bushman` 8x + `busheyes`), stijl: `img/dennen_sheet.jpg`.
+- Prompt: *"Remaster this exact pixel-art creature sprite as a 3D game concept sheet, in the style of the attached pine
+  sheet. It is a 'bush-man' from an old strategy game: a young pine tree that is secretly alive. The 6 frames show it
+  opening heavy-lidded eyes, pulling two stubby root-legs out of a split trunk, growing thin twig arms and walking;
+  the last frame is the same tree frozen solid in icy blue. Show 4 views on a plain light grey background: 1 disguised
+  (an ordinary pine, eyes shut, roots in the ground), 2 awake from the front (white eyes with dark pupils peeking out
+  of the needles at about 60 % height, two bark legs, twig arms with three-twig hands), 3 walking from the side,
+  4 attacking (leaning forward, arms up, a jagged mouth opening in the needles). Dark green layered needles and brown
+  bark like the attached pines; about 1.8x the height of a villager. No text, no other characters."*

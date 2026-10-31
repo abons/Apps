@@ -1,6 +1,7 @@
 """Props voor missie 1: paddenstoel, zilveren_beker, vlag, kampvuur, houtstapel, steenhoop, zaagbok (bouwplaats), hek_poort, bron (put, latere
 missies), bronplas (de spring van missie 1: kring keien om een plasje),
-hek_segment, hek_paal, poort, akker_kaal, akker_rijp.
+hek_segment, hek_paal, poort, akker_kaal, akker_rijp; missie 4: tinnen_beker (valstrik), magische_sleutel,
+magische_poort.
 
 Hout en steen: tegelbare Poly Haven-sets met UV in meters; losse keien (steenhoop, kampvuur) en de
 paddenstoel worden van een hoge versie gebakken (kleur/normaal/ORM). Wind/fladderen zoals de bomen
@@ -23,7 +24,7 @@ import natuur_lib as L
 from atlas import CEL
 
 ALLE = ["paddenstoel", "zilveren_beker", "vlag", "kampvuur", "houtstapel", "steenhoop", "zaagbok", "bron", "bronplas", "hek_segment", "hek_poort",
-        "hek_paal", "poort", "akker_kaal", "akker_rijp"]
+        "hek_paal", "poort", "akker_kaal", "akker_rijp", "tinnen_beker", "magische_sleutel", "magische_poort"]
 ALLEEN = [n for n in L.OPTS.get("alleen", ",".join(ALLE)).split(",") if n]
 
 
@@ -125,10 +126,10 @@ def keien_obj(naam, keien, sub, mat=None):
     return o
 
 
-def gebakken_keien(naam, keien, res=1024, mos=0.35):
+def gebakken_keien(naam, keien, res=1024, mos=0.35, sub_laag=2):
     import rotsen
     hoog = keien_obj(naam + "_hoog", keien, 5, rotsen.rotsmateriaal(naam + "_hm", mos=mos))
-    laag = keien_obj(naam, keien, 2)
+    laag = keien_obj(naam, keien, sub_laag)
     laag.data.set_sharp_from_angle(angle=math.radians(80))
     L.uv_slim(laag, hoek=66, marge=0.008)
     mat = L.bak_set(naam, laag, [hoog], res=res, ext=0.04, ray=0.1, ao_min=0.3)
@@ -360,7 +361,29 @@ def _bump(nt, schaal, kracht):
 # --- Zilveren beker --------------------------------------------------------------------------
 def zilveren_beker():
     """Kelk met knoop en zes groene stenen; 0,55 m (pickup, groter dan echt voor leesbaarheid)."""
+    return _beker("zilveren_beker")
+
+
+def tinnen_beker():
+    """Missie 4: de valstrik-beker (origineel klasse 159 'silver goblet', MIS4-9: 'would never be made of pewter').
+    Zelfde vorm als de zilveren, maar tin: dof grijs, ruwer, licht gedeukt (de kelk is met ruis vervormd) en de
+    stenen zijn dof groen glas zonder gloed."""
+    return _beker("tinnen_beker", tin=True)
+
+
+def _deuk(seed, kracht):
+    off = Vector((seed * 3.1, seed * 1.7, seed * 2.3))
+
+    def punt(a, r, z):
+        p = Vector((math.cos(a), math.sin(a), z * 4.0))
+        f = 1 + kracht * noise.noise(p * 2.2 + off) + kracht * 0.5 * noise.noise(p * 5.0 + off)
+        return (r * f * math.cos(a), r * f * math.sin(a), z)
+    return punt
+
+
+def _beker(naam, tin=False):
     b = L.Bouwer()   # 0 zilver, 1 steen, 2 zilver-mat (knoop)
+    deuk = _deuk(7, 0.035) if tin else None
     s = 0.55 / 0.62
     prof = [(0.0, 0.0), (0.16, 0.0), (0.17, 0.012), (0.165, 0.025), (0.13, 0.04), (0.07, 0.06), (0.045, 0.1),
             (0.035, 0.16), (0.032, 0.22), (0.05, 0.24), (0.052, 0.255)]
@@ -371,13 +394,13 @@ def zilveren_beker():
             (0.178 * s, 0.62 * s), (0.17 * s, 0.57 * s), (0.155 * s, 0.5 * s), (0.12 * s, 0.45 * s), (0.0, 0.43 * s)]
     draai(b, prof, 32, mat=0)
     draai(b, knoop, 32, mat=2)
-    draai(b, kelk, 40, mat=0)
+    draai(b, kelk, 40, mat=0, punt=deuk)
     # stenen met kasjes
     for k in range(6):
         a = 2 * math.pi * k / 6
         z = 0.52 * s
         r = 0.172 * s
-        c = Vector((r * math.cos(a), r * math.sin(a), z))
+        c = Vector(deuk(a, r, z) if deuk else (r * math.cos(a), r * math.sin(a), z))
         n = Vector((math.cos(a), math.sin(a), -0.12)).normalized()
         x, y = L.frame(n)
         # kasje: ring
@@ -401,11 +424,16 @@ def zilveren_beker():
             b.f([rij[i], rij[i + 1], mid[i]], [(0, 0), (1, 0), (0.5, 0.5)], 1)
             b.f([mid[i], rij[i + 1], mid[(i + 1) % 8]], [(0, 0), (1, 0), (0.5, 0.5)], 1)
             b.f([mid[i], mid[(i + 1) % 8], tv], [(0, 0), (1, 0), (0.5, 1)], 1)
-    zilver = L.pbr("zilver", (0.80, 0.80, 0.82), ruw=0.26, metaal=1.0)
-    knoopm = L.pbr("zilver_mat", (0.70, 0.70, 0.72), ruw=0.5, metaal=1.0)
-    steen = L.pbr("smaragd", (0.01, 0.32, 0.05), ruw=0.05, emissie=(0.01, 0.30, 0.04), emissie_kracht=0.8)
-    me = b.mesh("zilveren_beker", [zilver, steen, knoopm])
-    o = L.obj("zilveren_beker", me)
+    if tin:
+        zilver = L.pbr("tin", (0.30, 0.30, 0.285), ruw=0.58, metaal=0.75)
+        knoopm = L.pbr("tin_mat", (0.27, 0.27, 0.26), ruw=0.72, metaal=0.6)
+        steen = L.pbr("groen_glas", (0.04, 0.16, 0.06), ruw=0.3)
+    else:
+        zilver = L.pbr("zilver", (0.80, 0.80, 0.82), ruw=0.26, metaal=1.0)
+        knoopm = L.pbr("zilver_mat", (0.70, 0.70, 0.72), ruw=0.5, metaal=1.0)
+        steen = L.pbr("smaragd", (0.01, 0.32, 0.05), ruw=0.05, emissie=(0.01, 0.30, 0.04), emissie_kracht=0.8)
+    me = b.mesh(naam, [zilver, steen, knoopm])
+    o = L.obj(naam, me)
     me.set_sharp_from_angle(angle=math.radians(60))
     return [o]
 
@@ -1104,6 +1132,128 @@ def poort():
                           Vector((x + 0.42 * math.cos(a), 0.42 * math.sin(a), sz * 0.35)), rnd.uniform(0, 6)))
     ko = gebakken_keien("poort_keien", keien, res=512, mos=0.6)
     ko.parent = o
+    return [o]
+
+
+# --- Missie 4: magische sleutel en magische poort ------------------------------------------------
+def facet_steen(b, c, n, rr, mat, hoog=0.02):
+    """Geslepen koepel (8 facetten) op middelpunt c, normaal n, straal rr (zoals de stenen op de beker)."""
+    x, y = L.frame(n)
+
+    def rand(f, h, half=0.0):
+        return [b.v(c + n * h + (x * math.cos(2 * math.pi * (i + half) / 8) + y * math.sin(2 * math.pi * (i + half) / 8)) * rr * f)
+                for i in range(9)]
+    bodem = rand(0.82, 0.0)
+    rij = rand(0.82, hoog * 0.45)
+    mid = rand(0.5, hoog * 0.8, 0.5)
+    tv = b.v(c + n * hoog)
+    for i in range(8):
+        b.f([bodem[i], bodem[i + 1], rij[i + 1], rij[i]], [(0, 0), (1, 0), (1, 1), (0, 1)], mat)
+        b.f([rij[i], rij[i + 1], mid[i]], [(0, 0), (1, 0), (0.5, 0.5)], mat)
+        b.f([mid[i], rij[i + 1], mid[(i + 1) % 8]], [(0, 0), (1, 0), (0.5, 0.5)], mat)
+        b.f([mid[i], mid[(i + 1) % 8], tv], [(0, 0), (1, 0), (0.5, 1)], mat)
+
+
+def magische_sleutel():
+    """Missie 4 (origineel klasse 198 'magic key', sprite `mkey`): grijze ijzeren sleutel, ronde ring met een groene
+    steen in het midden (beide kanten), schacht met kraag, baard met twee tanden. 0,64 m lang (pickup, groter dan
+    echt, zoals de beker). Staat op zijn kant: schacht langs x, de ring in het xz-vlak, de steen kijkt naar -y en +y,
+    de tanden wijzen omlaag; oorsprong midden onder."""
+    b = L.Bouwer()          # 0 ijzer, 1 smaragd, 2 ijzer donker (kraag, baard)
+    A = 0.125               # hoogte van de schachtas
+    X0 = -0.21              # midden van de ring (zo ligt het geheel rond x = 0)
+
+    def ring_as_y(a, r, z):           # draai om de y-as door het ringmidden
+        return (X0 + r * math.cos(a), z, A + r * math.sin(a))
+
+    ring = [(0.0, 0.017), (0.052, 0.017), (0.058, 0.026), (0.074, 0.031), (0.098, 0.031), (0.112, 0.022),
+            (0.118, 0.0), (0.112, -0.022), (0.098, -0.031), (0.074, -0.031), (0.058, -0.026), (0.052, -0.017),
+            (0.0, -0.017)]
+    draai(b, ring, 40, mat=0, punt=ring_as_y)
+
+    def schacht_as_x(a, r, z):        # draai om de x-as, z = afstand langs x vanaf het ringmidden
+        return (X0 + z, r * math.cos(a), A + r * math.sin(a))
+
+    kraag = [(0.0, 0.104), (0.032, 0.104), (0.036, 0.112), (0.036, 0.13), (0.03, 0.138), (0.036, 0.146),
+             (0.036, 0.162), (0.03, 0.172)]
+    draai(b, kraag, 16, mat=2, punt=schacht_as_x)
+    schacht = [(0.03, 0.172), (0.028, 0.3), (0.028, 0.49), (0.032, 0.5), (0.032, 0.53), (0.022, 0.535), (0.0, 0.535)]
+    draai(b, schacht, 16, mat=0, punt=schacht_as_x)
+    # baard: plaatje onder het eind van de schacht met twee tanden (sprite: twee tanden en een inkeping)
+    for (x0, x1, z0, z1) in ((0.405, 0.525, -0.045, 0.0), (0.405, 0.445, -0.112, -0.04), (0.47, 0.525, -0.122, -0.04)):
+        bm = L.blok((x1 - x0, 0.03, z1 - z0), afkant=0.005)
+        L.bm_naar_bouwer(bm, b, mat=2, uvschaal=4.0, M=Matrix.Translation(Vector((X0 + (x0 + x1) / 2, 0, A + (z0 + z1) / 2))))
+        bm.free()
+    # de steen, beide kanten
+    for kant in (-1, 1):
+        facet_steen(b, Vector((X0, kant * 0.017, A)), Vector((0, kant, 0)), 0.05, 1, hoog=0.022)
+    ijzer = L.pbr("sleutel_ijzer", (0.50, 0.50, 0.56), ruw=0.38, metaal=1.0)
+    donker = L.pbr("sleutel_ijzer_donker", (0.33, 0.33, 0.37), ruw=0.5, metaal=1.0)
+    steen = L.pbr("smaragd", (0.01, 0.32, 0.05), ruw=0.05, emissie=(0.01, 0.30, 0.04), emissie_kracht=1.2)
+    me = b.mesh("magische_sleutel", [ijzer, steen, donker])
+    o = L.obj("magische_sleutel", me)
+    me.set_sharp_from_angle(angle=math.radians(55))
+    return [o]
+
+
+def magische_poort():
+    """Missie 4 (origineel klasse 199 'magic gate', sprite `mgate`): twee ruige grijze rotspijlers met mos en daartussen
+    een dichte houten deur met kringen in reliëf en een blauwe steen. In het origineel lost de deur bij het openen op
+    in een wolk spikkels (6 frames) en blijven de rotsen staan; daarom is de deur een eigen node `poort_deur`
+    (oorsprong midden onder, op de grond): open = `poort_deur` verbergen of laten vervagen/zakken. Empty `poort_vonk`
+    zit op de blauwe steen (bron voor de oplos-deeltjes). Doorgang 2 m langs x (tegelmaat), het geheel ~4 m."""
+    rnd = random.Random(199)
+    # rotspijlers: hoge keien (gebakken, met mos), elk met een lagere kei ertegen
+    keien = []
+    hoog = kei_functie(rnd.randrange(10000), vlakken=12, ruis=0.2)     # beide pijlers even hoog: zelfde vorm, gedraaid
+    for kant in (-1, 1):
+        x = kant * 1.42
+        keien.append((hoog, (0.52, 0.46, 1.95),
+                      Vector((x, rnd.uniform(-0.04, 0.04), 1.1)), (0.0 if kant > 0 else math.pi) + rnd.uniform(-0.3, 0.3)))
+        keien.append((kei_functie(rnd.randrange(10000), vlakken=10, ruis=0.18), (0.42, 0.4, 0.75),
+                      Vector((x + kant * 0.38, rnd.uniform(0.18, 0.3) * (-kant), 0.42)), rnd.uniform(0, 6)))
+        keien.append((kei_functie(rnd.randrange(10000)), (0.24, 0.22, 0.18),
+                      Vector((x - kant * 0.1, 0.5 * kant, 0.1)), rnd.uniform(0, 6)))
+    o = gebakken_keien("magische_poort", keien, res=1024, mos=0.45, sub_laag=3)
+    # deur: verticale planken als een dicht paneel, een rand, kringen in reliëf en de blauwe steen (beide kanten)
+    d = L.Bouwer()          # 0 planken, 1 hout donker (rand, kringen), 2 blauwe steen, 3 ijzer (kasje)
+    B, H, D = 2.1, 1.95, 0.12
+    for k in range(10):
+        w = B / 10
+        x = -B / 2 + w * (k + 0.5)
+        bm = L.blok((w - 0.006, D, H), afkant=0.008)
+        L.bm_naar_bouwer(bm, d, mat=0, uvschaal=1.0, M=Matrix.Translation(Vector((x, 0, H / 2 + 0.04))))
+        bm.free()
+    for (sx, sz, px, pz) in ((B, 0.09, 0, H), (B, 0.09, 0, 0.09), (0.09, H, -B / 2 + 0.045, H / 2 + 0.04),
+                             (0.09, H, B / 2 - 0.045, H / 2 + 0.04)):
+        bm = L.blok((sx, D + 0.03, sz), afkant=0.012)
+        L.bm_naar_bouwer(bm, d, mat=1, uvschaal=1.0, M=Matrix.Translation(Vector((px, 0, pz))))
+        bm.free()
+    MZ = 1.02                               # hoogte van het midden (steen)
+    for kant in (-1, 1):
+        y0 = kant * D / 2
+        for r in (0.34, 0.56, 0.76):        # drie kringen in reliëf (het sprite heeft een spiraal van kringen)
+            P = [Vector((r * math.cos(t), y0 + kant * 0.012, MZ + r * math.sin(t) * 0.98))
+                 for t in np.linspace(0, 2 * math.pi, 49)]
+            L.buis(d, P, [0.022] * len(P), zijden=6, mat=1, uvschaal=2.0)
+        # kasje en de steen
+        P = [Vector((0, y0, MZ)), Vector((0, y0 + kant * 0.03, MZ))]
+        rr = L.buis(d, P, [0.15, 0.13], zijden=12, mat=3)
+        schijf_uv(d, rr[-1], P[-1], 3, omgekeerd=kant < 0)
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=10, radius=0.1)
+        L.bm_naar_bouwer(bm, d, mat=2, M=Matrix.Translation(Vector((0, y0 + kant * 0.04, MZ))) @ Matrix.Diagonal((1, 0.55, 1, 1)))
+        bm.free()
+    blauw = L.pbr("blauwe_steen", (0.05, 0.18, 0.75), ruw=0.08, emissie=(0.02, 0.08, 0.4), emissie_kracht=1.0)
+    donker = L.ph("weathered_brown_planks", "planken_donker", factor=(0.62, 0.42, 0.28))
+    deur_hout = L.ph("weathered_brown_planks", "planken_rood", factor=(1.0, 0.66, 0.42))
+    do = L.obj("poort_deur", d.mesh("poort_deur", [deur_hout, donker, blauw, m("ijzer")]))
+    do.data.set_sharp_from_angle(angle=math.radians(40))
+    do.parent = o
+    vonk = bpy.data.objects.new("poort_vonk", None)
+    bpy.context.scene.collection.objects.link(vonk)
+    vonk.location = (0, 0, MZ)
+    vonk.parent = o
     return [o]
 
 

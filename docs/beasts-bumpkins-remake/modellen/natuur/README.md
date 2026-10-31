@@ -34,6 +34,9 @@ Driehoeken: LOD0 / LOD1 (+ sneeuwlaag).
 | heksegment, 2 m (palen op x = +-1) | `hek_segment.glb` | 2676 | oranje touw om de kruisingen |
 | poort (stenen sleutelpoort, `mgate`, latere missies), doorgang 2 m | `poort.glb` | 2224 | blauwe steen emissief, keien met mos; deur los als `poort_deur` |
 | hekpoort (houten, `gate`, missie 1), 2 m | `hek_poort.glb` | 3782 | twee palen met touw, vleugel `poort_deur` (scharnier op x = -1) |
+| tinnen beker (M4-valstrik, klasse 159 in M4), 0,55 m | `tinnen_beker.glb` | 2288 | vorm van de zilveren, tin dof grijs (ruw 0,58), kelk licht gedeukt (ruis), stenen dof groen glas zonder gloed; 6/10 |
+| magische sleutel (`mkey`, klasse 198), 0,65 m | `magische_sleutel.glb` | 1588 | grijs ijzer, ring met emissieve smaragd (beide kanten), twee tanden; staat op zijn kant (schacht langs x, steen naar ±y = ±z in Godot); 6/10 |
+| magische poort (`mgate`, klasse 199), doorgang 2,1 m, 4,3 x 1,4 x 2,7 m | `magische_poort.glb` | 6784 | twee rotspijlers (gebakken, mos) + `poort_deur` (dicht paneel, kringen, emissieve blauwe steen; oorsprong midden onder), Empty `poort_vonk` op de steen. Open = `poort_deur` verbergen/vervagen (het origineel lost de deur op in spikkels); 6/10 |
 | akker kaal, 2 x 2 m | `akker_kaal.glb` | 2822 | vier ruggen langs x |
 | akker rijp, 2 x 2 m | `akker_rijp.glb` | 3830 | tarwe als gekruiste kaarten (`akker_rijp_gewas`, wind) |
 
