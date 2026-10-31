@@ -837,9 +837,10 @@ def gpu():
 
 
 def exporteer_hoog(pad):
-    """glTF van het hoge model: zonder camera, licht, vanger, halmen en LOD1-proxies."""
+    """glTF van het hoge model: zonder camera, licht, vanger, halmen, LOD1-proxies en bakschillen (rt = laag)."""
     for o in bpy.context.view_layer.objects:
-        o.select_set(o.type in ("MESH", "EMPTY") and not o.get("lod1") and o.name != "vanger")
+        o.select_set(o.type in ("MESH", "EMPTY") and not o.get("lod1") and o.get("rt") != "laag"
+                     and o.name != "vanger")
     bpy.ops.export_scene.gltf(filepath=pad, export_format="GLB", use_selection=True, export_apply=True,
                               export_cameras=False, export_lights=False)
 

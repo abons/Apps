@@ -10,7 +10,9 @@ mee naar glTF en de halmen (hair curves) ook niet, dus:
   buisjes op de rieten schil gebakken;
 - wat onder een scharnier hangt (`deur`, `deur_gevel`, `wieken`) blijft een eigen object onder dat
   lege object, zodat het in Godot kan draaien;
-- LOD1 is een losse glb van de proxies uit het bouwscript (`lod1`), op een eigen atlas.
+- LOD1 is een losse glb van de proxies uit het bouwscript (`lod1`), op een eigen atlas;
+- objecten met `rt = "laag"` (bakschil, bv. de cilinder om een ronde stenen muur) gaan alleen het lage model in,
+  heel (niet gedecimeerd); objecten met `rt = "bron"` (de stenen van die muur) zijn alleen bakbron.
 
 Draaien (headless):
   blender -b -P loods_molen_rt.py -- naam=molen [res=2048] [snel] [vergelijk] [alleen_vergelijk]
@@ -48,7 +50,7 @@ SCHARNIEREN = ("deur", "deur_gevel", "wieken")
 # gewicht per groep bij het decimeren: dak blijft heel (silhouet), losse stenen mogen het meest kwijt
 WEEG = {"dak": None, "steen": 0.55}
 # kooi (extrusie) en straal per groep: hoe ver de hoge bron van de lage kan liggen
-KOOI = {"dak": (0.16, 0.3), "steen": (0.04, 0.1)}
+KOOI = {"dak": (0.16, 0.3), "steen": (0.04, 0.1), "muur": (0.04, 0.11)}
 KOOI_STD = (0.025, 0.08)
 T0 = time.time()
 
@@ -503,7 +505,9 @@ def bouw():
     os.makedirs(TEXDIR, exist_ok=True)
     RT = bpy.data.collections.new("RT")
     sc.collection.children.link(RT)
-    ORIG = [o for o in sc.objects if o.type == "MESH" and not o.get("lod1") and o.name != "vanger"]
+    ALLE = [o for o in sc.objects if o.type == "MESH" and not o.get("lod1") and o.name != "vanger"]
+    ORIG = [o for o in ALLE if o.get("rt") != "bron"]          # het lage model (rt = laag: bakschil, heel)
+    HOOG = [o for o in ALLE if o.get("rt") != "laag"]          # de bakbronnen
     PROXY = [o for o in sc.objects if o.type == "MESH" and o.get("lod1")]
     HAAR = [o for o in sc.objects if o.type == "CURVES"]
 
@@ -532,8 +536,10 @@ def bouw():
             bpy.data.meshes.remove(me)
     tel = lambda o: bron_tris[o.data.name if not o.modifiers else o.name]
 
-    def doel(n, k, g="rest"):
+    def doel(n, k, g="rest", heel=False):
         w = WEEG.get(g, 1.0)
+        if heel:
+            return n
         if w is None or n <= KLEIN:
             return n
         return KLEIN + (n - KLEIN) * min(1.0, k * w)
@@ -541,7 +547,7 @@ def bouw():
     if sum(tel(o) for o in ORIG) > LOD0_MAX:
         for _ in range(30):
             k = (lo_k + hi_k) / 2
-            if sum(doel(tel(o), k, groep_van(o)) for o in ORIG) > LOD0_MAX:
+            if sum(doel(tel(o), k, groep_van(o), o.get("rt") == "laag") for o in ORIG) > LOD0_MAX:
                 hi_k = k
             else:
                 lo_k = k
@@ -553,7 +559,7 @@ def bouw():
         delen = []
         for o in objs:
             n = tel(o)
-            ratio = doel(n, K, g) / n
+            ratio = doel(n, K, g, o.get("rt") == "laag") / n
             if ratio >= 0.999:
                 delen.append(eval_mesh(o))
                 continue
@@ -607,8 +613,8 @@ def bouw():
     # ---------------------------------------------------------------- bronnen en bakken
     Z = {}
     for g in sorted({g for g, _ in per}):
-        Z[g] = zelfstandig("_z_" + g, [o for (gg, _), objs in per.items() if gg == g for o in objs], RT)
-    for o in ORIG + PROXY:
+        Z[g] = zelfstandig("_z_" + g, [o for o in HOOG if groep_van(o) == g], RT)
+    for o in ALLE + PROXY:
         o.hide_render = True
     for o in Z.values():
         o.hide_render = True
@@ -623,7 +629,7 @@ def bouw():
         ext, ray = (0.14, 0.4) if g == "lod1" else KOOI.get(g, KOOI_STD)
         uv_atlas(lows)
         res, ores = (LOD1_RES, LOD1_RES // 2) if g == "lod1" else (RES, ORM_RES)
-        if g not in ("lod1", "dak", "steen", "hout"):          # kleine groepen: kleinere atlas
+        if g not in ("lod1", "dak", "steen", "hout", "muur"):          # kleine groepen: kleinere atlas
             res, ores = res // 2, ores // 2
         kl, nr = beeld(f"{NAAM}_{g}_kleur", res), beeld(f"{NAAM}_{g}_normaal", res, data=True)
         ao, ru = beeld(f"{NAAM}_{g}_ao", ores, data=True), beeld(f"{NAAM}_{g}_ruw", ores, data=True)

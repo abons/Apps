@@ -37,9 +37,12 @@ const GEBOUWEN := {
 	&"weg": {"tekst": "Weg", "toets": KEY_T, "glb": "", "hoogte": 0.15},      # af = padtegel, view/wegen.gd (slepen = rij)
 	&"hek": {"tekst": "Hek", "toets": KEY_F, "glb": "", "hoogte": 1.1},       # palen + segmenten naar de buren (slepen = rij)
 	&"poort": {"tekst": "Poort", "toets": KEY_P, "glb": "", "hoogte": 1.3},   # hek_poort.glb, vleugel draait open (klik)
-	# missie 3 (Wereld.VANAF_MISSIE): put = bron.glb (well, 4,9 x 5,0 m); gilde nog zonder glb: het blok uit Props
+	# missie 3 (Wereld.VANAF_MISSIE): put = bron.glb (well, 4,9 x 5,0 m); gilde = voetvolkgilde_rt.glb (zonder glb het
+	# blok uit Props). De gildedeur zit in de glb op -X, Plan.DEUREN wil +Z: `draai` = extra hoek om Y bovenop
+	# Plan.draai, alleen voor het beeld (afdruk en deur blijven die van de sim).
 	&"put": {"tekst": "Put", "toets": KEY_U, "glb": "res://assets/bron.glb", "hoogte": 2.0},
-	&"voetvolkgilde": {"tekst": "Gilde", "toets": KEY_V, "glb": "", "hoogte": 3.0, "placeholder": "gilde"},
+	&"voetvolkgilde": {"tekst": "Gilde", "toets": KEY_V, "glb": "res://assets/voetvolkgilde_rt.glb", "hoogte": 3.0,
+		"placeholder": "gilde", "draai": PI * 0.5},
 }
 const RIJ_SOORTEN := [&"weg", &"hek"]     ## slepen = een rij (BouwRij); draaien doet er niet toe
 const KNOP_H := 44.0                      ## knophoogte in px: met een vinger te raken
@@ -872,7 +875,7 @@ func _zet_op_plek(n: Node3D, p: Plan) -> void:
 	var schaal: float = info["schaal"]
 	var r := p.afdruk()
 	n.scale = Vector3.ONE * schaal
-	n.rotation.y = p.draai * PI * 0.5
+	n.rotation.y = p.draai * PI * 0.5 + float(GEBOUWEN[p.soort].get("draai", 0.0))
 	var m := Vector3((r.position.x + r.size.x * 0.5) * w.tegel_m, GROND_Y, (r.position.y + r.size.y * 0.5) * w.tegel_m)
 	if terrein != null:
 		m.y = _laagste_grond(r)

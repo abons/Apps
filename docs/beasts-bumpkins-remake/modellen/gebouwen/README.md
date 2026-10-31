@@ -116,6 +116,32 @@ Cycles-beauty in `preview/<naam>_rt_vergelijk.png` (beauty | LOD0 | LOD1, EEVEE)
 | gereedschapsloods | ~79k | ~0,4k |
 | molen | ~75k | ~0,5k |
 
+## Voetvolkgilde (`voetvolkgilde.py`, 2026-10-31)
+
+Ronde stenen toren met kraag, borstwering en kantelen, dakterras van paars-lila tegels met trapgat en rechte trap
+(besluit gebruiker 2026-10-30: geen wenteltrap), portaal met rondboogdeur (-X), rond hutje met rieten koepel (-Y), twee
+uitbouwen met rieten kapjes, banier, bank met beker, twee schilden. Sprite `fguild.png` (118x129), concept v3.
+
+- Bouwen + render: `blender -b -P voetvolkgilde.py -- [schaal=4] [snel] [deur=graden]` (~20 s); game-glb:
+  `blender -b -P loods_molen_rt.py -- naam=voetvolkgilde res=1024 vergelijk` (~2,5 min); standen:
+  `blender -b -P standen.py -- naam=voetvolkgilde preview`.
+- Maat: schacht 1,76 m straal, kraag 3,15 m, terras 3,55 m, borstwering 3,9 m, kantelen 4,38 m; trapgat 0,78 m;
+  hutje 0,56 m straal, 1,62 m hoog; deur 0,86 x 1,62 m. Omhulsel in de glb 4,7 x 4,4 x 4,7 m.
+- ⚠️ **Bakschillen** (nieuw in `loods_molen_rt.py`): de ronde muren en de portaalmuren zijn in de glb een gladde
+  cilinder/vlak (`*_schil`, `rt = "laag"`, heel) met de stenen erop gebakken; die stenen en de specie erachter
+  (`rt = "bron"`) gaan zelf niet mee. Eigen atlas `muur`. Daarvoor kregen ~700 gedecimeerde stenen per stuk ~40
+  driehoeken (scherven met zwarte vlakken) en de atlas was een postzegel per eiland. Echt gebleven: kraag, kantelen,
+  afdekking, binnenkant borstwering, boog, portaaldak.
+- Driehoeken: LOD0 60.384 (steen 44,9k, dak 6,8k, muur 1,7k), LOD1 912. glb 14,2 / 0,9 MB.
+- Ankers: `deur` (scharnier, conventie als de loods), `deur_drempel`, `oefenplek` (voor de bank), `wachtpost` (op het
+  terras). ⚠️ Een anker mag geen meshnaam dragen: `terras` werd stil `terras.001`.
+- In de game: `view/bouwmenu.gd` `GEBOUWEN.voetvolkgilde` met `"draai": PI/2` (deur -X in de glb, `Plan.DEUREN` wil +Z).
+- Rondes (eigen oordeel, realisme / gelijkenis): 0 (half af, 2026-10-30): 5/5, 1: 6/6, 2: 6/7, 3 (met rt): 6,5/7.
+  Gestopt na 3.
+- Nog mis: kantelen lezen als gestapeld puin, niet als de strakke blokken van het concept; stenen donkerder en ronder dan
+  het concept; riet bleker dan de sprite (oranje-geel); schillen hebben een glad silhouet; stand 2-muurkoppen zijn een
+  egale lichte schijf.
+
 ## Bouwstanden (`standen.py`, `standen_lib.py`, hut: `../peasant_hut_standen.py`)
 
 Standen 1-3 worden UIT de af-glb gesneden (besluit 2026-10-30): de gebakken eilanden van `<naam>_rt.blend` met
@@ -146,6 +172,7 @@ zitten in geen stand; de lege `deur`/`wieken`-nodes wel.
 | molen | 4,9k | 6,1k | 43k | 75k | 10,9 / 16,4 / 19,0 / 31,7 |
 | melkerij_boerderij | 7,1k | 11,3k | 41k | 51k | 4,9 / 2,8 / 3,9 / 6,3 |
 | kippenhok | 1,4k | 6,6k | 14,5k | 15,7k | 4,9 / 3,7 / 4,1 / 6,5 |
+| voetvolkgilde | 4,2k | 3,3k | 10,6k | 60k | 7,6 / 5,3 / 8,3 / 14,2 |
 
 - ⚠️ De atlassen zitten in elke glb opnieuw (glb sluit alles in): per stand alleen de materialen die erin zitten,
   maar loods en molen dragen 2048-atlassen, dus 11-21 MB per stand. Delen kan alleen met `.gltf` + losse
@@ -160,6 +187,9 @@ zitten in geen stand; de lege `deur`/`wieken`-nodes wel.
   - Melkerij: 2 = muren 0,7 m (pleister, stijlen), holle binnenkern met vloer en deuropening, varkenshok heel
     (laag); 3 = volle muren, voorgevel, ramen, ronde spanten + gordingen, halve schoorsteen (3,5 m); geen riet,
     dakkapel, bloembakken, varken. Binnenkern dicht (plafond op 2,6 m).
+  - Voetvolkgilde: 2 = stompen van 0,7 m (schillen gesneden en dichtgemaakt), portaalkern hol; 3 = schacht, hutje,
+    uitbouwen en portaal vol, kraagschijf als vloer met trapgat en trap; geen borstwering, kantelen, terras, riet,
+    banier, schilden, bank (`gebied` top > 3,1 m = weg).
   - Kippenhok: drie standen, ze zijn te onderscheiden: 1 = aarde met paaltjes (28 cm), 2 = stromat, stenen voet,
     hoekstijlen, regels, kozijn en dakgeraamte (geen planken), 3 = planken, gevels, loopplank, legnest, trog,
     hek en spanten; geen riet, eieren, korrels.

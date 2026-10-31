@@ -96,6 +96,20 @@ CFG = {
         spanten=[("x", (-0.18, 0.12, 0.42, 0.72), (-0.4, 1.1), 0.035, 0.03),
                  ("y", (0.0, 0.36, 0.72), (-0.35, 1.0), 0.03, 0.03)],
     ),
+    # ronde toren: de muren zijn bakschillen (open cilinders); `snij` maakt er in stand 2 een dichte stomp van 0,7 m van.
+    # Stand 3: schacht, hutje en uitbouwen vol, portaal met dak, de kraagschijf als vloer met het trapgat en de trap;
+    # geen borstwering, kantelen, terras, riet, banier, schilden of bank.
+    "voetvolkgilde": dict(
+        z2=0.7, dik=0.2, standaard=("auto", "heel"),
+        rollen={**{n: WEG for n in ("terras", "borst_schil", "borst_binnen", "kanteel_kern", "hut_riet", "kap_riet",
+                                     "touw", "banier", "banierstok", "dwarslat", "speer", "speerpunt", "schild",
+                                     "beker", "bankblad", "bankpoot", "bankregel")},
+                "portaal_kern": ("hol", "heel"), "deurgat": WEG[:1] + ("heel",), "gras": ("heel", "heel")},
+        gebied={"top": ((-3.0, -3.0, 3.1), (3.0, 3.0, 6.0), WEG)},     # kraagstenen, kantelen, afdekking, gatrand
+        voet=[(-2.3, -0.9), (-2.3, 0.9), (-1.2, 1.75), (0.4, 2.0), (1.65, 1.15), (2.0, -0.4), (1.4, -1.5),
+              (0.8, -2.65), (-0.65, -2.65), (-1.45, -1.55)], marge=0.3,
+        dak=(), sjabloon="trapboom", touw="touw", gras=("gras",), spanten=[], spanten_in=(),
+    ),
 }
 C = CFG[NAAM]
 

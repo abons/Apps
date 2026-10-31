@@ -32,13 +32,14 @@ $bron = @(
     '..\modellen\gebouwen\kippenhok_rt.glb',
     '..\modellen\gebouwen\molen_rt.glb',
     '..\modellen\gebouwen\melkerij_boerderij_rt.glb',
+    '..\modellen\gebouwen\voetvolkgilde_rt.glb',
     '..\modellen\dieren\kip.glb',
     '..\modellen\dieren\kip_anim.json',
     '..\modellen\dieren\ei.glb')
 # bouwstanden 1-3 (zelfde oorsprong en ankers als de af-glb; view/bouwmenu.gd wisselt ze op de bouwplaats)
 foreach ($s in 1..3) {
     $bron += "..\modellen\peasant_hut_stand$s.glb"
-    foreach ($g in @('gereedschapsloods', 'molen', 'melkerij_boerderij', 'kippenhok')) { $bron += "..\modellen\gebouwen\${g}_stand$s.glb" }
+    foreach ($g in @('gereedschapsloods', 'molen', 'melkerij_boerderij', 'kippenhok', 'voetvolkgilde')) { $bron += "..\modellen\gebouwen\${g}_stand$s.glb" }
 }
 foreach ($b in $bron) {
     $src = Join-Path $PSScriptRoot $b

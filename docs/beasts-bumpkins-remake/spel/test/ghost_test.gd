@@ -37,7 +37,7 @@ func _start() -> void:
 	bm = Bouwmenu.new()
 	root.add_child(bm)
 	bm.bouw(w, b, wereld3d)
-	for s in [&"hut", &"gereedschapsloods", &"kippenhok", &"molen", &"melkerij"]:
+	for s in [&"hut", &"gereedschapsloods", &"kippenhok", &"molen", &"melkerij", &"voetvolkgilde"]:
 		if not ResourceLoader.exists(Bouwmenu.GEBOUWEN[s]["glb"]):
 			print("  overgeslagen (geen glb): ", s)
 			continue

@@ -24,6 +24,6 @@ Laden: `--missie=3`; test `test/missie3_test.gd`.
   halen (2 s). Effect op de levensduur nog niet.
 - **Voetvolkgilde**: voorgebouwd 3x3, niet over vlag of kampvuur, bouwbaar vanaf M3 (50); man + klik op het gilde =
   voetsoldaat (30 kas, max 6 per gilde, hint 3-5), zwaard (`prop_zwaard`, schade 6, slag 0,8 s, bereik 1,5), boert
-  niet, valt wolven binnen 8 tegels zelf aan. Gebouw nog een blok uit `view/props.gd` (glb half, `modellen/gebouwen/`).
+  niet, valt wolven binnen 8 tegels zelf aan. Gebouw = `voetvolkgilde_rt.glb` + standen (2026-10-31, `modellen/gebouwen/README.md`); zonder glb het blok uit `view/props.gd`.
 - **Donkere wolf** (sex 29): `Wolf.soort = &"donkere_wolf"` (eigen glb), zelfde gedrag. **Wesp** (24): nog een gewone wolf.
 - Hut: voorgebouwd als afgebouwd Plan, draai vrij gekozen (deur bij het pad).
