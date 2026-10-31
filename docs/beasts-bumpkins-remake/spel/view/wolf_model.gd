@@ -218,6 +218,9 @@ static func _maak_wezen(soort: StringName, wc: Dictionary) -> Node3D:
 				if ap.has_animation(&"idle"):
 					ap.play(&"idle")
 			_gloei(lijf, float(wc.get("gloed", 0.0)))
+			_kleur(lijf, wc.get("albedo", {}), float(wc.get("alfa_knip", 0.0)))
+			if float(wc.get("halo", 0.0)) > 0.0:
+				_halo(lijf, wc)
 			_hp(n)
 			(n.get_node("Hp") as Node3D).position.y = float(wc.get("hp_y", 1.25))
 			return n
@@ -257,6 +260,79 @@ static func _gloei(n: Node, gloed: float) -> void:
 				mi.set_surface_override_material(i, m)
 	for c in n.get_children():
 		_gloei(c, gloed)
+
+
+## spel.json `albedo` = {materiaalnaam: [r, g, b]}: vermenigvuldigt albedo_color (sRGB) in het spel. Het glb houdt de
+## kleuren van het concept onder studiolicht; de middagzon en de lucht in het spel maken ze veel lichter en blauwer
+## (zombie v2: huid las als bijna wit). `alfa_knip` = alpha_scissor_threshold voor materialen met alfa-knip: hoger
+## houdt de gaten in de lompen ook op afstand open (mipmaps middelen ze anders weg).
+static func _kleur(n: Node, albedo: Dictionary, knip: float) -> void:
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(i) as StandardMaterial3D
+			if m == null:
+				continue
+			var f: Array = albedo.get(m.resource_name, [])
+			var knippen := knip > 0.0 and m.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+			if f.size() < 3 and not knippen:
+				continue
+			m = m.duplicate()
+			if f.size() >= 3:
+				m.albedo_color = Color(m.albedo_color.r * float(f[0]), m.albedo_color.g * float(f[1]), m.albedo_color.b * float(f[2]), m.albedo_color.a)
+			if knippen:
+				m.alpha_scissor_threshold = knip
+			mi.set_surface_override_material(i, m)
+	for c in n.get_children():
+		_kleur(c, albedo, knip)
+
+
+## Gloed om het zombie-oog (node `zombie_oog`): additief billboard met een radiaal verloop (leest ook zonder bloom,
+## mobiel heeft glow uit) plus een zwak groen lampje. spel.json: halo = doorsnede (m), halo_licht = energie.
+static func _halo(lijf: Node, wc: Dictionary) -> void:
+	var oog := lijf.find_child("zombie_oog", true, false) as Node3D
+	if oog == null:
+		return
+	var kleur := Color(0.3, 1.0, 0.15)
+	var g := Gradient.new()
+	g.set_color(0, Color(kleur.r, kleur.g, kleur.b, 1.0))
+	g.set_color(1, Color(kleur.r, kleur.g, kleur.b, 0.0))
+	g.add_point(0.25, Color(kleur.r, kleur.g, kleur.b, 0.55))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	tex.width = 64
+	tex.height = 64
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.no_depth_test = false
+	m.albedo_texture = tex
+	m.albedo_color = Color(1.6, 1.6, 1.6)
+	var q := QuadMesh.new()
+	var d := float(wc.get("halo", 0.1))
+	q.size = Vector2(d, d)
+	var mi := MeshInstance3D.new()
+	mi.name = "OogHalo"
+	mi.mesh = q
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = oog.get_aabb().get_center() if oog is MeshInstance3D else Vector3.ZERO
+	oog.add_child(mi)
+	var e := float(wc.get("halo_licht", 0.0))
+	if e > 0.0:
+		var l := OmniLight3D.new()
+		l.name = "OogLicht"
+		l.light_color = kleur
+		l.light_energy = e
+		l.omni_range = 0.35
+		l.shadow_enabled = false
+		l.position = mi.position
+		oog.add_child(l)
 
 
 static func _tint(n: Node, m: Material) -> void:
