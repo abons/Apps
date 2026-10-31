@@ -762,7 +762,7 @@ func _toon_ghost(p: Plan) -> bool:
 		pad_nieuw = w.weg_nieuw(pad_route)
 		var pp := w.prijs(soort)
 		var wpt := int(w.spel.get("weg_per_tegel", 0))
-		prijs_tekst = "%s %d" % [GEBOUWEN[soort]["tekst"], pp] if pad_nieuw == 0 \
+		prijs_tekst = "%s %d" % [GEBOUWEN[soort]["tekst"], pp] if pad_nieuw == 0 or wpt == 0 \
 				else "%s %d + pad %d x %d = %d" % [GEBOUWEN[soort]["tekst"], pp, pad_nieuw, wpt, pp + pad_nieuw * wpt]
 	var reden := _pad_reden
 	if reden == "" and w.kas < w.prijs(soort) + pad_nieuw * int(w.spel.get("weg_per_tegel", 0)):

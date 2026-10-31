@@ -1863,7 +1863,7 @@ func annuleer_plan(p: Plan) -> int:
 func annuleer_opbrengst(p: Plan) -> int:
 	if p == null or p.klaar or p.betaald < 0:
 		return -1
-	var g := p.betaald if p.voortgang <= 0.0 else 0
+	var g := p.betaald         # altijd de hele gebouwprijs terug, ook als er al aan gebouwd is (gebruiker 2026-10-31)
 	return g + annuleer_weg(p).size() * int(spel.get("weg_per_tegel", 0))
 
 

@@ -7,7 +7,7 @@ extends SceneTree
 ## geen route -> rood met "Geen pad naar je dorp" en geen voorbeeld; te duur met het pad -> rood "Te duur".
 ## Annuleren (besluit gebruiker 2026-10-31, Wereld.annuleer_plan): kas terug zoals voor het plaatsen, de nieuwe
 ## padtegels weer de oude grond; een tegel die een ander plan of een eigen weg gebruikt blijft (en komt niet terug);
-## begonnen = alleen de deurweg terug.
+## begonnen = toch alles terug (gebruiker 2026-10-31).
 
 var fouten := 0
 var w: Wereld
@@ -78,7 +78,7 @@ func _start() -> void:
 	var gm := bm._pad_mi.material_override as ShaderMaterial
 	_check(gm != null and gm.shader.resource_path == "res://shaders/weg_ghost.gdshader" 			and gm.get_shader_parameter("ghost_tint") == Bouwmenu.GHOST_TINT_KAN 			and is_equal_approx(float(gm.get_shader_parameter("ghost_alfa")), Bouwmenu.GHOST_ALFA), "voorbeeld = keienweg-ghost, groen")
 	var n := bm.pad_nieuw
-	var tekst := "Hut %d + pad %d x %d = %d" % [w.prijs(&"hut"), n, wpt, w.prijs(&"hut") + n * wpt]
+	var tekst := ("Hut %d + pad %d x %d = %d" % [w.prijs(&"hut"), n, wpt, w.prijs(&"hut") + n * wpt]) if wpt > 0 else "Hut %d" % w.prijs(&"hut")
 	_check(tekst in bm.hint.text, "hint: '%s'" % bm.hint.text)
 	# goedkoop: zelfde sleutel = geen nieuwe BFS (de mesh blijft dezelfde)
 	var mesh := bm._pad_mi.mesh
@@ -229,7 +229,7 @@ func _annuleren(pz: Plan, plek: Vector2i, kas0: int, wpt: int) -> void:
 			_check(w.kas == kas_c - (c.pad_oud.size() - k) * wpt, "eigen weg: kas klopt")
 			w.raster.soort[w.raster.idx(naast.x, naast.y)] = naast_oud
 
-	# 4. begonnen: alleen de deurweg komt terug
+	# 4. begonnen: toch alles terug, gebouwprijs en deurweg (gebruiker 2026-10-31)
 	var e := _vrij_hutplan(plek)
 	_check(e != null, "begonnen: plek gevonden")
 	if e != null:
@@ -237,7 +237,7 @@ func _annuleren(pz: Plan, plek: Vector2i, kas0: int, wpt: int) -> void:
 		w.plan_zet(e)
 		e.voortgang = 0.3
 		var n_e := e.pad_oud.size()
-		_check(w.annuleer_plan(e) == n_e * wpt and w.kas == kas_e - w.prijs(&"hut"), "begonnen: alleen de deurweg terug (%d x %d)" % [n_e, wpt])
+		_check(w.annuleer_plan(e) == w.prijs(&"hut") + n_e * wpt and w.kas == kas_e, "begonnen: alles terug (%d + %d x %d)" % [w.prijs(&"hut"), n_e, wpt])
 
 
 ## Een hutplan op dezelfde plek als eerder, in de eerste draai die kan en 2+ nieuwe padtegels heeft.
