@@ -56,6 +56,17 @@
         {"id": "3-1", "bron": "MIS3-1.TXT", "open": true, "trigger": {"type": "voorwerp", "klasse": 172}, "_trigger": "eigen keuze: M3.MIS noemt mis3-1 niet (vermoedelijk vast in de exe), naar het patroon van 1-8",
           "tekst": "Dat is de kelk! Breng hem terug naar je vlag."}
       ]
+    },
+    "4": {
+      "briefing": {"bron": "M4.TXT", "titel": "De Beker van Vervulling", "tekst": "Er is goed nieuws: de oude koning Roland is overleden. Niemand houdt u nog tegen als u uw rijk wilt uitbreiden. Eerst moet u alleen de Beker van Vervulling vinden; daarmee bewijst u dat u klaar bent voor meer."},
+      "hints": [
+        {"id": "4-1", "bron": "MIS4-1.TXT", "open": false, "trigger": {"type": "aanraken", "object": "magische_poort", "tenzij_voorwerp": 198}, "_trigger": "M4.MIS: dorpeling raakt poort 9 terwijl de sleutel-conditie (id 5) nog niet waar is; de sleutel oprapen zet die (actie 0x18 5)",
+          "tekst": "Deze poort gaat alleen open met een sleutel."},
+        {"id": "4-2", "bron": "MIS4-2.TXT", "open": false, "trigger": {"type": "voorwerp", "klasse": 198}, "_trigger": "M4.MIS: dorpeling raakt sleutel 451 (conditie type 12)",
+          "tekst": "Je hebt de sleutel! Waar zou de poort zijn?"},
+        {"id": "4-9", "bron": "MIS4-9.TXT", "open": false, "trigger": {"type": "voorwerp", "klasse": 159}, "_trigger": "M4.MIS: dorpeling raakt zilveren beker 48; dezelfde regel zet vuur op de beker (spel.json missies.4.regels valbeker). Actie zonder 'open' (rolletje)",
+          "tekst": "Dat was een valstrik om je mensen in gevaar te brengen. De echte beker is niet van tin: het is een gouden beker die je zoekt."}
+      ]
     }
   }
 }

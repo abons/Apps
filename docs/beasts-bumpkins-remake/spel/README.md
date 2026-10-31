@@ -18,7 +18,7 @@ powershell -File sync.ps1                       # kaart (data/origineel/) en glb
 "$G" --headless --path . --import               # eerste keer en na elke sync
 "$G" --path .                                   # spelen
 "$G" --headless --path . --script res://test/sim_test.gd    # simtest (zonder GPU)
-"$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2
+"$G" --headless --path . --script res://test/missie2_test.gd # simtest missie 2 (ook missie3_test, missie4_test)
 "$G" --headless --path . --script res://test/wolf_test.gd    # wolven: zwerven, jagen, weide, stenen gooien
 "$G" --headless --path . --script res://test/audio_test.gd   # laden alle klanken
 "$G" --headless --path . --script res://test/touch_bouw_test.gd  # touch: bouwen met Bouwen-knop, twee-vingerdraai
@@ -79,6 +79,8 @@ Nog niet: wolf-glb, kinderen/baby's pakken, vluchten, wolfgeluid; goud (161) en 
 op te rapen; klasse 226 (betekenis onbekend) is `geen`; prijzen/geluk, pensioen en de hints van missie 2 ontbreken; het leeg buiten de
 kaart (zwart in het origineel) wordt water, zodat het meer in het NW in de zee overloopt. `ontbreekt` in objecten.json geeft per klasse
 een waarschuwing in de log.
+
+**Missie 4** (Beker van Vervulling, `--missie=4`, `../map4.md`): kaart `python ../lokaal/map2/maak_map.py 4 data/origineel/map4.json`, 4 dorpelingen, kas 8.000, voorgebouwde hut en bouwersgilde. Puzzel uit M4.MIS als data: `missies.4.voorwerpen` (sleutel naar de poort, tinnen beker naar de vlag = 0), `missies.4.regels` (`sim/regels.gd`: afgeleverd/opgeraapt/wezen_dood/aanraken -> maak/open/weg), `doel.aanraken` (triggerplek 41,11), mijnen en vuur in `spel.json` `vallen`. Wezens type 18 = zombie (`wezens.zombie`, standaard passief: den met ogen, `wezen_model`). Dynamische objecten (poort, muur, mijn, olie, vuur) tekent `view/missie_view.gd`. Test `test/missie4_test.gd`, frames `--scenario=missie4 --stap=overzicht|poort|beker|wezens|muur`, `screenshots/missie4_*.jpg`.
 
 ## Zelfstandig werk en de nacht
 

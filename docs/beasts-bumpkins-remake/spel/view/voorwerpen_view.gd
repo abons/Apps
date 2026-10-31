@@ -16,19 +16,26 @@ func bouw(wereld: Wereld, wereld_view: WereldView) -> void:
 	view = wereld_view
 	name = "Voorwerpen"
 	for ob in Voorwerpen.alle(w):
-		var n := Props.maak(ob)
-		if n == null:
-			n = Node3D.new()
-		n.name = "%s_%d_%d" % [ob["naam"], ob["x"], ob["y"]]
-		add_child(n)
-		nodes.append({"ob": ob, "node": n, "schaal": n.scale})
-		_op_grond(ob)
+		_maak(ob)
+	w.object_erbij.connect(func(ob: Dictionary) -> void:     # missie 4: de gouden kelk verschijnt als de poort opengaat
+		if ob.get("voorwerp", false):
+			_maak(ob))
 	w.voorwerp_afgeleverd.connect(func(ob: Dictionary, _d: Dorpeling, _k: int) -> void:
 		var e := _van(ob)
 		if not e.is_empty():
 			(e["node"] as Node3D).queue_free()
 			nodes.erase(e))
 	w.voorwerp_gevallen.connect(_op_grond)
+
+
+func _maak(ob: Dictionary) -> void:
+	var n := Props.maak(ob)
+	if n == null:
+		n = Node3D.new()
+	n.name = "%s_%d_%d" % [ob["naam"], ob["x"], ob["y"]]
+	add_child(n)
+	nodes.append({"ob": ob, "node": n, "schaal": n.scale})
+	_op_grond(ob)
 
 
 ## Een dict is als sleutel niet bruikbaar (hash op inhoud, en x/y/drager veranderen): zoeken op referentie.
@@ -58,11 +65,13 @@ func grond_pos(ob: Dictionary) -> Vector3:
 	return (e["node"] as Node3D).position
 
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	for e in nodes:
 		var ob: Dictionary = e["ob"]
 		var id := int(ob["drager"])
 		if id < 0:
+			if ob["naam"] == "magische_sleutel" and not w.gepauzeerd:   # draait langzaam, zoals de sleutel in het origineel deint
+				(e["node"] as Node3D).rotation.y += dt * w.tempo * 1.2
 			continue
 		var n: Node3D = e["node"]
 		var u: Dictionary = view.units.get(id, {})

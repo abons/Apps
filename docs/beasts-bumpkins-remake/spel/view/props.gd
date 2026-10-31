@@ -86,7 +86,8 @@ static func _placeholder(naam: String, ob: Dictionary) -> Node3D:
 		"wolf": _wolf(n)
 		"goud": _goud(n)
 		"drankje": _drankje(n)
-		_: return null
+		_:
+			return MissieProps.maak(naam)      # missie 4: sleutel, poort, muur, mijn, olie, vuur (null als onbekend)
 	return n
 
 

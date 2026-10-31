@@ -45,6 +45,11 @@ signal dorpeling_geraakt(d: Dorpeling, oorzaak: String)
 signal dorpeling_dood(d: Dorpeling, oorzaak: String)
 signal met_pensioen(d: Dorpeling)
 signal kas_beloning(id: String, kas: int)   ## sim/beloningen.gd: een kas-actie uit het missiebestand (0x16)
+signal object_erbij(ob: Dictionary)          ## sim/regels.gd: een regel maakt een object (origineel actie 0x04)
+signal object_weg(ob: Dictionary)            ## sim/regels.gd: object van de kaart (0x17, of een mijn die afging)
+signal object_veranderd(ob: Dictionary)      ## sim/regels.gd: bv. de magische poort gaat open (0x13)
+signal ontploffing(t: Vector2i)              ## sim/regels.gd: een mijn gaat af op tegel t
+signal regel_gevuurd(id: String)             ## sim/regels.gd: missieregel uit spel.json missies.<nr>.regels
 
 ## Bouwbare soorten: voetafdruk in tegels (2 m per tegel). Prijs en bouwtijd volgen met de economie.
 ## Voetafdruk in tegels (2 m), breed (x) x diep (z) bij draai 0, uit de glb op ware grootte (Bouwmenu.GEBOUWEN):
@@ -94,6 +99,9 @@ var doden := 0                            # dorpelingen gestorven (sim/leven.gd)
 var pensioenen := 0                       # met pensioen gegaan, origineel Retirements
 var beloningen := {}                      # sim/beloningen.gd: id -> tijd_s waarop de kas-actie vuurde
 var beloning_start_s := -1.0
+var opgeraapt := {}                       # sim/voorwerpen.gd: klasse -> true zodra een voorwerp ervan is opgeraapt
+var afgeleverd := {}                      # sim/voorwerpen.gd: klasse -> true zodra een voorwerp ervan bij zijn doel is
+var regels_af := {}                       # sim/regels.gd: regel-id -> tijd_s waarop hij vuurde
 var wolf_gen_t: Array[float] = []         # sim/wolf.gd: s per wolf-generator (missie.wolf_generator)
 var wolven_gemaakt := 0                   # hoogste wolf-id tot nu toe (id's worden niet hergebruikt)
 var uitslag := ""                         # "" bezig, "gewonnen", "verloren"
@@ -220,9 +228,10 @@ func _plaats_objecten(kaart: Dictionary) -> void:
 			_kaart_wolven.append({"tegel": Vector2i(int(o["x"]), int(o["y"])),
 				"soort": StringName(d.get("soorten", {}).get(str(int(o.get("sex", 23))), "wolf"))})
 			continue
-		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": d["model"], "x": int(o["x"]), "y": int(o["y"]),
+		var model: String = missie.get("modellen", {}).get(cls, d["model"])   # missie 4: klasse 159 = de tinnen valbeker
+		var ob := {"cls": int(o["cls"]), "naam": d["naam"], "model": model, "x": int(o["x"]), "y": int(o["y"]),
 			"blokkeert": d["blokkeert"], "voetafdruk": d["voetafdruk"], "state": int(o["state"]), "sex": int(o["sex"]),
-			"spawn": d.get("spawn", false), "owner": int(o.get("owner", 0))}
+			"spawn": d.get("spawn", false), "owner": int(o.get("owner", 0)), "dynamisch": d.get("dynamisch", false)}
 		if d.get("voorwerp", false):  # op te rapen (sim/voorwerpen.gd)
 			ob["voorwerp"] = true
 			ob["drager"] = -1
@@ -377,6 +386,7 @@ func tik(dt: float) -> void:
 	Leven.tik_alle(self, dt)
 	Beloningen.tik(self)
 	Voorwerpen.tik_alle(self, dt)
+	Regels.tik(self, dt)
 	mist.tik(self)
 	_werk_generator(dt)
 	_gezin(dt)
@@ -1017,6 +1027,18 @@ func _voorgebouwd_plan(vg: Dictionary) -> Plan:
 				if af < bd:
 					bd = af
 					beste = p
+	# missie 4: het bouwersgilde (112,102) staat in de kaart op het eind van het pad. Op een pad bouwen kan niet; dan
+	# staat het gebouw met zijn deur op die padtegel (het pad loopt naar de deur, zoals een weg naar de deur).
+	if beste == null and raster.soort_naam(t.x, t.y) == "pad" and Plan.DEUREN.has(soort):
+		for dr in 4:
+			var wil: int = voorgebouwd_draai if voorgebouwd_draai >= 0 else int(vg.get("draai", -1))
+			if beste != null or (wil >= 0 and dr != wil):
+				continue
+			for oy in range(-6, 7):
+				for ox in range(-6, 7):
+					var p := maak_plan(soort, t + Vector2i(ox, oy), dr)
+					if p != null and p.deur_tegel() == t and not _raakt_ander_anker(p, vg):
+						beste = p
 	return beste
 
 
@@ -1279,6 +1301,8 @@ func doel_gehaald() -> bool:
 		return false
 	if doel.has("kas_boven") and kas <= int(doel["kas_boven"]):
 		return false
+	if doel.has("aanraken") and not Regels.aangeraakt(self, Vector2i(int(doel["aanraken"][0]), int(doel["aanraken"][1]))):
+		return false        # missie 4: een dorpeling raakt de triggerplek (origineel conditie type 12 op klasse 87)
 	return true
 
 

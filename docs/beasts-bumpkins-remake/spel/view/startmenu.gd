@@ -235,6 +235,8 @@ static func doel_tekst(nr: int) -> String:
 		uit.append("%d koeien" % int(d["koeien"]))
 	if d.has("kas_boven"):
 		uit.append("kas boven %s" % _duizend(int(d["kas_boven"]) + (1 if int(d["kas_boven"]) % 1000 == 999 else 0)))
+	if d.has("tekst"):          # missie 4: doel zonder telling (triggerplek), in woorden
+		uit.append(String(d["tekst"]))
 	return ", ".join(uit)
 
 

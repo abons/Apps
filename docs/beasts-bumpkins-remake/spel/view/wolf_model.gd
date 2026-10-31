@@ -88,7 +88,32 @@ static func glb_pad(soort: StringName) -> String:
 	return GLB.get(soort, GLB[&"wolf"])
 
 
+## Wezen zonder eigen wolf-glb (missie 4: zombie): spel.json `wezen_model.<soort>` = {glb, terugval, tint, schaal}.
+## Keuze: `-- --<soort>_model=glb|boom|wolf`, anders glb als die er is, anders de terugval. Geeft {} voor een wolf.
+static func wezen_cfg(soort: StringName) -> Dictionary:
+	if GLB.has(soort):
+		return {}
+	var d = Gegevens.lees(Gegevens.SPEL)
+	var c: Dictionary = d.get("wezen_model", {}).get(String(soort), {}) if d is Dictionary else {}
+	if c.is_empty():
+		return {}
+	c = c.duplicate()
+	var keuze := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--%s_model=" % soort):
+			keuze = a.get_slice("=", 1)
+	if keuze == "":
+		keuze = "glb" if ResourceLoader.exists(String(c.get("glb", ""))) else String(c.get("terugval", "wolf"))
+	if keuze == "glb" and not ResourceLoader.exists(String(c.get("glb", ""))):
+		keuze = String(c.get("terugval", "wolf"))
+	c["keuze"] = keuze
+	return c
+
+
 static func maak(soort: StringName = &"wolf") -> Node3D:
+	var wc := wezen_cfg(soort)
+	if not wc.is_empty():
+		return _maak_wezen(soort, wc)
 	var pad := glb_pad(soort)
 	if not ResourceLoader.exists(pad):
 		return _placeholder()
@@ -174,6 +199,52 @@ static func _placeholder() -> Node3D:
 	return n
 
 
+static func _maak_wezen(soort: StringName, wc: Dictionary) -> Node3D:
+	match String(wc["keuze"]):
+		"glb":      # eigen glb met dezelfde clips als de wolf (idle, lopen, rennen, bijten, dood)
+			var n := Node3D.new()
+			n.name = String(soort).capitalize()
+			var lijf: Node3D = (load(String(wc["glb"])) as PackedScene).instantiate()
+			lijf.name = "Lijf"
+			n.add_child(lijf)
+			var ap := _speler(lijf)
+			if ap:
+				for naam in ap.get_animation_list():
+					if naam in [&"idle", &"lopen", &"rennen"]:
+						ap.get_animation(naam).loop_mode = Animation.LOOP_LINEAR
+				if ap.has_animation(&"idle"):
+					ap.play(&"idle")
+			_hp(n)
+			return n
+		"boom":     # den met ogen (view/missie_props.gd)
+			var n := Node3D.new()
+			n.name = String(soort).capitalize()
+			var lijf: Node3D = MissieProps.maak("boom_ogen")
+			lijf.name = "Lijf"
+			n.add_child(lijf)
+			_hp(n)
+			(n.get_node("Hp") as Node3D).position.y = 3.6
+			return n
+	# wolf met tint en schaal: van een gewone wolf te onderscheiden
+	var w := maak(&"wolf")
+	var lijf2 := w.get_node("Lijf") as Node3D
+	lijf2.scale *= float(wc.get("schaal", 1.0))
+	var t: Array = wc.get("tint", [0.5, 0.65, 0.4])
+	var over := StandardMaterial3D.new()
+	over.albedo_color = Color(float(t[0]), float(t[1]), float(t[2]), 0.45)
+	over.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	over.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_tint(lijf2, over)
+	return w
+
+
+static func _tint(n: Node, m: Material) -> void:
+	if n is GeometryInstance3D:
+		(n as GeometryInstance3D).material_overlay = m
+	for c in n.get_children():
+		_tint(c, m)
+
+
 ## Hp-balkje (WolvenView draait het naar de camera).
 static func _hp(n: Node3D) -> void:
 	var hp := Node3D.new()
@@ -207,7 +278,9 @@ static func _hp(n: Node3D) -> void:
 static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float, tempo := 1.0) -> void:
 	var lijf := n.get_node("Lijf") as Node3D
 	var ap := _speler(lijf)
-	if ap == null:
+	if lijf.has_node("Ogen"):
+		_werk_boom(lijf, wf, dt)
+	elif ap == null:
 		_werk_placeholder(n, wf, fase, t, dt)
 	else:
 		_werk_glb(ap, lijf, wf, tempo)
@@ -215,6 +288,20 @@ static func werk(n: Node3D, wf: Wolf, fase: float, t: float, dt: float, tempo :=
 	hp.visible = wf.leeft() and (wf.hp < wf.hp_max or wf.geraakt < 3.0)
 	if hp.visible:
 		(hp.get_node("Vul") as Node3D).scale.x = maxf(0.001, float(wf.hp) / float(wf.hp_max))
+
+
+## Den met ogen: ogen gaan open als er een dorpeling in de buurt is (Wolf.kijkt_naar) en volgen hem; dood = omvallen.
+static func _werk_boom(lijf: Node3D, wf: Wolf, dt: float) -> void:
+	var ogen := lijf.get_node("Ogen") as Node3D
+	var open := 1.0 if wf.leeft() and (wf.kijkt_naar != null or wf.toestand != Wolf.ROAM) else 0.1
+	ogen.scale.y = move_toward(ogen.scale.y, open, dt * 4.0)
+	if wf.toestand == Wolf.DYING or wf.toestand == Wolf.DEAD:
+		var u := 1.0 if wf.toestand == Wolf.DEAD else wf.slag
+		lijf.rotation.x = -PI * 0.5 * u
+		if wf.toestand == Wolf.DEAD:
+			lijf.position.y = -0.6 * clampf((wf.slag - 0.7) / 0.3, 0.0, 1.0)
+	else:
+		lijf.rotation.x = 0.0
 
 
 static func _clip_v(naam: String) -> float:

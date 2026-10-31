@@ -1,8 +1,8 @@
 {
   "_wolf_model": "view/wolf_model.gd: \"tripo\" = assets/wolf_tripo.glb en donkere_wolf_tripo.glb (TRELLIS-mesh vervormd naar de Tripo-referentie, geprojecteerde textuur, modellen/dieren/wolf_tripo.py; lokaal), \"trellis\" = assets/wolf_trellis.glb en donkere_wolf_trellis.glb (AI-model, modellen/dieren/wolf_trellis.py), \"procedureel\" = wolf.glb en donkere_wolf.glb (wolf.py). Ontbreekt de tripo/trellis-glb, dan de procedurele; ontbreekt die ook, de placeholder.",
-  "wolf_model": "tripo",
+  "wolf_model": "trellis",
   "_koe_model": "view/koe.gd: \"tripo\" = assets/koe_tripo.glb (procedurele koe vervormd naar de Tripo-referentie, geprojecteerde textuur, modellen/dieren/koe_tripo.py; lokaal), \"procedureel\" = koe.glb (koe.py). Ontbreekt de tripo-glb, dan de procedurele.",
-  "koe_model": "tripo",
+  "koe_model": "procedureel",
   "tegel_m": 2.0,
   "sim_hz": 10,
   "loop_mps": 0.849,
@@ -45,6 +45,15 @@
     "kijk_s": 0.5, "zwerf_straal": 6, "zwerf_wacht": [3.0, 9.0], "rust_s": 25.0, "sterf_s": 1.0, "rot_s": 30.0,
     "steen_bereik": 4.0, "steen_schade": 17, "worp_s": 1.8, "raak_s": 1.5, "verweer_straal": 6.0,
     "beet_schade": 15, "beet_pauze_s": 3.0, "prooi_voorkeur": {"koe": 0.8, "kind": 0.6, "oud": 0.8, "volwassen": 1.3}, "zwak_voorkeur": 0.6},
+  "_wezens": "sim/wolf.gd: per soort (objecten.json 104 soorten) overschrijft wezens.<soort> de waarden uit wolf. Zombie = wezen-type 18, groep 21 (hover_names.json: 18 zombie; groep 21 hoort in alle missies bij type 18). BEASTS.EXE typetabel 0x5e5e00 + 292 x 18: hp 240 (+0xe4, 0x40e2fc), wapen 21 (+0xfc); wapentabel 0x6aff88 + 35 x 21: 15 + 0..14 schade (gemiddeld 22) elke 80 tikken (7,5 s). +0x100 = 60 (wolf 200, man 128; betekenis onbekend, geen snelheid gevonden). Het tekenen bewijst de soort: klasse 104 kiest in toestand 0 per type een sprite (0x43c23d, tabel 0x43edcc), type 18 -> zombie.mfb (0x43c29f); de boom met ogen (bushman.mfb, busheyes.mfb) is een eigen objectklasse 92 (0x43e8d4) die in geen enkele .MIS staat. passief = true: besluit gebruiker 2026-10-31 (herinnert zich een boom met ogen die verder niets deed): staat stil, kijkt naar dorpelingen, valt niet aan, wel te doden (regel muur_open). Met passief false (open vraag) het actieve gedrag, eigen keuze: trager dan een wolf (1,2 m/s, zwerft 0,5), jaagt alleen op dorpelingen (koe 0 = geen prooi), oorzaak zombie.",
+  "wezens": {"zombie": {"passief": true, "hp": 240, "beet_schade": 22, "beet_pauze_s": 7.5, "slag_s": 1.2, "snelheid_mps": 1.2, "zwerf_mps": 0.5,
+    "zwerf_straal": 4, "zicht": 6.0, "rust_s": 10.0, "oorzaak": "zombie",
+    "prooi_voorkeur": {"koe": 0.0, "kind": 0.8, "oud": 0.8, "volwassen": 1.0}}},
+  "_wezen_model": "view/wolf_model.gd: model per wezen-soort zonder eigen wolf-glb. glb = pad (clips idle, lopen, rennen, bijten, dood zoals wolf_anim.json, kijkt langs +Z); ontbreekt hij, dan terugval: boom = den met ogen die opengaan en de dichtste dorpeling volgen (view/missie_props.gd, zoals de gebruiker zich het wezen herinnert), wolf = het wolfmodel met tint en schaal. -- --zombie_model=boom|wolf|glb kiest voor frames.",
+  "wezen_model": {"zombie": {"glb": "res://assets/zombie.glb", "terugval": "boom", "tint": [0.45, 0.62, 0.38], "schaal": 1.15}},
+  "_vallen": "sim/regels.gd (missie 4). mijn (klasse 37): BEASTS.EXE 0x448ff6 (aanraak-switch 0x448f4f, tabel 0x449918): wie hem raakt hoort een klank en de mijn gaat in toestand 24 (ontploffen). Schade en straal niet gevonden: eigen keuze, alleen dorpelingen zetten hem af. vuur (klasse 7, ontstaat door de valbeker): 0x448f78: een bouwer (type 4) die het vuur raakt dooft het (hp 1); verder eigen keuze: brandt duur_s, elke s schade_per_s aan dorpelingen binnen straal; met olie (61) op dezelfde tegel gaan na ontsteek_s de mijnen binnen mijn_straal af.",
+  "vallen": {"mijn": {"raak": 0.6, "straal": 1.5, "schade": 60},
+    "vuur": {"duur_s": 25.0, "straal": 1.2, "schade_per_s": 10, "ontsteek_s": 2.0, "mijn_straal": 2.5}},
   "_wolf_prooi": "Gebruiker 2026-10-30: wolven pakken geen kinderen weg maar bijten dorpelingen (ook kinderen) en kunnen ze doden. Prooi = laagste afstand x prooi_voorkeur[koe|kind|oud|volwassen] x lerp(zwak_voorkeur, 1, gezondheid/max) binnen zicht (hint 2-1: vooral kinderen en vee). Een dorpeling krijgt beet_schade per beet, daarna wacht de wolf beet_pauze_s (bijten met tussenpozen); een koe is na koe_beten weg. Wolf-generator per missie: missies.<nr>.wolf_generator = [{tegel: [x, y], start, max, interval_s}] (origineel klasse 171 met 0xE7 = 104; M2 heeft er geen, M12/M16-M18/M22/M24/M29/M30 wel).",
   "_leven": "sim/leven.gd. gezondheid: max hp per soort uit BEASTS.EXE (typetabel 0x5e5e00 + 292 x type, +0xe4; gezet 0x438046, bij een typewissel in dezelfde verhouding): man (type 1) 148, vrouw (2) 96, kind (13/14) 30, oud (11/12) 80, bouwer (4) 200, voetsoldaat (7) 180 (oude remake-waarde: 24 voor iedereen). herstel_per_s mee geschaald (oud 0,1 bij 24 hp), eigen keuze. Herstel: na herstel_na_s zonder schade herstel_per_s hp/s, slapend x herstel_slaap. Levensloop baby > kind (gezin.opgroeien_s) > volwassene > oudere > dood: levensduur_s = [min, max] s als volwassene (origineel: een volwassene leeft 4-5 spel-jaren, jaar = 4 x seizoen_s; per dorpeling uit een hash), met pensioen (oud: werkt en vecht niet meer, model oudere man/vrouw) vanaf oud_vanaf x levensduur, dood bij 1,0. Leeftijd in het origineel (byte +0xce van het object, 0x442f40): kind tot 12 (dan man/vrouw, 0x44353c), pensioen op 88 (type 11/12, 0x443965), vanaf 96 kan een oudere sterven (0x443a28); de leeftijd telt met kans 1/12 per beurt op, een tevreden dorpeling (geluk > 128) slaat soms een jaar over (0x4434f6). Dus kind : volwassen : oud = 12 : 76 : ~8; remake oud_vanaf 0,9 (76 / 84; oud 0,75) en gezin.opgroeien_s 690 = 12 / 84 x gemiddelde levensduur 4860 (oud 150). In welke tijd een beurt valt is niet uitgezocht, levensduur_s blijft dus eigen keuze. Startdorpelingen beginnen op start_ouderdom [min, max] x levensduur. ongeluk_versnelt: ouderdom loopt (1 + (1 - geluk) x dit) keer zo snel (haak voor de prijzen, hint 2-3). Vluchten: kind, oudere, bouwer en wie onder vlucht_onder x gezondheid zit rent weg als een levende wolf binnen vlucht_straal komt, naar een tegel binnen vlucht_ruimte die vlucht_winst verder van de wolf ligt (beasts-src FLEE_FEAR 6 / FLEE_ROOM 6 / FLEE_GAIN 4), het dichtst bij het kampvuur, op vlucht_tempo x looptempo. lijk_s: zo lang ligt een dode (view).",
   "leven": {"gezondheid": {"man": 148, "vrouw": 96, "kind": 30, "oud": 80, "bouwer": 200, "voetsoldaat": 180}, "herstel_na_s": 20.0, "herstel_per_s": 0.6, "herstel_slaap": 3.0,
@@ -76,6 +85,24 @@
       "doel": {"kas_boven": 24999}, "_doel_kelk": "tweede winstroute: gouden kelk (172) naar de vlag (1578). M3.MIS heeft twee regels met precies die conditie (type 12, 172 bij 1578): regel A = +7000 (0x16) dan kelk 2483 weg (0x17), regel B = kelk weg dan +6000. Eigen keuze: regels vuren na elkaar, A haalt de kelk weg, dus B is nooit meer waar: alleen +7000 (vraag aan de gebruiker).",
       "voorwerpen": {"172": {"naar": "vlag", "kas": 7000}},
       "verlies": {"dorpelingen_onder": 2},
-      "koe_generator": {"start": 1, "max": 2, "interval_s": 45}}
+      "koe_generator": {"start": 1, "max": 2, "interval_s": 45}},
+    "4": {"naam": "Beker van Vervulling", "dorp": "Parpton", "kaart": "res://data/origineel/map4.json", "start_kas": 8000, "bos_dichtheid": 0.6,
+      "_regels": "M4.MIS (../map4.md): sleutel 451 (klasse 198) bij poort 9 (199) -> 0x17 sleutel weg, 0x04 maak klasse 172 (gouden kelk) op (40,10), 0x13 poort 9 open. Dorpeling raakt zilveren beker 48 -> hint 4-9 en 0x04 maak klasse 7 (vuur) op (68,85), waar olie (61) onder de beker ligt, tussen 11 mijnen (37). Wezen 179 (zombie op 47,12) vernietigd -> 0x17 muren 74, 79, 95 = (44,9..11), de oostwand van de ommuurde plek. Dorpeling raakt object 21 (klasse 87, triggerplek 41,11) -> 0x14 1 = gewonnen. Eigen dorpelingen < 2 -> 0x14 2 = verloren.",
+      "doel": {"aanraken": [41, 11], "tekst": "vind de Beker van Vervulling"},
+      "verlies": {"dorpelingen_onder": 2},
+      "_voorwerpen": "198 sleutel naar de poort (kas 0; de regel 'poort_open' doet de rest). 159 zilveren beker: in M4.MIS geen regel naar de vlag (tin, waardeloos); eigen keuze: naar de vlag = weg zonder kas, zodat de drager weer iets anders (de sleutel) kan oprapen.",
+      "voorwerpen": {"198": {"naar": "magische_poort", "kas": 0}, "159": {"naar": "vlag", "kas": 0}},
+      "_modellen": "per klasse een ander model in deze missie (Wereld._plaats_objecten): de valbeker is klasse 159 zoals de zilveren beker van M1, maar van tin (hint 4-9).",
+      "modellen": {"159": "natuur:tinnen_beker"},
+      "regels": [
+        {"id": "poort_open", "als": {"type": "afgeleverd", "klasse": 198},
+          "doe": [{"type": "maak", "klasse": 172, "tegel": [40, 10]}, {"type": "open", "object": "magische_poort"}]},
+        {"id": "valbeker", "als": {"type": "opgeraapt", "klasse": 159},
+          "doe": [{"type": "maak", "klasse": 7, "tegel": [68, 85]}]},
+        {"id": "muur_open", "als": {"type": "wezen_dood", "tegel": [47, 12]},
+          "doe": [{"type": "weg", "klasse": 29, "tegels": [[44, 9], [44, 10], [44, 11]]}]}
+      ],
+      "_koe_generator": "generator (107,77) p5=5, p6=4 (betekenis onzeker; M1/M2 lezen p6 als max); 1 wilde koe staat al op de kaart (109,79).",
+      "koe_generator": {"start": 1, "max": 4, "interval_s": 45}}
   }
 }

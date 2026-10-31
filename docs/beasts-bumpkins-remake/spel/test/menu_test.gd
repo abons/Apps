@@ -3,7 +3,7 @@ extends SceneTree
 ## godot --headless --path . --script res://test/menu_test.gd
 ## Met een venster en `-- --frames` (zonder --headless) ook frames naar out/menu/:
 ## godot --path . --script res://test/menu_test.gd -- --frames
-## Loopt de echte hoofdscène door: startmenu (1-3 speelbaar, 4-30 vaal) -> missie 2 -> menuknop (klik) = pauze, sim stil
+## Loopt de echte hoofdscène door: startmenu (1-4 speelbaar, 5-30 vaal) -> missie 2 -> menuknop (klik) = pauze, sim stil
 ## -> Esc = hervat -> Esc = pauze -> Missie opnieuw (nieuwe Wereld, de oude is weg, evenveel nodes) -> gewonnen ->
 ## Volgende missie (3) -> Andere missie -> startmenu met Doorgaan en "gewonnen" bij 2 -> missie 1. Indeling op 1600x900,
 ## 2400x1080 en 1080x2400, pc en touch: start- en pauzemenu in beeld, knoppen op touch >= 48 dp, tekst >= 16 dp.
@@ -33,10 +33,10 @@ func _start() -> void:
 	_check(sm != null and (current_scene as Node).get("w") == null, "zonder --missie: startmenu, geen wereld")
 	if sm == null:
 		return _klaar()
-	for nr in [1, 2, 3]:
+	for nr in [1, 2, 3, 4]:
 		_check(sm.rijen.has(nr) and not (sm.rijen[nr] as Button).disabled, "missie %d speelbaar" % nr)
-	var vaal := range(4, 31).filter(func(n: int) -> bool: return sm.rijen.has(n) and (sm.rijen[n] as Button).disabled)
-	_check(vaal.size() == 27, "missie 4-30 vaal (%d)" % vaal.size())
+	var vaal := range(5, 31).filter(func(n: int) -> bool: return sm.rijen.has(n) and (sm.rijen[n] as Button).disabled)
+	_check(vaal.size() == 26, "missie 5-30 vaal (%d)" % vaal.size())
 	_check(not sm.knop_door.visible, "nog geen Doorgaan zonder voortgang")
 	_check(Startmenu.titel(2) == "Terug op het vasteland" and Startmenu.titel(7) == "Oorlogskas", "titels: briefing of campagne.json")
 	await _indeling_start(sm, "pc", "start")
@@ -112,7 +112,7 @@ func _start() -> void:
 		return _klaar()
 	m.hud.brief.sluit()
 	m.pauzemenu.open_einde("gewonnen")
-	_check(not m.pauzemenu.knoppen.has("volgende") and m.pauzemenu.sub.text.contains("nog niet gebouwd"), "missie 3 gewonnen: geen volgende (4 is er nog niet)")
+	_check(m.pauzemenu.knoppen.has("volgende"), "missie 3 gewonnen: Volgende missie (4 is speelbaar)")
 	m.pauzemenu.open_einde("verloren")
 	_check(m.pauzemenu.knoppen.has("opnieuw") and m.pauzemenu.knoppen.size() == 3, "verloren: Opnieuw, Andere missie, Bekijken")
 

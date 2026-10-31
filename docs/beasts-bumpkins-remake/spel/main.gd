@@ -1,6 +1,6 @@
 extends Node3D
 ## Beasts & Bumpkins remake: zet sim (Wereld), view, licht, camera, besturing en HUD in elkaar.
-## Opties na `--`:  --missie=1|2|3 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
+## Opties na `--`:  --missie=1|2|3|4 (standaard 1, spel.json `missies`)  --seizoen=lente|zomer|herfst|winter  --uur=12  --tempo=1|2|4  --regen  --scenario=overzicht|kaart|dorp|selectie|pad|vlag|wolf|bos|rots|bouw|claim|gezin|molen|melk|kalf|kippen|ei|bouwer|zagen|houweel|stapels|daken|hek|sleep|nacht|beker|deur|paddenstoel|mist_start|mist_verkend|mist_rand|minikaart|prijzen
 ## --mist=aan|uit: mist van oorlog (sim/mist.gd). Standaard aan in gewoon spel en in de mist_*- en minikaart-scenario's, uit in de
 ## andere scenario's (zodat hun frames gelijk blijven).
 ## Een scenario scriptt camera en invoer (voor frames met --write-movie); zonder scenario speel je zelf.
@@ -93,6 +93,9 @@ func _ready() -> void:
 	voorwerpen = preload("res://view/voorwerpen_view.gd").new()   # beker, kelk: op de grond en in de hand
 	add_child(voorwerpen)
 	voorwerpen.bouw(w, view)
+	var missie_view: Node3D = preload("res://view/missie_view.gd").new()   # missie 4: poort, muren, mijnen, vuur
+	add_child(missie_view)
+	missie_view.bouw(w, view)
 	var mist_view := MistView.new()   # zwart over alles wat op onverkende tegels staat (shaders/mist.gdshader)
 	add_child(mist_view)
 	mist_view.bouw(w)
@@ -506,6 +509,9 @@ func _start_scenario() -> void:
 		"missie3":
 			# missie 3: dorp, voetsoldaat worden + wolf, put (test/missie3_scenario.gd, --stap=dorp|soldaat|put)
 			add_child(load("res://test/missie3_scenario.gd").new().start(self))
+		"missie4":
+			# missie 4: overzicht, poort, beker, wezens, muur (test/missie4_scenario.gd, --stap=overzicht|poort|beker|wezens|muur)
+			add_child(load("res://test/missie4_scenario.gd").new().start(self))
 		"deur":
 			# een dorpeling loopt door de voordeur naar binnen en weer naar buiten (test/deur_scenario.gd, --gebouw= --draai=)
 			add_child(load("res://test/deur_scenario.gd").new().start(self))

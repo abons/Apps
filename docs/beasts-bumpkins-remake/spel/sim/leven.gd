@@ -190,7 +190,7 @@ static func dreiging(w: Wereld, d: Dorpeling) -> Wolf:
 	var bd := float(cfg(w)["vlucht_straal"])
 	for wf in w.wolven:
 		var af := wf.pos.distance_to(d.pos)
-		if wf.leeft() and af < bd:
+		if wf.leeft() and af < bd and not wf.passief(w):     # passief wezen (missie 4): geen reden om te vluchten
 			bd = af
 			beste = wf
 	return beste

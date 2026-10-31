@@ -21,7 +21,10 @@ const DEAD := &"dood"
 const STRIKE_AT := 0.42         ## beasts-src Beast.STRIKE_AT: waar in de slag de beet valt
 
 var id := 0
-var soort := &"wolf"            ## &"wolf" | &"donkere_wolf" (objecten.json 104 "soorten", sex 29); zelfde gedrag, eigen glb
+var soort := &"wolf"            ## &"wolf" | &"donkere_wolf" (sex 29) | &"zombie" (sex 18, missie 4); objecten.json 104 "soorten"
+var kaart_tegel := Vector2i(-1, -1)   ## tegel in de kaart (sim/regels.gd wezen_dood: "wezen 179 vernietigd")
+var _c: Dictionary = {}         ## spel.json wolf + wezens.<soort> (cfg)
+var kijkt_naar = null           ## passief wezen (wezens.<soort>.passief): de dorpeling binnen zicht waar het naar kijkt (view: ogen)
 var pos := Vector2.ZERO
 var vorige := Vector2.ZERO
 var route: Array[Vector2] = []
@@ -59,6 +62,25 @@ static func _cfg(w: Wereld) -> Dictionary:
 	return w.spel["wolf"]
 
 
+## Waarden voor deze soort: spel.json `wolf`, overschreven door `wezens.<soort>` (missie 4: zombie).
+static func cfg_soort(w: Wereld, s: StringName) -> Dictionary:
+	var c: Dictionary = w.spel["wolf"].duplicate()
+	c.merge(w.spel.get("wezens", {}).get(String(s), {}), true)
+	return c
+
+
+func cfg(w: Wereld) -> Dictionary:
+	if _c.is_empty():
+		_c = cfg_soort(w, soort)
+	return _c
+
+
+## Passief (spel.json wezens.<soort>.passief, missie 4 zombie op verzoek van de gebruiker): staat stil, valt niet aan,
+## kijkt naar de dichtste dorpeling binnen zicht. Te doden met stenen (een regel kan erop wachten), geen vluchtreden.
+func passief(w: Wereld) -> bool:
+	return bool(cfg(w).get("passief", false))
+
+
 ## Wolven uit de kaart (Wereld._kaart_wolven: {tegel, soort} van klasse 104; een kale Vector2i = gewone wolf).
 static func uit_kaart(w: Wereld, tegels: Array) -> Array[Wolf]:
 	var uit: Array[Wolf] = []
@@ -66,15 +88,18 @@ static func uit_kaart(w: Wereld, tegels: Array) -> Array[Wolf]:
 	for kw in tegels:
 		var t: Vector2i = kw["tegel"] if kw is Dictionary else kw
 		var v := w.dichtstbij_loopbaar(t)
+		if w.raster.loopbaar_v(t):   # missie 4: wezens achter de poort of in de ommuurde plek (niet in Wereld.bereik)
+			v = t
 		if v.x < 0:
 			continue
 		var wf := Wolf.new()
 		wf.id = uit.size() + 1
 		if kw is Dictionary:
 			wf.soort = kw.get("soort", &"wolf")
+		wf.kaart_tegel = t
 		wf.zet_tegel(v)
 		wf.anker = v
-		wf.hp = int(c["hp"])
+		wf.hp = int(wf.cfg(w)["hp"])
 		wf.hp_max = wf.hp
 		wf.geraakt = 99.0
 		wf.wacht = w.rng.randf_range(0.5, 3.0)
@@ -95,7 +120,7 @@ static func tik_alle(w: Wereld, dt: float) -> void:
 
 
 func tick(w: Wereld, dt: float) -> void:
-	var c := _cfg(w)
+	var c := cfg(w)
 	vorige = pos
 	snelheid_mps = 0.0
 	geraakt += dt
@@ -113,6 +138,21 @@ func tick(w: Wereld, dt: float) -> void:
 		if t.x >= 0:
 			zet_tegel(t)
 			route.clear()
+	if passief(w):
+		route.clear()
+		toestand = ROAM
+		kijk -= dt
+		if kijk <= 0.0:
+			kijk = float(c["kijk_s"])
+			kijkt_naar = null
+			var bd := float(c["zicht"])
+			for d in w.dorpelingen:
+				if not d.binnen and pos.distance_to(d.pos) <= bd:
+					bd = pos.distance_to(d.pos)
+					kijkt_naar = d
+			if kijkt_naar != null:
+				_kijk_naar(kijkt_naar.pos)
+		return
 	rust = maxf(0.0, rust - dt)
 	pauze = maxf(0.0, pauze - dt)
 	if prooi != null and _prooi_weg(w):
@@ -151,7 +191,7 @@ func tick(w: Wereld, dt: float) -> void:
 					beten += 1
 					if prooi is Dorpeling:
 						var d: Dorpeling = prooi
-						d.raak(w, float(c["beet_schade"]), Leven.OORZAAK_WOLF)
+						d.raak(w, float(c["beet_schade"]), String(c.get("oorzaak", Leven.OORZAAK_WOLF)))
 						if not d.leeft():
 							_laat_los()
 							rust = float(c["rust_s"])
@@ -224,13 +264,13 @@ func _kijk_naar(p: Vector2) -> void:
 ## of eigen), maar een koe in een weide achter een dichte poort haalt hij niet: daar is geen pad heen. Een dorpeling in
 ## een hut ook niet.
 func _zoek_prooi(w: Wereld) -> Object:
-	var c := _cfg(w)
+	var c := cfg(w)
 	var zicht := float(c["zicht"])
 	var vk: Dictionary = c.get("prooi_voorkeur", {})
 	var kandidaten: Array = []
 	for k in w.vee:
 		var af := pos.distance_to(k.pos)
-		if af <= zicht:
+		if af <= zicht and float(vk.get("koe", 1.0)) > 0.0:     # zombie: koe 0 = geen prooi
 			kandidaten.append([af * float(vk.get("koe", 1.0)), k])
 	for d in w.dorpelingen:
 		if d.binnen:
@@ -251,7 +291,7 @@ func _zwerf(w: Wereld, dt: float) -> void:
 	wacht -= dt
 	if wacht > 0.0:
 		return
-	var c := _cfg(w)
+	var c := cfg(w)
 	wacht = w.rng.randf_range(float(c["zwerf_wacht"][0]), float(c["zwerf_wacht"][1]))
 	var straal := int(c["zwerf_straal"])
 	for _i in 8:

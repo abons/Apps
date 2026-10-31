@@ -69,6 +69,21 @@ func _waar(t: Dictionary) -> bool:
 			return w.kas > int(t["bedrag"])
 		"voorwerp":
 			return _opgeraapt.has(int(t["klasse"]))
+		"aanraken":       # missie 4 (hint 4-1): een dorpeling staat bij het object, en (tenzij_voorwerp) de sleutel is nog niet gevonden
+			if t.has("tenzij_voorwerp") and w.opgeraapt.has(int(t["tenzij_voorwerp"])):
+				return false
+			return _bij_object(String(t["object"]), float(t.get("straal", 1.6)))
+	return false
+
+
+func _bij_object(naam: String, straal: float) -> bool:
+	for ob in w.objecten:
+		if ob["naam"] != naam:
+			continue
+		var m := Vector2(ob["x"], ob["y"]) + Vector2(0.5, 0.5)
+		for d in w.dorpelingen:
+			if not d.binnen and d.pos.distance_to(m) <= straal:
+				return true
 	return false
 
 

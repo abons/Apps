@@ -332,7 +332,7 @@ func _bouw_objecten() -> void:
 	var tellers := {}
 	for ob in w.objecten:
 		var naam: String = ob["naam"]
-		if naam.begins_with("boom_") or ob["spawn"] or ob.get("voorwerp", false):   # voorwerp: view/voorwerpen_view.gd
+		if naam.begins_with("boom_") or ob["spawn"] or ob.get("voorwerp", false) or ob.get("dynamisch", false):   # voorwerp: view/voorwerpen_view.gd; dynamisch (poort, muur, mijn): view/missie_view.gd
 			continue
 		var n := Props.maak(ob)
 		if n == null:

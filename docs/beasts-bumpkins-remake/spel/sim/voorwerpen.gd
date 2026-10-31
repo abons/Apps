@@ -85,6 +85,7 @@ static func tik_alle(w: Wereld, _dt: float) -> void:
 				break
 			if van(w, d).is_empty():
 				ob["drager"] = d.id
+				w.opgeraapt[int(ob["cls"])] = true
 				w.voorwerp_opgeraapt.emit(ob, d)
 				break
 
@@ -99,6 +100,7 @@ static func _bij_doel(w: Wereld, d: Dorpeling, naar: String) -> bool:
 static func _lever(w: Wereld, ob: Dictionary, d: Dorpeling, kas: int) -> void:
 	w.kas += kas
 	w.objecten.erase(ob)
+	w.afgeleverd[int(ob["cls"])] = true
 	w.voorwerp_afgeleverd.emit(ob, d, kas)
 
 
