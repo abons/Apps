@@ -60,16 +60,13 @@ opgenomen in een headless browser. Ze werken, maar:
          `poster.jpg`), elk onder een paar MB. Kijk een paar frames na op bedragen.
       5. Haal dit punt weg en pas `apps.js` alleen aan als paden of velden wijzigen.
 - [ ] **Alle andere kaartjes zijn verouderd**: de screenshots en video's van Word Guesser, Woord Swiper,
-      Woord Puzzel, Fast Lane, Kwelder, Beasts, DnDAI, Kinderwoordjes en Volleybal dateren van 2026-09-30
+      Woord Puzzel, Fast Lane, Kwelder, Beasts, Kinderwoordjes en Volleybal dateren van 2026-09-30
       tot 2026-10-05 en komen niet meer overeen met de huidige apps. Alleen e-charge is op 2026-10-06
-      ververst. Maak ze opnieuw, per app, van de huidige versie.
+      ververst, DnDAI op 2026-11-22. Maak ze opnieuw, per app, van de huidige versie.
 - [ ] Optioneel: opnemen op je eigen telefoon (schermopname van Android/iOS) voor een scherper beeld.
 
 - [ ] **Volleybal**: het kaartje toont screenshots; een korte opname van de app op je telefoon (team kiezen,
       aanwezigheid doorgeven) maakt het levendiger.
-
-- [ ] **DnDAI**: de screenshots op het kaartje (`media/dndai/`) zijn dezelfde als in de publieke repo en
-      inmiddels verouderd. Vervang ze door nieuwe van de huidige versie van de app.
 
 ## 3. Welke apps horen erbij?
 

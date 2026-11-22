@@ -15,6 +15,7 @@
 //   poster      stilstaand beeld dat getoond wordt voordat de video speelt
 //   screenshots lijst met afbeeldingen; zonder video worden ze als slideshow getoond
 //   color       achtergrondkleur achter de telefoonbeelden
+//   wide        true = liggende screenshots (16:9) in plaats van telefoonbeelden
 //   links       knoppen onder het kaartje: { label, url }
 
 window.APPS = [
@@ -156,6 +157,46 @@ window.APPS = [
     links: [{ label: "GitHub", url: "https://github.com/abons/beasts" }],
   },
   {
+    id: "dorpsspel",
+    name: "Dorpsspel",
+    type: "game",
+    status: "In ontwikkeling · pc en Android",
+    tagline: "Realtime dorpsspel in 3D: van een kampvuur op een eiland naar een dorp.",
+    description:
+      "Begin met een handvol dorpelingen en een kampvuur. Bouw afdaken, kippenhokken, akkers en een molen, vang vis, overleef de winter en de bliksem. Eigen ontwerp en eigen missies, gebouwd in Godot.",
+    tags: ["Strategie", "Realtime", "3D"],
+    screenshots: [
+      "media/dorpsspel/dorp.webp",
+      "media/dorpsspel/nacht.webp",
+      "media/dorpsspel/kamp.webp",
+      "media/dorpsspel/bliksem.webp",
+      "media/dorpsspel/kippen.webp",
+    ],
+    wide: true,
+    color: "#4f7a3a",
+    links: [],
+  },
+  {
+    id: "bnb-remake",
+    name: "Beasts & Bumpkins-remake",
+    type: "game",
+    status: "In ontwikkeling · pc",
+    tagline: "Een 3D-remake van Beasts and Bumpkins (1998), missie voor missie.",
+    description:
+      "De missies van het origineel opnieuw opgebouwd in Godot: dorpen, gilden, zombies, tovenaars en vijandige buren, met nieuwe 3D-modellen, dag en nacht en seizoenen.",
+    tags: ["Strategie", "Realtime", "3D"],
+    screenshots: [
+      "media/bnb-remake/dorp.webp",
+      "media/bnb-remake/kerk.webp",
+      "media/bnb-remake/nacht.webp",
+      "media/bnb-remake/toren.webp",
+      "media/bnb-remake/rivier.webp",
+    ],
+    wide: true,
+    color: "#3a6a8a",
+    links: [],
+  },
+  {
     id: "kwelder",
     name: "Kwelder",
     type: "game",
@@ -184,10 +225,10 @@ window.APPS = [
       "Kies een verhaal en een personage en speel aan een virtuele tafel. De AI vertelt, handhaaft de regels en houdt je karakterblad bij; de dobbelstenen rol je zelf in de app.",
     tags: ["RPG", "AI", "Android"],
     screenshots: [
-      "media/dndai/tafel.webp",
+      "media/dndai/beginscherm.webp",
+      "media/dndai/gevecht.webp",
       "media/dndai/dobbelsteen.webp",
       "media/dndai/suggesties.webp",
-      "media/dndai/aanval.webp",
       "media/dndai/levelup.webp",
     ],
     color: "#7b4b94",

@@ -68,6 +68,7 @@
       frame.append(el("img", { src: app.poster || `https://i.ytimg.com/vi/${encodeURIComponent(app.youtube)}/hqdefault.jpg`, alt: "", loading: "lazy" }));
       button.append(frame, el("span", { className: "badge", textContent: "▶ Video" }));
     } else if (shots.length) {
+      if (app.wide) frame.classList.add("wide");
       const imgs = shots.map((src, i) => el("img", { src, alt: "", loading: "lazy", className: i === 0 ? "active" : "" }));
       frame.append(...imgs);
       const dots = shots.length > 1 ? el("span", { className: "dots" }, shots.map((_, i) => el("i", { className: i === 0 ? "on" : "" }))) : null;
@@ -176,7 +177,7 @@
     const item = items[index];
     if (playerMedia.contains(document.activeElement)) player.focus();
     playerMedia.replaceChildren();
-    playerMedia.className = "player-media " + (item.kind === "youtube" ? "wide" : "tall");
+    playerMedia.className = "player-media " + (item.kind === "youtube" || (item.kind === "image" && app.wide) ? "wide" : "tall");
     if (item.kind === "video") {
       const v = videoEl(item.src, { controls: true, autoplay: true, loop: true, playsInline: true });
       v.setAttribute("aria-label", `Demo van ${app.name}`);
